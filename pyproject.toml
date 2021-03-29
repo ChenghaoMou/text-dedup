@@ -12,6 +12,8 @@ strsimpy = "^0.2.0"
 pandas = "^1.2.3"
 pytest = "^6.2.2"
 alive-progress = "^1.6.2"
+pytest-benchmark = "^3.2.3"
+sentence-transformers = "^1.0.3"
 
 [tool.poetry.dev-dependencies]
 

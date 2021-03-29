@@ -75,9 +75,10 @@ def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, colum
     # Construct similarity matrix
     duplicates = []
 
-    # with alive_bar(len(col)) as bar: 
-    for i, x in enumerate(col):
-        duplicates.append([duplicates[j][i] if j < i else deduper.compare(x, y) if x != y else True for j, y in enumerate(col)])
+    # with alive_bar(len(col)) as bar:
+    matrix = deduper.batch_compare(col, col)
+    for i in range(len(col)):
+        duplicates.append([duplicates[j][i] if j < i else matrix[i][j] if i != j else True for j in range(len(col))])
             # bar()
 
     h = len(duplicates)

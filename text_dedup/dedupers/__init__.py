@@ -2,20 +2,24 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2021-03-13 09:20:29
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
+import torch
 from numpy import linalg as LA
 from strsimpy.cosine import Cosine
 from strsimpy.jaccard import Jaccard
 from strsimpy.jaro_winkler import JaroWinkler
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
-
+from sentence_transformers import SentenceTransformer, util
 
 class Deduper:
     
     def compare(self, this: str, other: str) -> bool:
         return this == other
+    
+    def batch_compare(self, this: List[str], other: List[str]) -> List[List[bool]]:
+        return [[self.compare(x, y) for y in other] for x in this]
 
 class EditDistanceSimilarityDeduper(Deduper):
 
@@ -88,3 +92,29 @@ class PretrainedWordEmbeddingDeduper(Deduper):
         return np.sum(
             [np.asarray(self.embedding_matrix.get(w, np.zeros(self.embedding_size))).reshape(1, -1) for w in text.split(' ')], axis=0
         )
+
+    def compare_batch(self, this: List[str], other: List[str]) -> List[List[bool]]:
+        embeddings1 = np.asarray([self.embed(t) for t in this]) # [N, H]
+        embeddings2 = np.asarray([self.embed(t) for t in other]) # [N, H]
+
+        return util.pytorch_cos_sim(torch.from_numpy(embeddings1), torch.from_numpy(embeddings2)) >= self.threshold
+
+class PretrainedBERTEmbeddingDeduper(Deduper):
+
+    def __init__(self, model: str, threshold: float):
+        self.model = SentenceTransformer(model)
+        self.threshold = threshold
+    
+    def compare(self, this: str, other: str) -> bool:
+        embeddings1 = self.model.encode([this], convert_to_tensor=True)
+        embeddings2 = self.model.encode([other], convert_to_tensor=True)
+
+        #Compute cosine-similarits
+        cosine_scores = util.pytorch_cos_sim(embeddings1, embeddings2)
+        return cosine_scores.item() >= self.threshold
+
+    def compare_batch(self, this: List[str], other: List[str]) -> List[List[bool]]:
+        embeddings1 = self.model.encode(this, convert_to_tensor=True)
+        embeddings2 = self.model.encode(other, convert_to_tensor=True)
+
+        return util.pytorch_cos_sim(embeddings1, embeddings2) >= self.threshold
