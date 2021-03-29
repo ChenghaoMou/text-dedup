@@ -1,5 +1,7 @@
-# text-dedup (WIP)
-Text deduplication with fuzzy match and more
+# text-dedup
+![PyPI](https://img.shields.io/pypi/v/text-dedup?style=plastic)
+
+Text deduplication with fuzzy match and more. (WIP)
 
 ## Usage
 
