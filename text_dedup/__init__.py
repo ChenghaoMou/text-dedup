@@ -76,23 +76,28 @@ def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, colum
     duplicates = []
 
     # with alive_bar(len(col)) as bar:
-    matrix = deduper.batch_compare(col, col)
+    matrix = deduper.batch_compare(col)
+
     for i in range(len(col)):
         duplicates.append([duplicates[j][i] if j < i else matrix[i][j] if i != j else True for j in range(len(col))])
             # bar()
-
+    # print(duplicates)
     h = len(duplicates)
     w = len(duplicates[0]) if h else 0
     parent = {}
 
-    for i in range(h):
-        parent[i] = parent.get(i, i)
-        for j in range(w):
-            if duplicates[i][j] is True:
-                if j not in parent:
-                    parent[j] = j
-                parent[i] = min(parent[i], parent[j])
-    
-    df[target_column] = [parent[i] for i in range(h)]
+    def find_parent(i):
+        if parent.get(i, i) == i:
+            return i
+        
+        return find_parent(parent[i])
 
+    for i in range(h):
+        parent[i] = find_parent(i)
+        for j in range(w):
+            if j >= i: continue
+            if bool(duplicates[i][j]) is True:
+                parent[i] = min(find_parent(i), find_parent(j))
+
+    df[target_column] = [parent[i] for i in range(h)]
     return df

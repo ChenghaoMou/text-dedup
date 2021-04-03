@@ -66,3 +66,48 @@ def test_drop_duplicates_semantical(data: List[str], threshold: float, expected_
     assert len(data_dedup) == expected_size
 
     return
+
+
+def test_performance1(benchmark):
+
+    from datasets import load_dataset
+
+    dataset = load_dataset("quora", split="train")
+    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:200]] + [r["text"][1] for r in dataset["questions"][:200]]})
+
+    result1 = benchmark.pedantic(
+        drop_duplicates,
+        kwargs={
+        "df": questions, 
+        "column": "text", 
+        "deduper": PretrainedBERTEmbeddingDeduper(
+            model='paraphrase-distilroberta-base-v1',
+            threshold=0.7
+        )},
+        iterations=5,
+        rounds=5
+    )
+
+    assert len(result1) < 400
+
+def test_performance2(benchmark):
+
+    from datasets import load_dataset
+
+    dataset = load_dataset("quora", split="train")
+    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:200]] + [r["text"][1] for r in dataset["questions"][:200]]})
+
+    result2 = benchmark.pedantic(
+        drop_duplicates, 
+        kwargs={
+        "df": questions, 
+        "column": "text", 
+        "deduper": EditDistanceSimilarityDeduper(
+            similarity_metric="cosine", 
+            threshold=0.6, 
+            k=3
+        )},
+        iterations=5,
+        rounds=5
+    )
+    assert len(result2) < 400

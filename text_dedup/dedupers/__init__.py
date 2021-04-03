@@ -18,8 +18,8 @@ class Deduper:
     def compare(self, this: str, other: str) -> bool:
         return this == other
     
-    def batch_compare(self, this: List[str], other: List[str]) -> List[List[bool]]:
-        return [[self.compare(x, y) for y in other] for x in this]
+    def batch_compare(self, this: List[str]) -> List[List[bool]]:
+        return [[self.compare(x, y) for y in this] for x in this]
 
 class EditDistanceSimilarityDeduper(Deduper):
 
@@ -93,11 +93,9 @@ class PretrainedWordEmbeddingDeduper(Deduper):
             [np.asarray(self.embedding_matrix.get(w, np.zeros(self.embedding_size))).reshape(1, -1) for w in text.split(' ')], axis=0
         )
 
-    def compare_batch(self, this: List[str], other: List[str]) -> List[List[bool]]:
+    def batch_compare(self, this: List[str]) -> List[List[bool]]:
         embeddings1 = np.asarray([self.embed(t) for t in this]) # [N, H]
-        embeddings2 = np.asarray([self.embed(t) for t in other]) # [N, H]
-
-        return util.pytorch_cos_sim(torch.from_numpy(embeddings1), torch.from_numpy(embeddings2)) >= self.threshold
+        return (util.pytorch_cos_sim(torch.from_numpy(embeddings1), torch.from_numpy(embeddings1)) >= self.threshold).numpy()
 
 class PretrainedBERTEmbeddingDeduper(Deduper):
 
@@ -113,8 +111,7 @@ class PretrainedBERTEmbeddingDeduper(Deduper):
         cosine_scores = util.pytorch_cos_sim(embeddings1, embeddings2)
         return cosine_scores.item() >= self.threshold
 
-    def compare_batch(self, this: List[str], other: List[str]) -> List[List[bool]]:
+    def batch_compare(self, this: List[str]) -> List[List[bool]]:
         embeddings1 = self.model.encode(this, convert_to_tensor=True)
-        embeddings2 = self.model.encode(other, convert_to_tensor=True)
 
-        return util.pytorch_cos_sim(embeddings1, embeddings2) >= self.threshold
+        return (util.pytorch_cos_sim(embeddings1, embeddings1) >= self.threshold).numpy()
