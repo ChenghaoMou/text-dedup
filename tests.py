@@ -1,7 +1,7 @@
 from typing import List
 import pytest
 import pandas as pd
-from text_dedup.dedupers import EditDistanceSimilarityDeduper, PretrainedBERTEmbeddingDeduper
+from text_dedup.dedupers import EditDistanceSimilarityDeduper, PretrainedBERTEmbeddingDeduper, LSHDeduper
 from text_dedup import drop_duplicates
 
 @pytest.mark.parametrize(
@@ -111,3 +111,23 @@ def test_performance2(benchmark):
         rounds=5
     )
     assert len(result2) < 400
+
+def test_performance3(benchmark):
+
+    from datasets import load_dataset
+
+    dataset = load_dataset("quora", split="train")
+    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:200]] + [r["text"][1] for r in dataset["questions"][:200]]})
+
+    result2 = benchmark.pedantic(
+        drop_duplicates, 
+        kwargs={
+        "df": questions, 
+        "column": "text", 
+        "deduper": LSHDeduper(
+            threshold=0.5,
+        )},
+        iterations=5,
+        rounds=5
+    )
+    assert len(result2) < 40

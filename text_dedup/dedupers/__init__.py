@@ -11,6 +11,7 @@ from strsimpy.cosine import Cosine
 from strsimpy.jaccard import Jaccard
 from strsimpy.jaro_winkler import JaroWinkler
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
+from datasketch import MinHash, MinHashLSH
 from sentence_transformers import SentenceTransformer, util
 
 class Deduper:
@@ -20,6 +21,31 @@ class Deduper:
     
     def batch_compare(self, this: List[str]) -> List[List[bool]]:
         return [[self.compare(x, y) for y in this] for x in this]
+
+class LSHDeduper(Deduper):
+
+    def __init__(self, threshold: float = 0.5, num_perm: int = 128, num_shingle: int=3):
+
+        self.lsh = None
+        self.threshold = threshold
+        self.num_perm = num_perm
+        self.num_single = num_shingle
+
+    def batch_compare(self, this: List[str]) -> List[List[bool]]:
+        self.lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm) 
+        hashes = [MinHash(num_perm=128) for _ in range(len(this))]
+        for i in range(len(this)):
+            for shingle in set(this[i][j:j+self.num_single] for j in range(len(this[i]) - self.num_single)):
+                hashes[i].update(shingle.encode('utf-8'))
+            self.lsh.insert(f'm{i}', hashes[i])
+        
+        matrix = np.zeros((len(this), len(this)))
+
+        for i in range(len(this)):
+            candidates = self.lsh.query(hashes[i])
+            for candidate in candidates:
+                matrix[i][int(candidate[1:])] = 1.0
+        return matrix.astype(bool)
 
 class EditDistanceSimilarityDeduper(Deduper):
 

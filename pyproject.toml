@@ -15,6 +15,7 @@ alive-progress = "^1.6.2"
 pytest-benchmark = "^3.2.3"
 sentence-transformers = "^1.0.3"
 datasets = "^1.5.0"
+datasketch = {extras = ["scipy"], version = "^1.5.3"}
 
 [tool.poetry.dev-dependencies]
 

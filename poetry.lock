@@ -93,6 +93,26 @@ tests = ["absl-py", "pytest", "pytest-xdist", "apache-beam (>=2.24.0)", "elastic
 torch = ["torch"]
 
 [[package]]
+name = "datasketch"
+version = "1.5.3"
+description = "Probabilistic data structures for processing and searching very large datasets"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+numpy = ">=1.11"
+scipy = {version = "*", optional = true, markers = "extra == \"scipy\""}
+
+[package.extras]
+benchmark = ["pyhash (>=0.9.3)", "matplotlib (>=3.1.2)", "scikit-learn (>=0.21.3)", "scipy (>=1.3.3)", "pandas (>=0.25.3)", "SetSimilaritySearch (>=0.1.7)", "pyfarmhash (>=0.2.2)", "nltk (>=3.4.5)"]
+cassandra = ["cassandra-driver (>=3.20)"]
+experimental_aio = ["aiounittest", "motor"]
+redis = ["redis (>=2.10.0)"]
+scipy = ["scipy"]
+test = ["cassandra-driver (>=3.20)", "redis (>=2.10.0)", "mock (>=2.0.0)", "mockredispy", "coverage", "pymongo (>=3.9.0)", "nose (>=1.3.7)", "nose-exclude (>=0.5.0)"]
+
+[[package]]
 name = "dill"
 version = "0.3.3"
 description = "serialize all of python"
@@ -585,7 +605,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "d363e21fe204e4e4915a4e46be31e55df5b94662ec5c2f6c0e6a2d981f77e615"
+content-hash = "e0223938ddbc6622f34b411b8df5457285ecc5fac51156732cf0caac06d686e1"
 
 [metadata.files]
 alive-progress = [
@@ -619,6 +639,10 @@ colorama = [
 datasets = [
     {file = "datasets-1.5.0-py3-none-any.whl", hash = "sha256:a58555cbcd162f70374e94de628ec4db8e6b347d18a04e814306592ddbdf5689"},
     {file = "datasets-1.5.0.tar.gz", hash = "sha256:4548241548ab45a3a4259f55c9e4ea79c6b03b2445be4a5971494c1b71e35262"},
+]
+datasketch = [
+    {file = "datasketch-1.5.3-py2.py3-none-any.whl", hash = "sha256:1fc23150bbe20d7ffdba6948ab8a7bf4cac8962071d394705c80c893732e838e"},
+    {file = "datasketch-1.5.3.tar.gz", hash = "sha256:785efb0cfe98266abd2bc9e68653970dafc16105a8f286d82eee4339bdcaf3a5"},
 ]
 dill = [
     {file = "dill-0.3.3-py2.py3-none-any.whl", hash = "sha256:78370261be6ea49037ace8c17e0b7dd06d0393af6513cc23f9b222d9367ce389"},
