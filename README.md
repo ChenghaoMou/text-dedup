@@ -1,7 +1,7 @@
-# text-dedup
+![banner](./banner.png)
 ![PyPI](https://img.shields.io/pypi/v/text-dedup?style=plastic)
 
-Text deduplication with fuzzy match and more. (WIP)
+Text de-duplication with edit distance, LSH or embeddings. (WIP)
 
 ## Usage
 
