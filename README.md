@@ -1,5 +1,6 @@
 ![banner](./banner.png)
-![PyPI](https://img.shields.io/pypi/v/text-dedup?style=plastic)
+[![PyPI version](https://badge.fury.io/py/text-dedup.svg)](https://badge.fury.io/py/text-dedup) ![Coverage](./coverage.svg)
+
 
 Text de-duplication with edit distance, LSH or embeddings. (WIP)
 
