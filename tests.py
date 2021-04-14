@@ -1,6 +1,8 @@
 from typing import List
+
 import pytest
 import pandas as pd
+from datasets import load_dataset
 from text_dedup.dedupers import EditDistanceSimilarityDeduper, PretrainedBERTEmbeddingDeduper, LSHDeduper
 from text_dedup import drop_duplicates
 
@@ -67,13 +69,11 @@ def test_drop_duplicates_semantical(data: List[str], threshold: float, expected_
 
     return
 
+def test_bert(benchmark):
 
-def test_performance1(benchmark):
-
-    from datasets import load_dataset
-
+    sample_size: int = 200
     dataset = load_dataset("quora", split="train")
-    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:200]] + [r["text"][1] for r in dataset["questions"][:200]]})
+    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
     result1 = benchmark.pedantic(
         drop_duplicates,
@@ -84,18 +84,17 @@ def test_performance1(benchmark):
             model='paraphrase-distilroberta-base-v1',
             threshold=0.7
         )},
-        iterations=5,
-        rounds=5
+        iterations=1,
+        rounds=1
     )
 
-    assert len(result1) < 400
+    assert len(result1) < sample_size * 2
 
-def test_performance2(benchmark):
+def test_edit_distance(benchmark):
 
-    from datasets import load_dataset
-
+    sample_size: int = 200
     dataset = load_dataset("quora", split="train")
-    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:200]] + [r["text"][1] for r in dataset["questions"][:200]]})
+    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
     result2 = benchmark.pedantic(
         drop_duplicates, 
@@ -107,17 +106,16 @@ def test_performance2(benchmark):
             threshold=0.6, 
             k=3
         )},
-        iterations=5,
-        rounds=5
+        iterations=1,
+        rounds=1
     )
-    assert len(result2) < 400
+    assert len(result2) < sample_size * 2
 
-def test_performance3(benchmark):
-
-    from datasets import load_dataset
-
+def test_lsh(benchmark):
+    
     dataset = load_dataset("quora", split="train")
-    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:200]] + [r["text"][1] for r in dataset["questions"][:200]]})
+    sample_size: int = 20000
+    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
     result2 = benchmark.pedantic(
         drop_duplicates, 
@@ -127,7 +125,7 @@ def test_performance3(benchmark):
         "deduper": LSHDeduper(
             threshold=0.5,
         )},
-        iterations=5,
-        rounds=5
+        iterations=1,
+        rounds=1
     )
-    assert len(result2) < 40
+    assert len(result2) < sample_size * 2

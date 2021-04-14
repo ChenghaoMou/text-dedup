@@ -3,9 +3,7 @@
 # @Date    : 2021-03-13 09:07:29
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from typing import Union, Optional
-from text_dedup.dedupers import Deduper, EditDistanceSimilarityDeduper, PretrainedWordEmbeddingDeduper
-from collections import deque
-from alive_progress import alive_bar
+from text_dedup.dedupers import Deduper
 import pandas as pd
 
 def drop_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, column: Optional[str] = None) -> Union[pd.DataFrame, pd.Series]:
@@ -72,16 +70,12 @@ def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, colum
     else:
         col = df
     
-    # Construct similarity matrix
     duplicates = []
-
-    # with alive_bar(len(col)) as bar:
-    matrix = deduper.batch_compare(col)
+    matrix = deduper.group(col)
 
     for i in range(len(col)):
         duplicates.append([duplicates[j][i] if j < i else matrix[i][j] if i != j else True for j in range(len(col))])
-            # bar()
-    # print(duplicates)
+
     h = len(duplicates)
     w = len(duplicates[0]) if h else 0
     parent = {}

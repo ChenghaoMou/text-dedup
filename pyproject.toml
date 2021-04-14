@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "text-dedup"
-version = "0.0.6"
+version = "0.0.7"
 description = "Text deduplication with fuzzy match and more"
 authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
 license = "MIT"
@@ -17,8 +17,10 @@ sentence-transformers = "^1.0.3"
 datasets = "^1.5.0"
 datasketch = {extras = ["scipy"], version = "^1.5.3"}
 coverage = "^5.5"
+dask = {extras = ["bag"], version = "^2021.4.0"}
 
 [tool.poetry.dev-dependencies]
+black = {version = "^20.8b1", allow-prereleases = true}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2021-03-13 09:20:29
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-from typing import Dict, List
+from typing import List, Union, Optional
 
 import numpy as np
-import torch
+import dask.bag as bag
+import pandas as pd
+from nltk import ngrams
 from numpy import linalg as LA
 from strsimpy.cosine import Cosine
 from strsimpy.jaccard import Jaccard
@@ -16,35 +18,75 @@ from sentence_transformers import SentenceTransformer, util
 
 class Deduper:
     
-    def compare(self, this: str, other: str) -> bool:
-        return this == other
+    @staticmethod
+    def extract(corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[str]:
+
+        if isinstance(corpus, list):
+            return corpus
+        elif isinstance(corpus, pd.Series):
+            return corpus.values.tolist()
+        elif isinstance(corpus, pd.DataFrame) and column is not None:
+            return corpus[column].values.tolist()
+        else:
+            raise ValueError('Invalid input, please check your data')
     
-    def batch_compare(self, this: List[str]) -> List[List[bool]]:
-        return [[self.compare(x, y) for y in this] for x in this]
+    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
+        """Group duplicates and return a boolean matrix indicating whether two docs are similar.
+
+        Parameters
+        ----------
+        corpus : Union[pd.DataFrame, pd.Series, List[str]]
+            Generic collection of documents
+        column : Optional[str], optional
+            Target column of a dataframe, by default None
+
+        Returns
+        -------
+        List[List[bool]]
+            A boolean matrix
+        """
+
+        raise NotImplementedError('This function is not implemented')
 
 class LSHDeduper(Deduper):
 
-    def __init__(self, threshold: float = 0.5, num_perm: int = 128, num_shingle: int=3):
+    def __init__(self, threshold: float = 0.5, num_perm: int = 128, shingle_size: int=3):
 
-        self.lsh = None
         self.threshold = threshold
         self.num_perm = num_perm
-        self.num_single = num_shingle
-
-    def batch_compare(self, this: List[str]) -> List[List[bool]]:
-        self.lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm) 
-        hashes = [MinHash(num_perm=128) for _ in range(len(this))]
-        for i in range(len(this)):
-            for shingle in set(this[i][j:j+self.num_single] for j in range(len(this[i]) - self.num_single)):
-                hashes[i].update(shingle.encode('utf-8'))
-            self.lsh.insert(f'm{i}', hashes[i])
+        self.shingle_size = shingle_size
+    
+    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
         
-        matrix = np.zeros((len(this), len(this)))
+        lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm)
+        corpus = self.extract(corpus, column=column)
 
-        for i in range(len(this)):
-            candidates = self.lsh.query(hashes[i])
+        def hashing(idx, shingles, num_perm):
+            min_hash = MinHash(num_perm)
+            for shingle in shingles:
+                min_hash.update(''.join(shingle).encode('utf-8'))
+            return (idx, min_hash)
+
+        # Only take parallel processing when the data size is larger than 2k
+        if len(corpus) <= 2_000:
+            hashes = []
+            for idx, doc in enumerate(corpus):
+                _, min_hash = hashing(idx, ngrams(doc, self.shingle_size), self.num_perm)
+                lsh.insert(f'm{idx}', min_hash)
+                hashes.append((idx, min_hash))
+        else:
+            hashes = bag.from_sequence([(i, list(ngrams(doc, self.shingle_size)), self.num_perm) for i, doc in enumerate(corpus)])
+            hashes = hashes.map(lambda x: hashing(*x)).compute()
+            for idx, min_hash in hashes:
+                lsh.insert(f'm{idx}', min_hash)
+
+        matrix = np.zeros((len(corpus), len(corpus)))
+
+        for idx, min_hash in hashes:
+            candidates = lsh.query(min_hash)
             for candidate in candidates:
-                matrix[i][int(candidate[1:])] = 1.0
+                matrix[idx][int(candidate[1:])] = 1.0
+        
         return matrix.astype(bool)
 
 class EditDistanceSimilarityDeduper(Deduper):
@@ -79,49 +121,29 @@ class EditDistanceSimilarityDeduper(Deduper):
         }.get(similarity_metric, None)
         self.threshold = threshold
     
-    def compare(self, this: str, other: str) -> bool:
+    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
         
-        if self.similarity_metric is None:
-            raise ValueError("Unknown similarity_metric")
+        corpus = self.extract(corpus, column=column)
 
-        return self.similarity_metric.similarity(this, other) >= self.threshold
+        def calculate(idx, doc, corpus):
+            return (idx, [self.similarity_metric.similarity(doc, other) for other in corpus])
+        
+        matrix = np.zeros((len(corpus), len(corpus)))
 
-class PretrainedWordEmbeddingDeduper(Deduper):
-
-    def __init__(self, embedding_matrix: Dict[str, np.ndarray], threshold: float):
-        """Traditional word-embedding-based similarity deduper. Current implementation takes one pair at a time
-        which makes the overall time complexity O(n**2). Suitable for small datasets.
-
-        Parameters
-        ----------
-        embedding_matrix : Dict[str, np.ndarray]
-            A dictionary mapping from a word to its embedding
-        threshold : float
-            Similarity threshold, anything larger than which will be considered
-            as a duplicate
-
-        Examples
-        --------
-        >>> deduper = PretrainedWordEmbeddingDeduper({'hello': [0, 1], 'world': [1, 0], 'english': [1, 0]}, threshold=0.5)
-        >>> deduper.compare('hello world', 'hello english')
-        True
-        """
-        self.embedding_matrix = embedding_matrix
-        self.embedding_size = np.asarray(embedding_matrix[list(embedding_matrix.keys())[0]]).reshape(1, -1).shape[-1]
-        self.threshold = threshold
-    
-    def compare(self, this: str, other: str) -> bool:
-        x, y = self.embed(this), self.embed(other)
-        return x.dot(y.T).item() / (LA.norm(x) * LA.norm(y)) >= self.threshold
-    
-    def embed(self, text: str) -> np.ndarray:
-        return np.sum(
-            [np.asarray(self.embedding_matrix.get(w, np.zeros(self.embedding_size))).reshape(1, -1) for w in text.split(' ')], axis=0
-        )
-
-    def batch_compare(self, this: List[str]) -> List[List[bool]]:
-        embeddings1 = np.asarray([self.embed(t) for t in this]) # [N, H]
-        return (util.pytorch_cos_sim(torch.from_numpy(embeddings1), torch.from_numpy(embeddings1)) >= self.threshold).numpy()
+        # Only take parallel processing when the data size is larger than 2k
+        if len(corpus) <= 2_000:
+            for idx, doc in enumerate(corpus):
+                _, similarities = calculate(idx, doc, corpus)
+                for j, similarity in enumerate(similarities):
+                    matrix[idx][j] = int(similarity >= self.threshold)
+        else:
+            docs = bag.from_sequence(list(enumerate(corpus)))
+            docs = docs.map(lambda x: calculate(x[0], x[1], corpus)).compute()
+            for idx, similarities in docs:
+                for j, similarity in similarities:
+                    matrix[idx][j] = int(similarity >= self.threshold)
+        
+        return matrix
 
 class PretrainedBERTEmbeddingDeduper(Deduper):
 
@@ -129,15 +151,7 @@ class PretrainedBERTEmbeddingDeduper(Deduper):
         self.model = SentenceTransformer(model)
         self.threshold = threshold
     
-    def compare(self, this: str, other: str) -> bool:
-        embeddings1 = self.model.encode([this], convert_to_tensor=True)
-        embeddings2 = self.model.encode([other], convert_to_tensor=True)
-
-        #Compute cosine-similarits
-        cosine_scores = util.pytorch_cos_sim(embeddings1, embeddings2)
-        return cosine_scores.item() >= self.threshold
-
-    def batch_compare(self, this: List[str]) -> List[List[bool]]:
-        embeddings1 = self.model.encode(this, convert_to_tensor=True)
-
-        return (util.pytorch_cos_sim(embeddings1, embeddings1) >= self.threshold).numpy()
+    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
+        corpus = self.extract(corpus, column=column)
+        embeddings = self.model.encode(corpus, convert_to_tensor=True)
+        return (util.pytorch_cos_sim(embeddings, embeddings) >= self.threshold).numpy().tolist()
