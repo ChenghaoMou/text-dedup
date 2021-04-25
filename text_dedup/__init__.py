@@ -3,18 +3,18 @@
 # @Date    : 2021-03-13 09:07:29
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from typing import Union, Optional
-from text_dedup.dedupers import Deduper
+from text_dedup.groupers import Grouper
 import pandas as pd
 
-def drop_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, column: Optional[str] = None) -> Union[pd.DataFrame, pd.Series]:
+def drop_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Grouper, column: Optional[str] = None) -> Union[pd.DataFrame, pd.Series]:
     """Drop nearly duplicates with a deduper.
 
     Parameters
     ----------
     df : Union[pd.DataFrame, pd.Series]
         Input dataframe or series
-    deduper : Deduper
-        Deduper
+    deduper : Grouper
+        Grouper
     column : Optional[str], optional
         Target column for dataframe, by default None
 
@@ -25,10 +25,10 @@ def drop_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, column
 
     Examples
     --------
-    >>> df = drop_duplicates(pd.DataFrame({"a": ["test", "test", "other"]}), deduper=Deduper(), column="a")
+    >>> df = drop_duplicates(pd.DataFrame({"a": ["test", "test", "other"]}), deduper=Grouper(), column="a")
     >>> df.shape
     (2, 1)
-    >>> df = drop_duplicates(pd.DataFrame({"a": ["This is a test message", "A test message", "other"]}), deduper=EditDistanceSimilarityDeduper(similarity_metric="cosine", threshold=0.7, k=1), column="a")
+    >>> df = drop_duplicates(pd.DataFrame({"a": ["This is a test message", "A test message", "other"]}), deduper=EditDistanceSimilarityGrouper(similarity_metric="cosine", threshold=0.7, k=1), column="a")
     >>> df.shape
     (2, 1)
     """
@@ -39,15 +39,15 @@ def drop_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, column
 
     return ans
 
-def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, column: Optional[str] = None, target_column: str = "group") -> Union[pd.DataFrame, pd.Series]:
+def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Grouper, column: Optional[str] = None, target_column: str = "group") -> Union[pd.DataFrame, pd.Series]:
     """Group duplicates and add a new column for group label.
 
     Parameters
     ----------
     df : Union[pd.DataFrame, pd.Series]
         Input dataframe or series
-    deduper : Deduper
-        Deduper
+    deduper : Grouper
+        Grouper
     column : Optional[str], optional
         Target column for dataframe, by default None
     target_column: str
@@ -60,7 +60,7 @@ def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, colum
 
     Examples
     --------
-    >>> df = group_duplicates(pd.DataFrame({"a": ["test", "test", "other"]}), deduper=Deduper(), column="a")
+    >>> df = group_duplicates(pd.DataFrame({"a": ["test", "test", "other"]}), deduper=Grouper(), column="a")
     >>> df["group"].values.tolist()
     [0, 0, 2]
     """
@@ -70,28 +70,8 @@ def group_duplicates(df: Union[pd.DataFrame, pd.Series], deduper: Deduper, colum
     else:
         col = df
     
-    duplicates = []
-    matrix = deduper.group(col)
 
-    for i in range(len(col)):
-        duplicates.append([duplicates[j][i] if j < i else matrix[i][j] if i != j else True for j in range(len(col))])
+    group_labels = deduper.fit_transform(col)
 
-    h = len(duplicates)
-    w = len(duplicates[0]) if h else 0
-    parent = {}
-
-    def find_parent(i):
-        if parent.get(i, i) == i:
-            return i
-        
-        return find_parent(parent[i])
-
-    for i in range(h):
-        parent[i] = find_parent(i)
-        for j in range(w):
-            if j >= i: continue
-            if bool(duplicates[i][j]) is True:
-                parent[i] = min(find_parent(i), find_parent(j))
-
-    df[target_column] = [parent[i] for i in range(h)]
+    df[target_column] = group_labels
     return df

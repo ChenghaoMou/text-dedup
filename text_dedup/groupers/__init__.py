@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2021-03-13 09:20:29
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+import abc
 from typing import List, Union, Optional
 
 import numpy as np
-import dask.bag as bag
 import pandas as pd
 from nltk import ngrams
 from numpy import linalg as LA
@@ -15,51 +15,94 @@ from strsimpy.jaro_winkler import JaroWinkler
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 from datasketch import MinHash, MinHashLSH
 from sentence_transformers import SentenceTransformer, util
+from sklearn.base import TransformerMixin
+from alive_progress import alive_bar
 
-class Deduper:
-    
+class Grouper(TransformerMixin):
+
+    @abc.abstractmethod
+    def transform(self, X) -> List[int]:
+        raise NotImplementedError('This function is not implemented')
+
+    def fit_transform(self, X) -> List[int]:
+        return self.transform(X)
+
     @staticmethod
-    def extract(corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[str]:
+    def extract(corpus: Union[pd.Series, List[str]]) -> List[str]:
+        """Extract text from a pd.Series or a list of strings
 
+        Parameters
+        ----------
+        corpus : Union[pd.Series, List[str]]
+            Input data
+
+        Returns
+        -------
+        List[str]
+            List of extracted text
+
+        Raises
+        ------
+        ValueError
+            Invalid input
+        """
         if isinstance(corpus, list):
             return corpus
         elif isinstance(corpus, pd.Series):
             return corpus.values.tolist()
-        elif isinstance(corpus, pd.DataFrame) and column is not None:
-            return corpus[column].values.tolist()
         else:
-            raise ValueError('Invalid input, please check your data')
-    
-    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
-        """Group duplicates and return a boolean matrix indicating whether two docs are similar.
+            raise ValueError(f'Invalid input, please check your parameter corpus: {type(corpus)}')
+
+    @staticmethod
+    def matrix2groups(matrix: np.ndarray) -> List[int]:
+        """Convert a similarity matrix into a list of group indices.
 
         Parameters
         ----------
-        corpus : Union[pd.DataFrame, pd.Series, List[str]]
-            Generic collection of documents
-        column : Optional[str], optional
-            Target column of a dataframe, by default None
+        matrix : np.ndarray
+            Similarity matrix
 
         Returns
         -------
-        List[List[bool]]
-            A boolean matrix
+        List[int]
+            List of group indices
         """
+        duplicates: List[List[bool]] = []
+        h = len(matrix)
+        for i in range(h):
+            duplicates.append([duplicates[j][i] if j < i else matrix[i][j] if i != j else True for j in range(h)])
+        
+        parent = {}
 
-        raise NotImplementedError('This function is not implemented')
+        def find_parent(i):
+            if parent.get(i, i) == i:
+                return i
+            
+            return find_parent(parent[i])
 
-class LSHDeduper(Deduper):
+        for i in range(h):
+            parent[i] = find_parent(i)
+            for j in range(h):
+                if j >= i: continue
+                if bool(duplicates[i][j]) is True:
+                    parent[i] = min(find_parent(i), find_parent(j))
+        
+        return [parent[i] for i in range(h)]
+
+class LSHGrouper(Grouper):
 
     def __init__(self, threshold: float = 0.5, num_perm: int = 128, shingle_size: int=3):
-
+        
         self.threshold = threshold
         self.num_perm = num_perm
         self.shingle_size = shingle_size
     
-    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
+    def transform(self, X: Union[pd.Series, List[str]]) -> List[int]:
         
         lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm)
-        corpus = self.extract(corpus, column=column)
+        
+        corpus = self.extract(X)
+        hashes = []
 
         def hashing(idx, shingles, num_perm):
             min_hash = MinHash(num_perm)
@@ -67,18 +110,12 @@ class LSHDeduper(Deduper):
                 min_hash.update(''.join(shingle).encode('utf-8'))
             return (idx, min_hash)
 
-        # Only take parallel processing when the data size is larger than 2k
-        if len(corpus) <= 2_000:
-            hashes = []
+        with alive_bar(len(corpus)) as bar:
             for idx, doc in enumerate(corpus):
                 _, min_hash = hashing(idx, ngrams(doc, self.shingle_size), self.num_perm)
                 lsh.insert(f'm{idx}', min_hash)
                 hashes.append((idx, min_hash))
-        else:
-            hashes = bag.from_sequence([(i, list(ngrams(doc, self.shingle_size)), self.num_perm) for i, doc in enumerate(corpus)])
-            hashes = hashes.map(lambda x: hashing(*x)).compute()
-            for idx, min_hash in hashes:
-                lsh.insert(f'm{idx}', min_hash)
+                bar()
 
         matrix = np.zeros((len(corpus), len(corpus)))
 
@@ -87,9 +124,9 @@ class LSHDeduper(Deduper):
             for candidate in candidates:
                 matrix[idx][int(candidate[1:])] = 1.0
         
-        return matrix.astype(bool)
+        return self.matrix2groups(matrix)
 
-class EditDistanceSimilarityDeduper(Deduper):
+class EditDistanceSimilarityGrouper(Grouper):
 
     def __init__(self, similarity_metric: str, threshold: float, **kwargs):
         """Edit-Distance-based similarity deduper. Current implementation takes one pair at a time
@@ -107,7 +144,7 @@ class EditDistanceSimilarityDeduper(Deduper):
 
         Examples
         --------
-        >>> deduper = EditDistanceSimilarityDeduper('cosine', threshold=0.7, k=2)
+        >>> deduper = EditDistanceSimilarityGrouper('cosine', threshold=0.7, k=2)
         >>> deduper.compare('this is a message', 'this is another message')
         True
         >>> deduper.compare('this is a message', 'hello world')
@@ -121,37 +158,33 @@ class EditDistanceSimilarityDeduper(Deduper):
         }.get(similarity_metric, None)
         self.threshold = threshold
     
-    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
+    def transform(self, X: Union[pd.Series, List[str]]) -> List[int]:
         
-        corpus = self.extract(corpus, column=column)
+        corpus = self.extract(X)
 
         def calculate(idx, doc, corpus):
             return (idx, [self.similarity_metric.similarity(doc, other) for other in corpus])
         
         matrix = np.zeros((len(corpus), len(corpus)))
 
-        # Only take parallel processing when the data size is larger than 2k
-        if len(corpus) <= 2_000:
+        with alive_bar(len(corpus)) as bar:
             for idx, doc in enumerate(corpus):
                 _, similarities = calculate(idx, doc, corpus)
                 for j, similarity in enumerate(similarities):
                     matrix[idx][j] = int(similarity >= self.threshold)
-        else:
-            docs = bag.from_sequence(list(enumerate(corpus)))
-            docs = docs.map(lambda x: calculate(x[0], x[1], corpus)).compute()
-            for idx, similarities in docs:
-                for j, similarity in similarities:
-                    matrix[idx][j] = int(similarity >= self.threshold)
+                bar()
         
-        return matrix
+        return self.matrix2groups(matrix)
 
-class PretrainedBERTEmbeddingDeduper(Deduper):
+class PretrainedBERTEmbeddingGrouper(Grouper):
 
     def __init__(self, model: str, threshold: float):
         self.model = SentenceTransformer(model)
         self.threshold = threshold
     
-    def group(self, corpus: Union[pd.DataFrame, pd.Series, List[str]], column: Optional[str] = None) -> List[List[bool]]:
-        corpus = self.extract(corpus, column=column)
+    def transform(self, X: Union[pd.Series, List[str]]) -> List[int]:
+        corpus = self.extract(X)
         embeddings = self.model.encode(corpus, convert_to_tensor=True)
-        return (util.pytorch_cos_sim(embeddings, embeddings) >= self.threshold).numpy().tolist()
+        
+        matrix = (util.pytorch_cos_sim(embeddings, embeddings) >= self.threshold).numpy().tolist()
+        return self.matrix2groups(matrix)

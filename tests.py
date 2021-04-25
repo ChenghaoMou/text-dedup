@@ -3,8 +3,10 @@ from typing import List
 import pytest
 import pandas as pd
 from datasets import load_dataset
-from text_dedup.dedupers import EditDistanceSimilarityDeduper, PretrainedBERTEmbeddingDeduper, LSHDeduper
+from text_dedup.groupers import EditDistanceSimilarityGrouper, PretrainedBERTEmbeddingGrouper, LSHGrouper
 from text_dedup import drop_duplicates
+
+SAMPLE_SIZE: int = 2000
 
 @pytest.mark.parametrize(
     ('data', 'threshold', 'expected_size'),  [
@@ -20,7 +22,7 @@ def test_drop_duplicates_normal(data: List[str], threshold: float, expected_size
     df = pd.DataFrame({"text": data})
     data_dedup = drop_duplicates(
         df, 
-        deduper=EditDistanceSimilarityDeduper(
+        deduper=EditDistanceSimilarityGrouper(
             similarity_metric="cosine", 
             threshold=threshold, 
             k=3),
@@ -31,7 +33,7 @@ def test_drop_duplicates_normal(data: List[str], threshold: float, expected_size
     
     data_dedup = drop_duplicates(
         df, 
-        deduper=PretrainedBERTEmbeddingDeduper(
+        deduper=PretrainedBERTEmbeddingGrouper(
             model='paraphrase-distilroberta-base-v1',
             threshold=threshold, 
         ),
@@ -58,7 +60,7 @@ def test_drop_duplicates_semantical(data: List[str], threshold: float, expected_
     
     data_dedup = drop_duplicates(
         df, 
-        deduper=PretrainedBERTEmbeddingDeduper(
+        deduper=PretrainedBERTEmbeddingGrouper(
             model='paraphrase-distilroberta-base-v1',
             threshold=threshold, 
         ),
@@ -71,7 +73,7 @@ def test_drop_duplicates_semantical(data: List[str], threshold: float, expected_
 
 def test_bert(benchmark):
 
-    sample_size: int = 200
+    sample_size: int = SAMPLE_SIZE
     dataset = load_dataset("quora", split="train")
     questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
@@ -80,7 +82,7 @@ def test_bert(benchmark):
         kwargs={
         "df": questions, 
         "column": "text", 
-        "deduper": PretrainedBERTEmbeddingDeduper(
+        "deduper": PretrainedBERTEmbeddingGrouper(
             model='paraphrase-distilroberta-base-v1',
             threshold=0.7
         )},
@@ -92,7 +94,7 @@ def test_bert(benchmark):
 
 def test_edit_distance(benchmark):
 
-    sample_size: int = 200
+    sample_size: int = SAMPLE_SIZE
     dataset = load_dataset("quora", split="train")
     questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
@@ -101,7 +103,7 @@ def test_edit_distance(benchmark):
         kwargs={
         "df": questions, 
         "column": "text", 
-        "deduper": EditDistanceSimilarityDeduper(
+        "deduper": EditDistanceSimilarityGrouper(
             similarity_metric="cosine", 
             threshold=0.6, 
             k=3
@@ -114,7 +116,7 @@ def test_edit_distance(benchmark):
 def test_lsh(benchmark):
     
     dataset = load_dataset("quora", split="train")
-    sample_size: int = 20000
+    sample_size: int = SAMPLE_SIZE
     questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
     result2 = benchmark.pedantic(
@@ -122,7 +124,7 @@ def test_lsh(benchmark):
         kwargs={
         "df": questions, 
         "column": "text", 
-        "deduper": LSHDeduper(
+        "deduper": LSHGrouper(
             threshold=0.5,
         )},
         iterations=1,

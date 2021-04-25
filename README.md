@@ -6,22 +6,22 @@ Text de-duplication with edit distance, LSH or embeddings. (WIP)
 
 ## Usage
 
-1. Group near duplicates with `EditDistanceSimilarityDeduper` or `LSHDeduper`
+1. Group near duplicates with `EditDistanceSimilarityGrouper` or `LSHGrouper`
 ```python
 import pandas as pd
-from text_dedup.dedupers import EditDistanceSimilarityDeduper
+from text_dedup.groupers import EditDistanceSimilarityGrouper
 from text_dedup import group_duplicates
 
 df = pd.read_csv(...)
 df_groups = group_duplicates(
     df, 
-    deduper=EditDistanceSimilarityDeduper(
+    deduper=EditDistanceSimilarityGrouper(
         similarity_metric="cosine", 
         threshold=0.8, 
         k=3),
     column="text",
     target_column="__group_label__"
-    )
+)
 
 df["__group_label__"].value_counts(dropna=False)
 ```
@@ -29,32 +29,32 @@ df["__group_label__"].value_counts(dropna=False)
 2. Remove near duplicates
 ```python
 import pandas as pd
-from text_dedup.dedupers import EditDistanceSimilarityDeduper
+from text_dedup.groupers import EditDistanceSimilarityGrouper
 from text_dedup import drop_duplicates
 
 df = pd.read_csv(...)
 df_dedup = drop_duplicates(
     df, 
-    deduper=EditDistanceSimilarityDeduper(
+    deduper=EditDistanceSimilarityGrouper(
         similarity_metric="cosine", 
         threshold=0.8, 
         k=3),
     column="text"
-    )
+)
 
 assert df.shape != df_dedup.shape
 ```
 
-3. Remove semantically similar duplicates using `PretrainedBERTEmbeddingDeduper`
+3. Remove semantically similar duplicates using `PretrainedBERTEmbeddingGrouper`
 ```python
 import pandas as pd
-from text_dedup.dedupers import PretrainedBERTEmbeddingDeduper
+from text_dedup.groupers import PretrainedBERTEmbeddingGrouper
 from text_dedup import drop_duplicates
 
 df = pd.read_csv(...)
 data_dedup = drop_duplicates(
     df, 
-    deduper=PretrainedBERTEmbeddingDeduper(
+    deduper=PretrainedBERTEmbeddingGrouper(
         model='paraphrase-distilroberta-base-v1',
         threshold=threshold, 
     ),
@@ -80,7 +80,7 @@ test_edit_distance     10,040.8134 (13.42)    10,290.2110 (13.68)    10,165.0379
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ```
 
-- 40000 samples (`PretrainedBERTEmbeddingDeduper` and `EditDistanceSimilarityDeduper` might not be scaling well to large datasets)
+- 40000 samples (`PretrainedBERTEmbeddingGrouper` and `EditDistanceSimilarityGrouper` might not be scaling well to large datasets)
 ```
 ----------------------------------------------- benchmark: 1 tests ----------------------------------------------
 Name (time in s)          Min       Max      Mean  StdDev    Median     IQR  Outliers     OPS  Rounds  Iterations
