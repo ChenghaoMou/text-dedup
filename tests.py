@@ -1,133 +1,46 @@
-from typing import List
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Date         : 2021-06-05 11:09:16
+# @Author       : Chenghao Mou (mouchenghao@gmail.com)
 
-import pytest
-import pandas as pd
-from datasets import load_dataset
-from text_dedup.groupers import EditDistanceSimilarityGrouper, PretrainedBERTEmbeddingGrouper, LSHGrouper
-from text_dedup import drop_duplicates
 
-SAMPLE_SIZE: int = 2000
+def test_performance(fraction: float = 0.05):
 
-@pytest.mark.parametrize(
-    ('data', 'threshold', 'expected_size'),  [
-        ([
-            'Hello world',
-            'Hello the world',
-            'Hola, yo soy Chenghao'
-        ], 0.6, 2)
-    ]
-)
-def test_drop_duplicates_normal(data: List[str], threshold: float, expected_size: int):
+    from datasets import load_dataset
+    from text_dedup import SentenceTransformerDeduper
+    from sklearn.metrics import f1_score, classification_report
+    from alive_progress import alive_bar
 
-    df = pd.DataFrame({"text": data})
-    data_dedup = drop_duplicates(
-        df, 
-        deduper=EditDistanceSimilarityGrouper(
-            similarity_metric="cosine", 
-            threshold=threshold, 
-            k=3),
-        column="text"
-    )
-    
-    assert len(data_dedup) == expected_size
-    
-    data_dedup = drop_duplicates(
-        df, 
-        deduper=PretrainedBERTEmbeddingGrouper(
-            model='paraphrase-distilroberta-base-v1',
-            threshold=threshold, 
-        ),
-        column="text"
-    )
-    
-    assert len(data_dedup) == expected_size
+    dataset = load_dataset("quora")["train"]
 
-    return
+    corpus = {}
+    pairs = []
+    with alive_bar() as bar:
+        for i in range(int(len(dataset) * fraction)):
+            row = dataset[i]
+            for text in row["questions"]["text"]:
+                corpus[len(corpus)] = text
+            pairs.append((len(corpus) - 1, len(corpus) - 2, row["is_duplicate"]))
+            bar()
 
-@pytest.mark.parametrize(
-    ('data', 'threshold', 'expected_size'),  [
-        ([
-            'Terresa is loved by his son Jack',
-            'Jack loves his mother Terresa',
-            'Terresa has a son whose name is Jack and Jack loves his mother very much',
-            'This is something very different'
-        ], 0.7, 2)
-    ]
-)
-def test_drop_duplicates_semantical(data: List[str], threshold: float, expected_size: int):
+    deduper = SentenceTransformerDeduper("distilbert-base-nli-stsb-mean-tokens")
+    indices = deduper.group(list(corpus.values()), show_progress_bar=True)
 
-    df = pd.DataFrame({"text": data})
-    
-    data_dedup = drop_duplicates(
-        df, 
-        deduper=PretrainedBERTEmbeddingGrouper(
-            model='paraphrase-distilroberta-base-v1',
-            threshold=threshold, 
-        ),
-        column="text"
-    )
-    
-    assert len(data_dedup) == expected_size
+    predictions = []
+    labels = []
 
-    return
+    for x, y, label in pairs:
+        predictions.append(indices[x] == indices[y])
+        labels.append(label)
 
-def test_bert(benchmark):
+    result = f1_score(labels, predictions)
+    assert result >= 0.5
+    print(classification_report(labels, predictions))
+    return result
 
-    sample_size: int = SAMPLE_SIZE
-    dataset = load_dataset("quora", split="train")
-    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
 
-    result1 = benchmark.pedantic(
-        drop_duplicates,
-        kwargs={
-        "df": questions, 
-        "column": "text", 
-        "deduper": PretrainedBERTEmbeddingGrouper(
-            model='paraphrase-distilroberta-base-v1',
-            threshold=0.7
-        )},
-        iterations=1,
-        rounds=1
-    )
+def test_scaling(benchmark):
 
-    assert len(result1) < sample_size * 2
+    result = benchmark.pedantic(test_performance, args=(0.05,), iterations=10)  # 16k
 
-def test_edit_distance(benchmark):
-
-    sample_size: int = SAMPLE_SIZE
-    dataset = load_dataset("quora", split="train")
-    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
-
-    result2 = benchmark.pedantic(
-        drop_duplicates, 
-        kwargs={
-        "df": questions, 
-        "column": "text", 
-        "deduper": EditDistanceSimilarityGrouper(
-            similarity_metric="cosine", 
-            threshold=0.6, 
-            k=3
-        )},
-        iterations=1,
-        rounds=1
-    )
-    assert len(result2) < sample_size * 2
-
-def test_lsh(benchmark):
-    
-    dataset = load_dataset("quora", split="train")
-    sample_size: int = SAMPLE_SIZE
-    questions = pd.DataFrame({"text": [r["text"][0] for r in dataset["questions"][:sample_size]] + [r["text"][1] for r in dataset["questions"][:sample_size]]})
-
-    result2 = benchmark.pedantic(
-        drop_duplicates, 
-        kwargs={
-        "df": questions, 
-        "column": "text", 
-        "deduper": LSHGrouper(
-            threshold=0.5,
-        )},
-        iterations=1,
-        rounds=1
-    )
-    assert len(result2) < sample_size * 2
+    assert result >= 0.5
