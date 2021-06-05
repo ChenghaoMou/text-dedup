@@ -10,7 +10,13 @@ import numpy as np
 
 class SentenceTransformerEmbedder:
     def __init__(self, model_name: str):
+        """Initialize a sentence transformer embedder.
 
+        Parameters
+        ----------
+        model_name : str
+            Name of the sentence transformer
+        """
         self.model = SentenceTransformer(model_name)
 
     def embed(self, corpus: List[str], **kwargs) -> List[np.ndarray]:

@@ -34,7 +34,7 @@ complexity:
 """
 
 
-class UF:
+class UF:  # pragma: no cover
     """An implementation of union find data structure.
     It uses weighted quick union by rank with path compression.
     """

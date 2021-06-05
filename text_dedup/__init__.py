@@ -3,6 +3,8 @@
 # @Date         : 2021-06-05 12:48:33
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 
+"""Text de-duplication with sentence transformers and annoy."""
+
 from typing import List
 from text_dedup.embed.stfm import SentenceTransformerEmbedder
 from text_dedup.utils.nn import annoy_clustering
@@ -11,7 +13,13 @@ from text_dedup.utils.group import get_group_indices
 
 class SentenceTransformerDeduper:
     def __init__(self, model_name: str):
+        """Initialize a sentence transformer deduper.
 
+        Parameters
+        ----------
+        model_name : str
+            Name of the sentence transformer
+        """
         self.model = SentenceTransformerEmbedder(model_name)
 
     def group(self, corpus: List[str], **kwargs) -> List[int]:

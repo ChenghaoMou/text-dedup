@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "text-dedup"
-version = "0.0.8"
+version = "0.0.9"
 description = "Text deduplication with fuzzy match and more"
 authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
 license = "MIT"

@@ -1,5 +1,6 @@
 .vscode
 .benchmarks
+cobertura.xml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
