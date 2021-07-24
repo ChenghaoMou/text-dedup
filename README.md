@@ -6,6 +6,7 @@
 
 -   SOTA embeddings with sentence-transformer
 -   Fast de-duplication with annoy
+-   [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
 
 ## Installation
 
@@ -25,6 +26,18 @@ df["group"] = deduper.group(df["text"].values.tolist(), show_progress_bar=True)
 
 # dedup with group indices
 df = df.drop_duplicates(["group"], keep="first")
+```
+
+```python
+from text_dedup import SuffixArray
+
+df = pd.read_csv('...')
+
+deduper = SuffixArray(k=50)
+groups, duplicates = deduper.fit_transform(df["text"].values.tolist())
+
+assert len(groups) == len(df), "Invalid number of rows"
+assert len(duplicates) == groups.shape[1], "Invalid number of columns"
 ```
 
 ## Benchmark (w/ a P100)

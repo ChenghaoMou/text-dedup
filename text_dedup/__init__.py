@@ -9,7 +9,7 @@ from typing import List
 from text_dedup.embed.stfm import SentenceTransformerEmbedder
 from text_dedup.utils.nn import annoy_clustering
 from text_dedup.utils.group import get_group_indices
-
+from text_dedup.suffix import SuffixArray
 
 class SentenceTransformerDeduper:
     def __init__(self, model_name: str):
