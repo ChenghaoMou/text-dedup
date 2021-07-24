@@ -150,6 +150,25 @@ tests = ["absl-py", "pytest", "pytest-xdist", "aiohttp", "apache-beam (>=2.26.0)
 torch = ["torch"]
 
 [[package]]
+name = "datasketch"
+version = "1.5.3"
+description = "Probabilistic data structures for processing and searching very large datasets"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+numpy = ">=1.11"
+
+[package.extras]
+benchmark = ["pyhash (>=0.9.3)", "matplotlib (>=3.1.2)", "scikit-learn (>=0.21.3)", "scipy (>=1.3.3)", "pandas (>=0.25.3)", "SetSimilaritySearch (>=0.1.7)", "pyfarmhash (>=0.2.2)", "nltk (>=3.4.5)"]
+cassandra = ["cassandra-driver (>=3.20)"]
+experimental_aio = ["aiounittest", "motor"]
+redis = ["redis (>=2.10.0)"]
+scipy = ["scipy"]
+test = ["cassandra-driver (>=3.20)", "redis (>=2.10.0)", "mock (>=2.0.0)", "mockredispy", "coverage", "pymongo (>=3.9.0)", "nose (>=1.3.7)", "nose-exclude (>=0.5.0)"]
+
+[[package]]
 name = "dill"
 version = "0.3.4"
 description = "serialize all of python"
@@ -693,7 +712,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "3030e8cd2e3470c0db42ce5e3420c1dd7de04dd63a8c0649ee272d3b2f660cc0"
+content-hash = "3fadc3cba58682fb12418990b71eb0fcd734e44c25f7b46acd8c8b8f39cbd8df"
 
 [metadata.files]
 alive-progress = [
@@ -792,6 +811,10 @@ coverage = [
 datasets = [
     {file = "datasets-1.10.2-py3-none-any.whl", hash = "sha256:a523e22b222b38700cc672445f2d534ed4a5aeda1399c074b722feda36b175c2"},
     {file = "datasets-1.10.2.tar.gz", hash = "sha256:19106e8f5fa7be95ccd19fa82653ce707cad378d0e323c3013a17c2b6513bf5c"},
+]
+datasketch = [
+    {file = "datasketch-1.5.3-py2.py3-none-any.whl", hash = "sha256:1fc23150bbe20d7ffdba6948ab8a7bf4cac8962071d394705c80c893732e838e"},
+    {file = "datasketch-1.5.3.tar.gz", hash = "sha256:785efb0cfe98266abd2bc9e68653970dafc16105a8f286d82eee4339bdcaf3a5"},
 ]
 dill = [
     {file = "dill-0.3.4-py2.py3-none-any.whl", hash = "sha256:7e40e4a70304fd9ceab3535d36e58791d9c4a776b38ec7f7ec9afc8d3dca4d4f"},
