@@ -10,6 +10,7 @@ from text_dedup.embed.stfm import SentenceTransformerEmbedder
 from text_dedup.utils.nn import annoy_clustering
 from text_dedup.utils.group import get_group_indices
 from text_dedup.suffix import SuffixArray
+from text_dedup.hash import MinHashDeduper
 
 class SentenceTransformerDeduper:
     def __init__(self, model_name: str):
@@ -28,3 +29,5 @@ class SentenceTransformerDeduper:
         clusters = annoy_clustering(embeddings, f=embeddings[0].shape[0])
 
         return get_group_indices(clusters)
+
+__all__ = ['SentenceTransformerDeduper', 'SuffixArray', 'MinHashDeduper']

@@ -6,7 +6,7 @@
 
 -   SOTA embeddings with sentence-transformer
 -   Fast de-duplication with annoy
--   [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
+-   Suffix Array and MinHash [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
 
 ## Installation
 
@@ -15,6 +15,8 @@ pip install text-dedup
 ```
 
 ## Usage
+
+-   Using Sentence Transformer
 
 ```python
 from text_dedup import SentenceTransformerDeduper
@@ -28,6 +30,8 @@ df["group"] = deduper.group(df["text"].values.tolist(), show_progress_bar=True)
 df = df.drop_duplicates(["group"], keep="first")
 ```
 
+-   Using Suffix Array for exact match
+
 ```python
 from text_dedup import SuffixArray
 
@@ -38,6 +42,15 @@ groups, duplicates = deduper.fit_transform(df["text"].values.tolist())
 
 assert len(groups) == len(df), "Invalid number of rows"
 assert len(duplicates) == groups.shape[1], "Invalid number of columns"
+```
+
+-   Using MinHash for fuzzy match
+
+```python
+from text_dedup import MinHashDeduper
+deduper = MinHashDeduper(ngram_size=5, threshold=0.3)
+groups = deduper.fit_transform(["This is a sentence.", "This is another sentence.", "This is a question.", "hello world"])
+assert groups == [0, 0, 2, 3]
 ```
 
 ## Benchmark (w/ a P100)

@@ -34,7 +34,7 @@ def similar(x: int, y: int, S: Any, k: int) -> bool:
     """
     if x == y:
         return True
-    
+
     return x + k <= len(S.value) and y + k <= len(S.value) and S.value[x:x+k] == S.value[y:y+k]
 
 def group(x: str, patterns: str) -> List[int]:

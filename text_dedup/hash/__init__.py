@@ -17,7 +17,7 @@ class MinHashDeduper:
         self.threshold = threshold
         self.ngram_size = ngram_size
         self.lsh = None
-    
+
     def fit_transform(self, data: List[str]) -> List[int]:
         """Group similar documents with minhash.
 
