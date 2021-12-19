@@ -107,7 +107,7 @@ class SuffixArray:
             from multiprocessing import shared_memory
             shared = shared_memory.ShareableList(duplicates)
         except ImportError as e:
-            print(f"The following error was: \n{e}\n\n" + "
+            print(f"The following error was: \n{e}\n\n" + 
                   "This was likely raised since you are not running python 3.8 or higher." + 
                   " Continuing without a shared memory file which is likely be inefficient.")
             shared = duplicates
