@@ -9,7 +9,6 @@ from typing import List, Any, Tuple
 from multiprocessing import Manager
 from ctypes import c_char_p
 import multiprocessing as mp
-from multiprocessing import shared_memory
 from numpy.lib.stride_tricks import sliding_window_view
 import numpy as np
 
@@ -104,7 +103,14 @@ class SuffixArray:
                 duplicates.append(S[idx: idx+self.k])
         
         # Find duplicated documents
-        shared = shared_memory.ShareableList(duplicates)
+        try:
+            from multiprocessing import shared_memory
+            shared = shared_memory.ShareableList(duplicates)
+        except ImportError as e:
+            print(f"The following error was: \n{e}\n\n" + "
+                  "This was likely raised since you are not running python 3.8 or higher." + 
+                  " Continuing without a shared memory file which is likely be inefficient.")
+            shared = duplicates
         with mp.Pool(mp.cpu_count()) as pool:
             results = pool.starmap(group, [(d, shared) for d in data])
         
