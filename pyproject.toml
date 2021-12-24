@@ -17,7 +17,7 @@ datasets = "^1.5.0"
 coverage = "^5.5"
 annoy = "^1.17.0"
 datasketch = "^1.5.3"
-torch
+torch= ">=1.9.0"
 sentencepiece = "<=0.1.95"
 numpy = "^1.20.0"
 
