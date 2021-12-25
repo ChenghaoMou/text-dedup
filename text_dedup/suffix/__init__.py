@@ -9,9 +9,9 @@ from typing import List, Any, Tuple
 from multiprocessing import Manager
 from ctypes import c_char_p
 import multiprocessing as mp
-from multiprocessing import shared_memory
 from numpy.lib.stride_tricks import sliding_window_view
 import numpy as np
+
 
 def similar(x: int, y: int, S: Any, k: int) -> bool:
     """Whether S[x:x+k] is the same as S[y:y+k].
@@ -35,7 +35,12 @@ def similar(x: int, y: int, S: Any, k: int) -> bool:
     if x == y:
         return True
 
-    return x + k <= len(S.value) and y + k <= len(S.value) and S.value[x:x+k] == S.value[y:y+k]
+    return (
+        x + k <= len(S.value)
+        and y + k <= len(S.value)
+        and S.value[x : x + k] == S.value[y : y + k]
+    )
+
 
 def group(x: str, patterns: str) -> List[int]:
     """Find patterns that are present in string x.
@@ -58,12 +63,12 @@ def group(x: str, patterns: str) -> List[int]:
             result.append(idx)
     return result
 
-class SuffixArray:
 
+class SuffixArray:
     def __init__(self, k: int = 50):
         self.array = []
         self.k = k
-    
+
     def fit_transform(self, data: List[str]) -> Tuple[List[str], np.ndarray]:
         """Find duplicate substrings in the data.
 
@@ -88,30 +93,43 @@ class SuffixArray:
         suffixes = []
         for i in range(len(S)):
             suffixes.append(S[i:])
-        
+
         self.array = np.argsort(suffixes)
-        
+
         # Find duplicated substrings
         manager = Manager()
         shared = manager.Value(c_char_p, S)
 
         with mp.Pool(mp.cpu_count()) as pool:
-            results = pool.starmap(similar, [(x, y, shared, self.k) for x, y in sliding_window_view(self.array, 2)])
-        
+            results = pool.starmap(
+                similar,
+                [(x, y, shared, self.k) for x, y in sliding_window_view(self.array, 2)],
+            )
+
         duplicates = []
         for idx, dup in zip(self.array, results):
             if dup:
-                duplicates.append(S[idx: idx+self.k])
-        
+                duplicates.append(S[idx : idx + self.k])
+
         # Find duplicated documents
-        shared = shared_memory.ShareableList(duplicates)
+        try:
+            from multiprocessing import shared_memory
+
+            shared = shared_memory.ShareableList(duplicates)
+        except ImportError as e:
+            print(
+                f"The following error was: \n{e}\n\n"
+                + "This was likely raised since you are not running python 3.8 or higher."
+                + " Continuing without a shared memory file which is likely be inefficient."
+            )
+            shared = duplicates
         with mp.Pool(mp.cpu_count()) as pool:
             results = pool.starmap(group, [(d, shared) for d in data])
-        
+
         shared.shm.close()
         shared.shm.unlink()
         del shared
-        
+
         groups = np.zeros((len(data), len(duplicates)), dtype=bool)
         for i, x in enumerate(results):
             for y in x:
