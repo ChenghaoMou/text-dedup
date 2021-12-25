@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "text-dedup"
-version = "0.0.11"
+version = "0.0.12"
 description = "Text deduplication with fuzzy match and more"
 authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.7.12"
 pandas = "^1.2.3"
 pytest = "^6.2.2"
 alive-progress = "^1.6.2"
