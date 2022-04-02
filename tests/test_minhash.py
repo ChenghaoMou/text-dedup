@@ -4,10 +4,11 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
 from text_dedup.embedders.minhash import MinHashEmbedder
-from text_dedup.utils.nn import lsh_clustering
 from text_dedup.utils.group import get_group_indices
+from text_dedup.utils.nn import lsh_clustering
 
-if __name__ == "__main__":
+
+def test_minhash():
 
     corpus = [
         "The quick brown fox jumps over the lazy dog",
@@ -21,4 +22,4 @@ if __name__ == "__main__":
 
     clusters = lsh_clustering(embeddings)
     groups = get_group_indices(clusters)
-    print(groups)
+    assert groups == [0, 0, 2, 2]

@@ -5,8 +5,9 @@
 
 from typing import List
 
-import torch
 import numpy as np
+import torch
+
 from text_dedup.embedders import Embedder
 
 
@@ -22,8 +23,8 @@ class TransformerEmbedder(Embedder):
         for i in range(0, len(corpus), batch_size):
             batch = corpus[i:i + batch_size]
             encodings = self.tokenizer(
-                batch, 
-                padding=True, 
+                batch,
+                padding=True,
                 truncation=True,
                 return_tensors='pt',
             )
@@ -32,5 +33,5 @@ class TransformerEmbedder(Embedder):
                 output = self.model(**encodings, output_hidden_states=True)
                 hidden = output.hidden_states[-1]
                 embeddings.extend(hidden.mean(dim=1).detach().cpu().numpy())
-        
+
         return np.asarray(embeddings)

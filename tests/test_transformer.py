@@ -4,12 +4,13 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
 from text_dedup.embedders.transformer import TransformerEmbedder
-from text_dedup.utils.nn import annoy_clustering
 from text_dedup.utils.group import get_group_indices
+from text_dedup.utils.nn import annoy_clustering
 
-if __name__ == "__main__":
 
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+def test_transformer():
+
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
     corpus = [
         "The quick brown fox jumps over the dog",
         "The quick brown fox jumps over the corgi",
@@ -25,4 +26,4 @@ if __name__ == "__main__":
 
     clusters = annoy_clustering(embeddings, f=768)
     groups = get_group_indices(clusters)
-    print(groups)
+    assert groups == [0, 0, 2, 2]

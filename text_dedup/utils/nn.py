@@ -4,12 +4,12 @@
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 
 
-from typing import List, Optional
+from typing import List
 
 import numpy as np
-from simhash import Simhash, SimhashIndex
 from annoy import AnnoyIndex
 from datasketch import MinHash, MinHashLSH
+from simhash import Simhash, SimhashIndex
 
 
 def annoy_clustering(
@@ -85,7 +85,7 @@ def simhash_clustering(
     hamming_distance: int = 3,
     # num_blocks: Optional[int] = 5,
 ) -> List[List[int]]:
-    
+
     index = SimhashIndex([(i, Simhash(value=signature)) for i, signature in enumerate(signatures)], k=hamming_distance)
 
     neighbors: List[List[int]] = []

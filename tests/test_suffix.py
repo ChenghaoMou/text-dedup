@@ -5,7 +5,8 @@
 
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
 
-if __name__ == "__main__":
+
+def test_suffix():
 
     corpus = [
         "The quick brown fox jumps over the lazy dog",
@@ -15,11 +16,18 @@ if __name__ == "__main__":
         "This is a random test",
         "The quick brown fox and a random test"
     ]
+    targets = [
+        [slice(0, 43, None)],
+        [slice(0, 43, None)],
+        [slice(0, 14, None)],
+        [slice(0, 14, None)],
+        [slice(0, 10, None), slice(7, 21, None)],
+        [slice(0, 20, None), slice(23, 37, None)],
+    ]
 
 
     embedder = SuffixArrayEmbedder(k=10)
     slices = embedder.embed(corpus, merge=True, merge_strategy='longest')
 
-    for sentence, intervals in zip(corpus, slices):
-        print(sentence)
-        print([sentence[slice] for slice in intervals])
+    for sentence, intervals, results in zip(corpus, slices, targets):
+        assert intervals == results

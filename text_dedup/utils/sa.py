@@ -81,7 +81,7 @@ def ksa(T):
     )
 
     # karkkainen-sanders step 1: sort sample suffixes
-    R_0 = [Triple(T, idx, length) for idx in B_0]
+    # R_0 = [Triple(T, idx, length) for idx in B_0]
     R_1 = [Triple(T, idx, length) for idx in B_1]
     R_2 = [Triple(T, idx, length) for idx in B_2]
 

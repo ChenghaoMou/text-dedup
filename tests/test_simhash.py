@@ -4,10 +4,11 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
 from text_dedup.embedders.simhash import SimHashEmbedder
-from text_dedup.utils.nn import simhash_clustering
 from text_dedup.utils.group import get_group_indices
+from text_dedup.utils.nn import simhash_clustering
 
-if __name__ == "__main__":
+
+def test_simhash():
 
     corpus = [
         "The quick brown fox jumps over the lazy dog",
@@ -21,4 +22,4 @@ if __name__ == "__main__":
 
     clusters = simhash_clustering(embeddings)
     groups = get_group_indices(clusters)
-    print(groups)
+    assert groups == [0, 0, 2, 2]

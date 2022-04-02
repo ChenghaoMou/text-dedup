@@ -3,12 +3,13 @@
 # @Date    : 2022-04-02 12:15:08
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
-from typing import List
-from dataclasses import dataclass
 from collections import deque
+from dataclasses import dataclass
+from typing import List
 
 from text_dedup.embedders import Embedder
 from text_dedup.utils.sa import construct_sa
+
 
 def _merge_intervals(slices: List[slice], merge_strategy: str = 'overlapping') -> List[slice]:
     """Merge overlapping intervals.
@@ -25,7 +26,7 @@ def _merge_intervals(slices: List[slice], merge_strategy: str = 'overlapping') -
     """
     if len(slices) == 0:
         return []
-    
+
     slices = sorted(list(map(lambda s: slice(s[0], s[1]), set([(s.start, s.stop) for s in slices]))), key=lambda x: (x.start, - x.stop))
 
     merged = []

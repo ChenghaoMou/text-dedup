@@ -13,6 +13,7 @@ from nltk.util import ngrams
 
 from text_dedup.embedders import Embedder
 
+
 def _unsigned_hash(obj: bytes):
     '''Returns a hash suitable for use as a hash_t. source: https://github.com/seomoz/simhash-py/blob/master/simhash/simhash.pyx '''
     # Takes first 8 bytes of MD5 digest
@@ -23,11 +24,11 @@ def _unsigned_hash(obj: bytes):
 def _compute(hashes: List[int]) -> int:
     '''Computes the simhash of a list of hashes.'''
     counts = np.zeros(64, dtype=np.int64)
-    for hash in hashes:
+    for h in hashes:
         for i in range(64):
-            counts[i] += (hash & 1) * 2 - 1
-            hash >>= 1
-    
+            counts[i] += (h & 1) * 2 - 1
+            h >>= 1
+
     result = 0
     for i in range(64):
         if counts[i] > 0:
