@@ -2,75 +2,128 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade)
 
+<div align="center" style="display:flex;flex-direction:column;">
+  <img src="./architecture.svg">
+</div>
+
 ## Features
 
--   SOTA embeddings with sentence-transformer
--   Fast de-duplication with annoy
--   Suffix Array and MinHash [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
-
-## Installation
-
-```bash
-pip install text-dedup
-```
+-   Support hash-based embeddings (MinHash + LSH, SimHash), `transformers` embeddings, and suffix array from [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499).
+-   Support both near-deduplication, semantic deduplication, and substring exact deduplication.
 
 ## Usage
 
--   Using Sentence Transformer
+More examples can be found in `examples`.
 
+### Hash-based Near Deduplication
 ```python
-from text_dedup import SentenceTransformerDeduper
+from text_dedup.embedders.minhash import MinHashEmbedder
+from text_dedup.utils.nn import lsh_clustering
+from text_dedup.utils.group import get_group_indices
 
-df = pd.read_csv('...')
+if __name__ == "__main__":
 
-deduper = SentenceTransformerDeduper("distilbert-base-nli-stsb-mean-tokens")
-df["group"] = deduper.group(df["text"].values.tolist(), show_progress_bar=True)
+    corpus = [
+        "The quick brown fox jumps over the lazy dog",
+        "The quick brown fox jumps over the lazy dog",
+        "This is a test",
+        "This is a test",
+    ]
 
-# dedup with group indices
-df = df.drop_duplicates(["group"], keep="first")
+    embedder = MinHashEmbedder()
+    embeddings = embedder.embed(corpus)
+
+    clusters = lsh_clustering(embeddings)
+    groups = get_group_indices(clusters)
+    print(groups)
+    # [0, 0, 2, 2]
 ```
 
--   Using Suffix Array for exact match
-
 ```python
-from text_dedup import SuffixArray
+from text_dedup.embedders.simhash import SimHashEmbedder
+from text_dedup.utils.nn import simhash_clustering
+from text_dedup.utils.group import get_group_indices
 
-df = pd.read_csv('...')
+if __name__ == "__main__":
 
-deduper = SuffixArray(k=50)
-groups, duplicates = deduper.fit_transform(df["text"].values.tolist())
+    corpus = [
+        "The quick brown fox jumps over the lazy dog",
+        "The quick brown fox jumps over the lazy dog",
+        "This is a test",
+        "This is a test",
+    ]
 
-assert len(groups) == len(df), "Invalid number of rows"
-assert len(duplicates) == groups.shape[1], "Invalid number of columns"
+    embedder = SimHashEmbedder()
+    embeddings = embedder.embed(corpus)
+
+    clusters = simhash_clustering(embeddings)
+    groups = get_group_indices(clusters)
+    print(groups)
+    # [0, 0, 2, 2]
 ```
 
--   Using MinHash for fuzzy match
+### Suffix Array Substring Exact Deduplication
 
 ```python
-from text_dedup import MinHashDeduper
-deduper = MinHashDeduper(ngram_size=5, threshold=0.3)
-groups = deduper.fit_transform(["This is a sentence.", "This is another sentence.", "This is a question.", "hello world"])
-assert groups == [0, 0, 2, 3]
+from text_dedup.embedders.suffix import SuffixArrayEmbedder
+
+if __name__ == "__main__":
+
+    corpus = [
+        "The quick brown fox jumps over the lazy dog",
+        "The quick brown fox jumps over the lazy dog",
+        "This is a test",
+        "This is a test",
+        "This is a random test",
+        "The quick brown fox and a random test"
+    ]
+
+
+    embedder = SuffixArrayEmbedder(k=10)
+    slices = embedder.embed(corpus, merge=True, merge_strategy='longest')
+
+    for sentence, intervals in zip(corpus, slices):
+        print(sentence)
+        print([sentence[slice] for slice in intervals])
+    # The quick brown fox jumps over the lazy dog
+    # ['The quick brown fox jumps over the lazy dog']
+    # The quick brown fox jumps over the lazy dog
+    # ['The quick brown fox jumps over the lazy dog']
+    # This is a test
+    # ['This is a test']
+    # This is a test
+    # ['This is a test']
+    # This is a random test
+    # ['This is a ', ' a random test']
+    # The quick brown fox and a random test
+    # ['The quick brown fox ', ' a random test']
 ```
 
-## Benchmark (w/ a P100)
+### Transformer Embedding Semantic Deduplication
 
-20k(5%) QQP subset
+```python
+from text_dedup.embedders.transformer import TransformerEmbedder
+from text_dedup.utils.nn import annoy_clustering
+from text_dedup.utils.group import get_group_indices
 
-```text
-              precision    recall  f1-score   support
+if __name__ == "__main__":
 
-       False       0.75      0.89      0.81     12671
-        True       0.73      0.50      0.60      7543
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    corpus = [
+        "The quick brown fox jumps over the dog",
+        "The quick brown fox jumps over the corgi",
+        "This is a test",
+        "This is a test message",
+    ]
 
-    accuracy                           0.75     20214
-   macro avg       0.74      0.70      0.71     20214
-weighted avg       0.74      0.75      0.73     20214
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased")
 
+    embedder = TransformerEmbedder(tokenizer, model)
+    embeddings = embedder.embed(corpus)
 
---------------------------------------------- benchmark: 1 tests --------------------------------------------
-Name (time in s)         Min      Max     Mean  StdDev   Median     IQR  Outliers     OPS  Rounds  Iterations
--------------------------------------------------------------------------------------------------------------
-test_scaling         89.9221  89.9221  89.9221  0.0000  89.9221  0.0000       0;0  0.0111       1          10
--------------------------------------------------------------------------------------------------------------
+    clusters = annoy_clustering(embeddings, f=768)
+    groups = get_group_indices(clusters)
+    print(groups)
+    # [0, 0, 2, 2]
 ```

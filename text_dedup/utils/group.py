@@ -4,6 +4,7 @@
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 
 from typing import List
+
 from text_dedup.utils.union_find import UF
 
 
