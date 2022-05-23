@@ -138,3 +138,5 @@ return_values
 app.py
 benchmark.py
 cache
+.DS_Store
+docs

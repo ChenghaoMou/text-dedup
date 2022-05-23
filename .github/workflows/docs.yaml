@@ -22,7 +22,8 @@ jobs:
       - uses: actions/setup-python@v3
       - run: pip install poetry pdoc
       - run: poetry install
-      - run: pdoc -d numpy -o docs text_dedup
+      - run: git clone https://github.com/oddlama/pdoc-bulma-theme
+      - run: pdoc -t pdoc-bulma-theme -d numpy -o docs text_dedup
       - run: tar --directory docs/ -hcf artifact.tar .
       - uses: actions/upload-artifact@v3
         with:

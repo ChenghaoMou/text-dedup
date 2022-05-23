@@ -4,7 +4,7 @@ from typing import List, Tuple, Generator
 
 def restore(
     offsets: List[Tuple[int, int]], seg_file: str
-) -> Generator[int, Tuple[int, int]]:
+) -> Generator:
     """
     Restore the original text from the offsets.
 
