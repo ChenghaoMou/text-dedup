@@ -11,8 +11,9 @@ import numpy as np
 
 
 class Embedder:
-
-    def embed(self, corpus: List[Any]) -> Union[np.ndarray, List[int], List[np.ndarray], List[slice]]:
+    def embed(
+        self, corpus: List[Any], **kwargs: Any
+    ) -> Union[np.ndarray, List[int], List[np.ndarray], List[slice]]:
         """Embed a corpus.
 
         Parameters

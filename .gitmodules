@@ -1,0 +1,3 @@
+[submodule "deduplicate-text-datasets"]
+	path = deduplicate-text-datasets
+	url = https://github.com/google-research/deduplicate-text-datasets.git

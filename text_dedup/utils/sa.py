@@ -9,6 +9,8 @@
 
 from typing import List
 
+from tqdm import tqdm
+
 
 class Triple(object):
     """Represent each sortable character in R with three integers"""
@@ -169,6 +171,6 @@ def ksa(T):
 
 
 def construct_sa(text: str) -> List[int]:
-    myT = list(map(ord, text))
+    myT = list(map(ord, tqdm(text, total=len(text))))
     sa = ksa(myT)
     return sa

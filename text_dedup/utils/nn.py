@@ -4,13 +4,14 @@
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 
 
-from typing import List
+import os
+from typing import List, Optional
 
 import numpy as np
 from annoy import AnnoyIndex
 from datasketch import MinHash, MinHashLSH
 from simhash import Simhash, SimhashIndex
-
+from mpire import WorkerPool
 
 def annoy_clustering(
     embeddings: List[np.ndarray],
@@ -19,6 +20,7 @@ def annoy_clustering(
     num_trees: int = 64,
     top_k: int = 100,
     distance_threshold: float = 0.5,
+    query_embeddings: Optional[List[np.ndarray]] = None,
 ) -> List[List[int]]:
     """Cluster embeddings with annoy.
 
@@ -49,6 +51,9 @@ def annoy_clustering(
 
     neighbors: List[List[int]] = []
 
+    if query_embeddings is None:
+        query_embeddings = embeddings
+
     for i, v in enumerate(embeddings):
         current: List[int] = []
         for j, dist in zip(
@@ -65,6 +70,7 @@ def lsh_clustering(
     signatures: List[np.ndarray],
     threshold: float = 0.5,
     num_perm: int = 128,
+    query_signatures: Optional[List[np.ndarray]] = None,
 ):
     lsh = MinHashLSH(threshold=threshold, num_perm=num_perm)
     with lsh.insertion_session() as session:
@@ -73,9 +79,11 @@ def lsh_clustering(
 
     neighbors: List[List[int]] = []
 
-    for key, minhash in enumerate(signatures):
-        result = lsh.query(MinHash(num_perm=num_perm, hashvalues=minhash))
-        neighbors.append([int(x.split("-")[1]) for x in result])
+    if query_signatures is None:
+        query_signatures = signatures
+    neighbors: List[List[int]] = []
+    with WorkerPool(n_jobs=os.cpu_count()) as pool:
+        neighbors = pool.map(lambda *signature: [int(x.split("-")[1]) for x in lsh.query(MinHash(num_perm=num_perm, hashvalues=signature))], query_signatures)
 
     return neighbors
 
@@ -84,14 +92,21 @@ def simhash_clustering(
     signatures: List[int],
     hamming_distance: int = 3,
     # num_blocks: Optional[int] = 5,
+    query_signatures: Optional[List[int]] = None,
 ) -> List[List[int]]:
 
-    index = SimhashIndex([(i, Simhash(value=signature)) for i, signature in enumerate(signatures)], k=hamming_distance)
+    index = SimhashIndex(
+        [(i, Simhash(value=signature)) for i, signature in enumerate(signatures)],
+        k=hamming_distance,
+    )
+
+    if query_signatures is None:
+        query_signatures = signatures
 
     neighbors: List[List[int]] = []
-    for signature in signatures:
-        neighbors.append(list(map(int, index.get_near_dups(Simhash(value=signature)))))
-    
+    with WorkerPool(n_jobs=os.cpu_count()) as pool:
+        neighbors = pool.map(lambda signature: list(map(int, index.get_near_dups(Simhash(value=signature)))), query_signatures)
+
     return neighbors
 
 

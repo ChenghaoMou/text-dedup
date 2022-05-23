@@ -131,3 +131,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.storage
+.shared
+return_values
+app.py
+benchmark.py
+cache
