@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v3
-      - run: pip install poetry
+      - run: pip install poetry pdoc
       - run: poetry install
       - run: pdoc -d numpy -o docs text_dedup
       - run: tar --directory docs/ -hcf artifact.tar .
