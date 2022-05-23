@@ -5,7 +5,7 @@
 
 
 from dataclasses import dataclass
-from typing import List
+from typing import Callable, List
 
 import numpy as np
 from datasketch import MinHash
@@ -22,8 +22,6 @@ class MinHashEmbedder(Embedder):
     ----------
     num_perm : int, optional (default=128)
         Number of permutations to use.
-    ngram_size : int, optional (default=5)
-        Size of ngrams to use.
     """
 
     num_perm: int = 128
@@ -52,11 +50,26 @@ class MinHashEmbedder(Embedder):
             signatures.append(m.hashvalues)
 
         return np.asarray(signatures)
-    
-    def embed_function(self, **kwargs):
+
+    def embed_function(self, **kwargs) -> Callable:
+        """
+        Embedding function that takes a string and returns the embedding/fingerprint.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Additional keyword arguments for tokenization.
+
+        Returns
+        -------
+        Callable
+            Embedding function.
+        """
+
         def wrapper(doc: str) -> np.ndarray:
             m = MinHash(num_perm=self.num_perm)
             for ngram in tokenize(doc, **kwargs):
                 m.update(ngram.encode("utf-8"))
             return m.hashvalues
+
         return wrapper

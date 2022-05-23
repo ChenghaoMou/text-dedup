@@ -1,17 +1,17 @@
-from itertools import product
 import os
+from itertools import product
 
-import typer
 import pandas as pd
+import typer
 from datasets import (Value, disable_progress_bar, get_dataset_config_names,
                       get_dataset_split_names, load_dataset)
 from datasets.utils.logging import ERROR, set_verbosity
 from rich.console import Console
 
-from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.minhash import MinHashEmbedder
+from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
-from text_dedup.utils.nn import simhash_clustering, lsh_clustering
+from text_dedup.utils.nn import lsh_clustering, simhash_clustering
 from text_dedup.utils.overlap import get_overlap
 
 # set_verbosity(verbosity=ERROR)
@@ -20,8 +20,12 @@ from text_dedup.utils.overlap import get_overlap
 console = Console()
 app = typer.Typer()
 
+
 @app.command()
-def simhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: str = typer.Option(None, '--config', '-c')):
+def simhash_dedup(
+    dataset: str = typer.Option(None, "--dataset", "-d"),
+    config: str = typer.Option(None, "--config", "-c"),
+):
     num_proc = os.cpu_count()
     splits = get_dataset_split_names(dataset, config)
     split_signatures = {}
@@ -33,14 +37,23 @@ def simhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: 
                 columns.append(feature)
         if columns:
             split_data = split_data.map(
-                lambda x: {"__text__": " ".join(x[f] for f in columns)}, num_proc=num_proc
+                lambda x: {"__text__": " ".join(x[f] for f in columns)},
+                num_proc=num_proc,
             )
             embedder = SimHashEmbedder()
             # Python int too large to convert to C long
             split_data = split_data.map(
-                lambda x: {"__signature__": str(embedder.embed_function(n_gram=6, level="char")(x["__text__"]))}, num_proc=num_proc
+                lambda x: {
+                    "__signature__": str(
+                        embedder.embed_function(n_gram=6, level="char")(x["__text__"])
+                    )
+                },
+                num_proc=num_proc,
             )
-            split_signatures[split] = (list(map(int, split_data["__signature__"])), split_data)
+            split_signatures[split] = (
+                list(map(int, split_data["__signature__"])),
+                split_data,
+            )
 
     results = {}
     records = []
@@ -80,15 +93,17 @@ def simhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: 
     df = df.assign(
         match=df.apply(lambda x: get_overlap(x["query"], x["ref"]), axis=1),
     )
-    df = df.assign(
-        match_length = df["match"].map(len)
-    )
+    df = df.assign(match_length=df["match"].map(len))
     df.sort_values(["query_split", "ref_split"], ascending=[True, False], inplace=True)
     console.print(results)
     console.print(df[:10])
 
+
 @app.command()
-def minhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: str = typer.Option(None, '--config', '-c')):
+def minhash_dedup(
+    dataset: str = typer.Option(None, "--dataset", "-d"),
+    config: str = typer.Option(None, "--config", "-c"),
+):
     num_proc = os.cpu_count()
     splits = get_dataset_split_names(dataset, config)
     split_signatures = {}
@@ -100,12 +115,18 @@ def minhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: 
                 columns.append(feature)
         if columns:
             split_data = split_data.map(
-                lambda x: {"__text__": " ".join(x[f] for f in columns)}, num_proc=num_proc
+                lambda x: {"__text__": " ".join(x[f] for f in columns)},
+                num_proc=num_proc,
             )
             embedder = MinHashEmbedder()
             # Python int too large to convert to C long
             split_data = split_data.map(
-                lambda x: {"__signature__": embedder.embed_function(n_gram=6, level="char")(x["__text__"])}, num_proc=num_proc
+                lambda x: {
+                    "__signature__": embedder.embed_function(n_gram=6, level="char")(
+                        x["__text__"]
+                    )
+                },
+                num_proc=num_proc,
             )
             split_signatures[split] = (split_data["__signature__"], split_data)
 
@@ -124,7 +145,9 @@ def minhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: 
         if x in split_signatures and y in split_signatures:
             x_embeddings, data = split_signatures[x]
             y_embeddings, reference_data = split_signatures[y]
-            clusters = lsh_clustering(x_embeddings, query_signatures=y_embeddings, threshold=0.90)
+            clusters = lsh_clustering(
+                x_embeddings, query_signatures=y_embeddings, threshold=0.90
+            )
             for i, cluster in enumerate(clusters):
                 if len(cluster) <= 1:
                     continue
@@ -147,23 +170,24 @@ def minhash_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: 
     df = df.assign(
         match=df.apply(lambda x: get_overlap(x["query"], x["ref"]), axis=1),
     )
-    df = df.assign(
-        match_length = df["match"].map(len)
-    )
+    df = df.assign(match_length=df["match"].map(len))
     df.sort_values(["query_split", "ref_split"], ascending=[True, False], inplace=True)
     console.print(results)
     console.print(df[:10])
 
-@app.command()
-def suffix_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: str = typer.Option(None, '--config', '-c')):
 
+@app.command()
+def suffix_dedup(
+    dataset: str = typer.Option(None, "--dataset", "-d"),
+    config: str = typer.Option(None, "--config", "-c"),
+):
     def get_slice_text(text, slice):
 
         try:
             ans = text.encode("utf-8")[slice].decode("utf-8")
         except Exception:
             ans = text.encode("utf-8")[slice]
-        
+
         return ans
 
     num_proc = os.cpu_count()
@@ -177,10 +201,11 @@ def suffix_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: s
                 columns.append(feature)
         if columns:
             split_data = split_data.map(
-                lambda x: {"__text__": " ".join(x[f] for f in columns)}, num_proc=num_proc
+                lambda x: {"__text__": " ".join(x[f] for f in columns)},
+                num_proc=num_proc,
             )
             embedder = SuffixArrayEmbedder()
-            slices = embedder.embed_bash(split_data['__text__'])
+            slices = embedder.embed_bash(split_data["__text__"])
             split_signatures[split] = (slices, split_data)
 
     records = []
@@ -200,7 +225,9 @@ def suffix_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: s
                             f"query": segment_data["__text__"],
                             "query_id": f"{x}-{i}",
                             "query_split": x,
-                            f"substring": get_slice_text(segment_data["__text__"], segment),
+                            f"substring": get_slice_text(
+                                segment_data["__text__"], segment
+                            ),
                         }
                     )
     df = pd.DataFrame(records)
@@ -209,5 +236,5 @@ def suffix_dedup(dataset: str = typer.Option(None, '--dataset', '-d'), config: s
 
 
 if __name__ == "__main__":
-    
+
     app()

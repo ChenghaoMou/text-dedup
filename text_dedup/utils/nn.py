@@ -71,7 +71,26 @@ def lsh_clustering(
     threshold: float = 0.5,
     num_perm: int = 128,
     query_signatures: Optional[List[np.ndarray]] = None,
-):
+) -> List[List[int]]:
+    """
+    Cluster embeddings with LSH.
+    
+    Parameters
+    ----------
+    signatures : List[np.ndarray]
+        List of embeddings
+    threshold : float, optional
+        Threshold for similarity, by default 0.5
+    num_perm : int, optional
+        Number of permutations to use, by default 128
+    query_signatures : Optional[List[np.ndarray]], optional
+        List of query embeddings, by default None
+
+    Returns
+    -------
+    List[List[int]]
+        List of neighbors
+    """
     lsh = MinHashLSH(threshold=threshold, num_perm=num_perm)
     with lsh.insertion_session() as session:
         for key, minhash in enumerate(signatures):
@@ -94,7 +113,25 @@ def simhash_clustering(
     # num_blocks: Optional[int] = 5,
     query_signatures: Optional[List[int]] = None,
 ) -> List[List[int]]:
+    """
+    Cluster embeddings with simhash.
 
+    Parameters
+    ----------
+    signatures : List[int]
+        List of embeddings
+    hamming_distance : int, optional
+        Hamming distance, by default 3
+    # num_blocks : Optional[int], optional
+    #     Number of blocks, by default 5
+    query_signatures : Optional[List[int]], optional
+        List of query embeddings, by default None
+    
+    Returns
+    -------
+    List[List[int]]
+        List of neighbors
+    """
     index = SimhashIndex(
         [(i, Simhash(value=signature)) for i, signature in enumerate(signatures)],
         k=hamming_distance,

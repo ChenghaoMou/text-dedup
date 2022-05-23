@@ -1,8 +1,25 @@
 from collections import deque
+from typing import List, Tuple, Generator
 
 
-def restore(offsets, seg_file: str):
+def restore(
+    offsets: List[Tuple[int, int]], seg_file: str
+) -> Generator[int, Tuple[int, int]]:
+    """
+    Restore the original text from the offsets.
 
+    Parameters
+    ----------
+    offsets : List[Tuple[int, int]]
+        List of (start, end) offsets.
+    seg_file : str
+        Path to the segmented file with duplicate offsets.
+
+    Yields
+    ------
+    int, Tuple[int, int]
+        index, (start, end) offset
+    """
     indices = deque([])
     with open(seg_file) as f:
         for line in f:

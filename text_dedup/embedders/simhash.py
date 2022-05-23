@@ -39,11 +39,36 @@ def _compute(hashes: List[int]) -> int:
 @dataclass
 class SimHashEmbedder(Embedder):
 
+    """
+    Embedding text using SimHash.
+
+    Parameters
+    ----------
+    num_perm : int, optional (default=128)
+        Number of permutations to use.
+    threshold : float, optional (default=0.5)
+        Threshold for similarity.
+    """
+
     num_perm: int = 128
     threshold: float = 0.5
 
     def embed(self, corpus: List[str], **kwargs) -> List[int]:
+        """
+        Embed a list of strings.
 
+        Parameters
+        ----------
+        corpus : List[str]
+            List of strings to embed.
+        kwargs : dict
+            Additional keyword arguments for tokenization.
+
+        Returns
+        -------
+        List[int]
+            Fingerprints of the corpus.
+        """
         signatures: List[int] = []
         for doc in corpus:
             tokens = tokenize(doc, **kwargs)
@@ -56,11 +81,25 @@ class SimHashEmbedder(Embedder):
         return signatures
 
     def embed_function(self, **kwargs) -> int:
+        """
+        Embedding function that takes a string and returns the embedding/fingerprint.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Additional keyword arguments for tokenization.
+
+        Returns
+        -------
+        int
+            Fingerprint of the string.
+        """
+
         def wrapper(doc: str) -> int:
 
             tokens = tokenize(doc, **kwargs)
             return _compute(
                 map(lambda x: _unsigned_hash(" ".join(x).encode("utf-8")), tokens)
             )
-        
+
         return wrapper

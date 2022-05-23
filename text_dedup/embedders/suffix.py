@@ -68,11 +68,37 @@ def _merge_intervals(
 @dataclass
 class SuffixArrayEmbedder(Embedder):
 
+    """
+    Find duplicate byte slices using suffix array.
+
+    Parameters
+    ----------
+    k: int
+        Minimum length of the byte slices.
+    """
+
     k: int = 100
 
     def embed(
         self, corpus: List[str], merge: bool = False, merge_strategy: str = "longest"
     ) -> List[List[slice]]:
+        """
+        Find duplicate byte slices using suffix array.
+
+        Parameters
+        ----------
+        corpus: List[str]
+            List of documents.
+        merge: bool
+            Whether to merge overlapping intervals.
+        merge_strategy: str
+            Merge strategy.
+
+        Returns
+        -------
+        List[List[slice]]
+            List of duplicate byte slices.
+        """
 
         assert merge_strategy in ["longest", "overlapping"]
 
@@ -131,6 +157,25 @@ class SuffixArrayEmbedder(Embedder):
         cache_dir: str = "cache",
         temp_file_prefix: str = "embed_temp",
     ) -> List[List[slice]]:
+        """
+        Find duplicate byte slices using suffix array, with the origianl Google scripts.
+
+        Parameters
+        ----------
+        corpus: List[str]
+            List of documents.
+        skip_existing: bool
+            Whether to skip existing files.
+        cache_dir: str
+            Directory to store intermediate files.
+        temp_file_prefix: str
+            Prefix of temporary files.
+
+        Returns
+        -------
+        List[List[slice]]
+            List of duplicate byte slices.
+        """
 
         cache_dir = os.path.abspath(cache_dir)
         if not os.path.exists(cache_dir):

@@ -23,7 +23,13 @@ class Embedder:
 
         Returns
         -------
-        np.ndarray
-            Embedding of the corpus.
+        Union[np.ndarray, List[int], List[np.ndarray], List[slice]]
+            Embeddings/fingerprints/duplicated slices of the corpus.
         """
         raise NotImplementedError
+
+    def embed_function(self, **kwargs):
+        def wrapper(doc: Any) -> np.ndarray:
+            raise NotImplementedError
+
+        return wrapper
