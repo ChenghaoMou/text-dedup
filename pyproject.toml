@@ -16,6 +16,7 @@ annoy = "^1.17.0"
 scipy = "1.7.3"
 mpire = "^2.3.5"
 loguru = "^0.6.0"
+tqdm = "^4.64.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.1"
