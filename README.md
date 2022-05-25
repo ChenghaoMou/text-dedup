@@ -15,6 +15,34 @@
 
 More examples can be found in `examples`.
 
+### Find Duplicates for any dataset on datasets
+
+```
+Usage: cli.py [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --install-completion  Install completion for the current shell.
+  --show-completion     Show completion for the current shell, to copy it or
+                        customize the installation.
+  --help                Show this message and exit.
+
+Commands:
+  minhash-dedup
+  simhash-dedup
+  suffix-dedup
+```
+
+```
+Usage: cli.py simhash-dedup [OPTIONS]
+
+Options:
+  -d, --dataset TEXT
+  -c, --config TEXT
+  -h, --hamming-distance INTEGER  [default: 3]
+  -o, --output TEXT               [default: results.jsonl]
+  --help                          Show this message and exit.
+```
+
 ### Hash-based Near Deduplication
 ```python
 from text_dedup.embedders.minhash import MinHashEmbedder
@@ -81,6 +109,8 @@ if __name__ == "__main__":
 
     embedder = SuffixArrayEmbedder(k=10)
     slices = embedder.embed(corpus, merge=True, merge_strategy='longest')
+    # or using the original rust code
+    # slices = embedder.embed_bash(corpus)
 
     for sentence, intervals in zip(corpus, slices):
         print(sentence)
