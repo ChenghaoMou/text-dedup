@@ -30,7 +30,7 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> list[s
     Examples
     --------
     >>> tokenize("This is a test.", n_gram=2)
-    ['This is', 'is a', 'a test', 'test .']
+    ['▁This▁is', '▁is▁', '▁a', 'a▁test', '▁test.']
     >>> tokenize("This is a test.", n_gram=2, level='char')
     ['Th', 'hi', 'is', 's ', ' i', 'is', 's ', ' a', 'a ', ' t', 'te', 'es', 'st', 't.']
     """
@@ -38,7 +38,7 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> list[s
     assert level in {'sentencepiece', 'char'}, f'Invalid level: {level}'
 
     if level == 'sentencepiece':
-        return [' '.join(ngram) for ngram in ngrams(tokenizer.tokenize(text), n=n_gram)]
+        return [''.join(ngram) for ngram in ngrams(tokenizer.tokenize(text), n=n_gram)]
     elif level == 'char':
         return [''.join(ngram) for ngram in ngrams(text, n=n_gram)]
 

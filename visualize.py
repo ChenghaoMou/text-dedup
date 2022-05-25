@@ -11,7 +11,7 @@ def load_data(file: str = 'results.jsonl'):
     return df
 
 
-df = load_data('simhash_results.jsonl')
+df = load_data('minhash_results.jsonl')
 
 if 'substring' in df.columns:
 
@@ -45,7 +45,6 @@ if 'ref' in df.columns:
         st.markdown(f'`{row["query_id"]}`')
         st.markdown(f'{x}', unsafe_allow_html=True)
 
-        start = y.index(row['match'])
         st.markdown(f'`{row["ref_id"]}`')
         st.markdown(f'{y}', unsafe_allow_html=True)
 

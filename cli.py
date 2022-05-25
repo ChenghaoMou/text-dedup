@@ -10,12 +10,14 @@ from datasets import get_dataset_split_names
 from datasets import load_dataset
 from datasets import Value
 from rich.console import Console
+from tqdm import tqdm
 
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
 from text_dedup.utils.nn import lsh_clustering
 from text_dedup.utils.nn import simhash_clustering
+
 # from text_dedup.utils.overlap import get_overlap
 # from datasets import disable_progress_bar
 # from datasets import get_dataset_config_names
@@ -120,7 +122,8 @@ def simhash_dedup(
     # df = df.assign(match_length=df["match"].map(len))
     df.sort_values(
         ['query_split', 'ref_split'],
-        ascending=[True, False], inplace=True,
+        ascending=[True, False],
+        inplace=True,
     )
     console.print(results)
     console.print(df[:10])
@@ -132,7 +135,7 @@ def minhash_dedup(
     dataset: str = typer.Option(None, '--dataset', '-d'),
     config: str = typer.Option(None, '--config', '-c'),
     num_perm: int = typer.Option(128, '--num-perm', '-n'),
-    threshold: int = typer.Option(0.9, '--threshold', '-t'),
+    threshold: float = typer.Option(0.95, '--threshold', '-t'),
     output: str = typer.Option('results.jsonl', '--output', '-o'),
 ):
     num_proc = os.cpu_count()
@@ -153,7 +156,8 @@ def minhash_dedup(
             split_data = split_data.map(
                 lambda x: {
                     '__signature__': embedder.embed_function(
-                        n_gram=6, level='sentencepiece',
+                        n_gram=6,
+                        level='sentencepiece',
                     )(x['__text__']),
                 },
                 num_proc=num_proc,
@@ -177,9 +181,11 @@ def minhash_dedup(
             y_embeddings, reference_data = split_signatures[y]
             sizes = [sys.getsizeof(rd['__text__']) for rd in reference_data]
             clusters = lsh_clustering(
-                x_embeddings, query_signatures=y_embeddings, threshold=threshold,
+                x_embeddings,
+                query_signatures=y_embeddings,
+                threshold=threshold,
             )
-            for i, cluster in enumerate(clusters):
+            for i, cluster in enumerate(tqdm(clusters, desc='Exporting...')):
                 if len(cluster) <= 1:
                     continue
                 for j in cluster:
@@ -211,7 +217,8 @@ def minhash_dedup(
     # df = df.assign(match_length=df["match"].map(len))
     df.sort_values(
         ['query_split', 'ref_split'],
-        ascending=[True, False], inplace=True,
+        ascending=[True, False],
+        inplace=True,
     )
     console.print(results)
     console.print(df[:10])
@@ -226,7 +233,9 @@ def suffix_dedup(
     skip_existing: bool = typer.Option(False, '--skip-existing', '-s'),
     cache_dir: str = typer.Option('cache', '--cache-dir'),
     temp_file_prefix: str = typer.Option(
-        'embed_temp', '--temp-file-prefix', '-t',
+        'embed_temp',
+        '--temp-file-prefix',
+        '-t',
     ),
     output: str = typer.Option('results.jsonl', '--output', '-o'),
 ):
@@ -275,7 +284,8 @@ def suffix_dedup(
                             'query_id': f'{x}-{i}',
                             'query_split': x,
                             'substring': get_slice_text(
-                                segment_data['__text__'], segment,
+                                segment_data['__text__'],
+                                segment,
                             ),
                         },
                     )
