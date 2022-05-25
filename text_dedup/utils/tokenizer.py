@@ -1,13 +1,15 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2022-05-22 11:33:39
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+from __future__ import annotations
 
-from typing import List
 from nltk.util import ngrams
-from nltk.tokenize import word_tokenize
+from transformers import T5TokenizerFast
 
-def tokenize(text: str, n_gram: int = 6, level: str = 'word', lan: str = "eng") -> List[str]:
+tokenizer = T5TokenizerFast.from_pretrained('google/mt5-base')
+
+
+def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> list[str]:
     """
     Tokenize the text into a sequence of strings.
 
@@ -17,10 +19,8 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'word', lan: str = "eng") 
         The text to tokenize.
     n_gram : int, optional (default=6)
         The size of the n-grams to use.
-    level : str, optional (default='word')
+    level : str, optional (default='sentencepiece')
         The level of tokenization to use.
-    lan : str, optional (default='eng')
-        The language of the text.
 
     Returns
     -------
@@ -35,15 +35,11 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'word', lan: str = "eng") 
     ['Th', 'hi', 'is', 's ', ' i', 'is', 's ', ' a', 'a ', ' t', 'te', 'es', 'st', 't.']
     """
 
-    assert level in {'word', 'char'}, f"Invalid level: {level}"
-    assert lan in {'eng',}, f"Invalid language: {lan}"
+    assert level in {'sentencepiece', 'char'}, f'Invalid level: {level}'
 
-    if lan == "eng":
-        if level == "word":
-            return [" ".join(ngram) for ngram in ngrams(word_tokenize(text), n=n_gram)]
-        elif level == "char":
-            return ["".join(ngram) for ngram in ngrams(text, n=n_gram)]
-    
+    if level == 'sentencepiece':
+        return [' '.join(ngram) for ngram in ngrams(tokenizer.tokenize(text), n=n_gram)]
+    elif level == 'char':
+        return [''.join(ngram) for ngram in ngrams(text, n=n_gram)]
+
     return []
-    
-

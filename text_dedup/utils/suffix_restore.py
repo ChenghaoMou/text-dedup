@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from collections import deque
-from typing import List, Tuple, Generator
+from typing import Deque
+from typing import Generator
 
 
 def restore(
-    offsets: List[Tuple[int, int]], seg_file: str
+    offsets: list[tuple[int, int]], seg_file: str,
 ) -> Generator:
     """
     Restore the original text from the offsets.
@@ -20,14 +23,14 @@ def restore(
     int, Tuple[int, int]
         index, (start, end) offset
     """
-    indices = deque([])
+    indices: Deque[tuple[int, int]] = deque([])
     with open(seg_file) as f:
         for line in f:
             try:
-                x, y = line.strip().split(" ", 1)
-                if x.isdigit() and y.isdigit():
-                    indices.append((int(x), int(y)))
-            except:
+                left, right = line.strip().split(' ', 1)
+                if left.isdigit() and right.isdigit():
+                    indices.append((int(left), int(right)))
+            except Exception:
                 pass
 
     for i, (start, end) in enumerate(offsets):

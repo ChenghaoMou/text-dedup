@@ -140,3 +140,4 @@ benchmark.py
 cache
 .DS_Store
 docs
+*jsonl
