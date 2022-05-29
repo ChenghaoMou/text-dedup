@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from typing import List
 from typing import Literal
 
 import numpy as np
@@ -14,7 +13,8 @@ from datasketch import MinHashLSH
 from mpire import WorkerPool
 from simhash import Simhash
 from simhash import SimhashIndex
-from tqdm import tqdm
+# from typing import List
+# from tqdm import tqdm
 
 
 def annoy_clustering(
@@ -115,9 +115,9 @@ def lsh_clustering(
 
     with WorkerPool(n_jobs=os.cpu_count()) as pool:
         neighbors = pool.map(
-            lambda *signature: [
+            lambda signature: [
                 int(x.split('-')[1]) for x in lsh.query(
-                    MinHash(num_perm=num_perm, hashvalues=signature),
+                    MinHash(num_perm=num_perm, hashvalues=signature.reshape(-1)),
                 )
             ], query_signatures, progress_bar=True,
         )

@@ -4,11 +4,11 @@
 """Embedding models for text."""
 from __future__ import annotations
 
-from typing import Any
-from typing import List
-from typing import Union
+# from typing import Any
+# from typing import List
+# from typing import Union
 
-import numpy as np
+# import numpy as np
 
 
 class Embedder:

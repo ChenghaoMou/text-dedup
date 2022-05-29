@@ -8,6 +8,7 @@ repos:
     -   id: debug-statements
     -   id: double-quote-string-fixer
     -   id: name-tests-test
+        args: ['--django']
     -   id: requirements-txt-fixer
 -   repo: https://github.com/asottile/setup-cfg-fmt
     rev: v1.20.1

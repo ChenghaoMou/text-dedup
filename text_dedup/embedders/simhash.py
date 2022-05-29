@@ -32,7 +32,7 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
         The hash of the object.
     """
     assert bit_length == 64, 'Only 64-bit hashes are supported.'
-    h = hashlib.md5(obj).digest()[: bit_length // 8]
+    h = hashlib.sha256(obj).digest()[: bit_length // 8]
     return int.from_bytes(h, byteorder='big', signed=False)
 
 
@@ -94,7 +94,8 @@ class SimHashEmbedder(Embedder):
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
 
-    def embed_function(self, **kwargs) -> Callable:
+    @staticmethod
+    def embed_function(**kwargs) -> Callable:
         """
         Embedding function that takes a string and returns the embedding/fingerprint.
 

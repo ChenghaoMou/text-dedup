@@ -15,9 +15,9 @@
 
 More examples can be found in `examples`.
 
-### Find Duplicates for any dataset on datasets
+### Find Duplicates for any dataset on Huggingface's datasets
 
-```
+```text
 Usage: cli.py [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -30,17 +30,6 @@ Commands:
   minhash-dedup
   simhash-dedup
   suffix-dedup
-```
-
-```
-Usage: cli.py simhash-dedup [OPTIONS]
-
-Options:
-  -d, --dataset TEXT
-  -c, --config TEXT
-  -h, --hamming-distance INTEGER  [default: 3]
-  -o, --output TEXT               [default: results.jsonl]
-  --help                          Show this message and exit.
 ```
 
 ### Hash-based Near Deduplication

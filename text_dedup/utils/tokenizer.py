@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 from nltk.util import ngrams
-from transformers import T5TokenizerFast
+from transformers import T5Tokenizer
 
-tokenizer = T5TokenizerFast.from_pretrained('google/mt5-base')
+tokenizer = T5Tokenizer.from_pretrained('google/mt5-base')
 
 
 def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> list[str]:

@@ -232,11 +232,11 @@ class SuffixArrayEmbedder(Embedder):
 
         results: list[list[slice]] = [[] for _ in corpus]
 
-        for id, (x, y) in restore(
+        for idx, (x, y) in restore(
             offsets, os.path.join(
                 cache_dir, temp_file_prefix + f'.{self.k}.byterange',
             ),
         ):
             if y - x >= self.k:
-                results[int(id)].append(slice(x, y))
+                results[int(idx)].append(slice(x, y))
         return results

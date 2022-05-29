@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # @Date    : 2022-04-02 10:53:30
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+# from __future__ import annotations
 from __future__ import annotations
 
 from dataclasses import dataclass
