@@ -1,0 +1,12 @@
+dataset: oscar-corpus/OSCAR-2109
+configs:
+  - deduplicated_gl
+columns:
+  - text
+num_proc: 10
+embedder:
+  name: SimHashEmbedder
+  hamming_distance: 3
+tokenization:
+  ngram_size: 12
+  level: sentencepiece

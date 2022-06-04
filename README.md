@@ -18,19 +18,12 @@ More examples can be found in `examples`.
 ### Find Duplicates for any dataset on Huggingface's datasets
 
 ```text
-Usage: cli.py [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --install-completion  Install completion for the current shell.
-  --show-completion     Show completion for the current shell, to copy it or
-                        customize the installation.
-  --help                Show this message and exit.
-
-Commands:
-  minhash-dedup
-  simhash-dedup
-  suffix-dedup
+python cli.py method=suffix  method.dataset=oscar-corpus/OSCAR-2201 method.configs="[gl]"
+python cli.py method=simhash method.tokenization.ngram_size=12 method.dataset=oscar-corpus/OSCAR-2201 method.configs="[gl]"
+python cli.py method=minhash method.tokenization.ngram_size=12 method.dataset=oscar-corpus/OSCAR-2201 method.configs="[gl]"
 ```
+
+Refer to `configs` to more details. Configurations are parsed with [hydra](https://hydra.cc).
 
 ### Hash-based Near Deduplication
 ```python
@@ -146,3 +139,8 @@ if __name__ == "__main__":
     print(groups)
     # [0, 0, 2, 2]
 ```
+
+
+## Dataset Duplication Report
+
+[ ] TODO

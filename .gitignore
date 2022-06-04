@@ -140,3 +140,8 @@ cache
 .DS_Store
 docs
 *jsonl
+results
+.lightning*
+outputs/
+results.bin
+visualize.py

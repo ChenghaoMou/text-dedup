@@ -8,11 +8,10 @@ from typing import Literal
 
 import numpy as np
 from annoy import AnnoyIndex
-from datasketch import MinHash
-from datasketch import MinHashLSH
+from datasketch import MinHash, MinHashLSH
 from mpire import WorkerPool
-from simhash import Simhash
-from simhash import SimhashIndex
+from simhash import Simhash, SimhashIndex
+
 # from typing import List
 # from tqdm import tqdm
 
@@ -115,9 +114,9 @@ def lsh_clustering(
 
     with WorkerPool(n_jobs=os.cpu_count()) as pool:
         neighbors = pool.map(
-            lambda signature: [
+            lambda *signature: [
                 int(x.split('-')[1]) for x in lsh.query(
-                    MinHash(num_perm=num_perm, hashvalues=signature.reshape(-1)),
+                    MinHash(num_perm=num_perm, hashvalues=signature),
                 )
             ], query_signatures, progress_bar=True,
         )

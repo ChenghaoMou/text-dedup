@@ -1,0 +1,13 @@
+dataset: oscar-corpus/OSCAR-2109
+configs:
+  - deduplicated_gl
+columns:
+  - text
+num_proc: 10
+embedder:
+  name: MinHashEmbedder
+  num_perm: 128
+  threshold: 0.95
+tokenization:
+  ngram_size: 12
+  level: sentencepiece

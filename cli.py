@@ -1,364 +1,232 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
+import time
 from itertools import product
-from typing import List
+from typing import Any, Dict, List
 
-import pandas as pd
-import typer
-from datasets import get_dataset_config_names
-from datasets import get_dataset_split_names
-from datasets import load_dataset
-from datasets import Value
-from rich.console import Console
-from tqdm import tqdm
+import hydra
+import orjson
+from datasets import (Value, get_dataset_config_names, get_dataset_split_names,
+                      load_dataset)
+from omegaconf import DictConfig
+from rich.logging import RichHandler
+from rich.progress import track
 
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
-from text_dedup.utils.nn import lsh_clustering
-from text_dedup.utils.nn import simhash_clustering
+from text_dedup.utils.nn import lsh_clustering, simhash_clustering
 
-# from text_dedup.utils.overlap import get_overlap
-# from datasets import disable_progress_bar
-# from datasets import get_dataset_config_names
-# from datasets.utils.logging import ERROR
-# from datasets.utils.logging import set_verbosity
-
-# set_verbosity(verbosity=ERROR)
-# disable_progress_bar()
-
-console = Console()
-app = typer.Typer()
+logging.getLogger('simhash').setLevel(logging.ERROR)
+# logging.getLogger("datasets").setLevel(logging.ERROR)
+logging.basicConfig(
+    level='INFO', format='%(message)s', datefmt='[%X]', handlers=[RichHandler()],
+)
+logger = logging.getLogger('text_dedup')
 
 
-@app.command()
-def simhash_dedup(
-    dataset: str = typer.Option(None, '--dataset', '-d'),
-    configs: list[str] = typer.Option([], '--config', '-c'),
-    columns: list[str] = typer.Option([], '--columns', '-f'),
-    hamming_distance: int = typer.Option(3, '--hamming-distance', '-h'),
-    ngram_size: int = typer.Option(6, '--ngram-size', '-n'),
-    output: str = typer.Option(
-        'results/simhash-{dataset}-{config}-{columns}-{ngram}-{distance}.jsonl',
-        '--output',
-        '-o',
-    ),
-):
-    num_proc = os.cpu_count()
-    if not configs:
-        configs = get_dataset_config_names(dataset)
+SPLITS = ['train', 'validation', 'test']
 
-    for config in configs:
-        splits = get_dataset_split_names(dataset, config)
-        split_signatures = {}
-        conf_columns = columns or []
-        for split in splits:
-            split_data = load_dataset(dataset, config, split=split)
-            if not conf_columns:
-                for feature, vtype in split_data.info.features.items():
-                    if isinstance(vtype, Value) and vtype.dtype == 'string':
-                        conf_columns.append(feature)
-            if conf_columns:
-                split_data = split_data.map(
-                    lambda x: {'__text__': ' '.join(x[f] for f in conf_columns)},
-                    num_proc=num_proc,
+
+def get_byte_size(x: str) -> int:
+    return sys.getsizeof(x)
+
+
+def get_slice_text(text: str, offset: slice) -> str:
+    return text.encode('utf-8')[offset].decode('utf-8', errors='ignore')
+
+
+@hydra.main(config_name='config', config_path='configs', version_base='1.2')
+def main(conf: DictConfig):
+    start_time = time.time()
+    conf = conf.method
+    num_proc: int = conf.num_proc or os.cpu_count() or 1
+
+    if not conf.configs:
+        logger.info('No configs specified, using all available configs')
+        conf.configs = get_dataset_config_names(conf.dataset, use_auth_token=True)
+
+    for config in conf.configs:
+        splits = get_dataset_split_names(conf.dataset, config, use_auth_token=True)
+        if conf.embedder.name in {
+            'SimHashEmbedder',
+            'MinHashEmbedder',
+            'SuffixArrayEmbedder',
+        }:
+            def serialize(x: Any) -> Any:
+                if conf.embedder.name == 'SimHashEmbedder':
+                    return str(x)
+                return x
+
+            def deserialize(x: Any) -> Any:
+                if conf.embedder.name == 'SimHashEmbedder':
+                    return int(x)
+                return x
+            split_signatures: Dict[str, Any] = {}
+            conf_columns: List[str] = conf.columns or []
+            for split in splits:
+                split_data = load_dataset(
+                    conf.dataset,
+                    config,
+                    split=split,
+                    use_auth_token=True,
+                    cache_dir='.cache',
                 )
-                embedder = SimHashEmbedder()
-                split_data = split_data.map(
-                    lambda x: {
-                        '__signature__': str(
-                            embedder.embed_function(
-                                n_gram=ngram_size, level='sentencepiece',
-                            )(
-                                x['__text__'],
-                            ),
-                        ),
-                    },
-                    num_proc=num_proc,
-                )
-                split_signatures[split] = (
-                    list(map(int, split_data['__signature__'])),
-                    split_data,
-                )
-
-        results = {}
-        records = []
-        for x, y in product(['train', 'validation', 'test'], repeat=2):
-            if x not in splits or y not in splits:
-                continue
-            if ['train', 'validation', 'test'].index(x) > [
-                'train',
-                'validation',
-                'test',
-            ].index(y):
-                continue
-
-            if x in split_signatures and y in split_signatures:
-                console.print(f'{x} vs {y}')
-                x_embeddings, data = split_signatures[x]
-                y_embeddings, reference_data = split_signatures[y]
-                sizes = [sys.getsizeof(rd['__text__']) for rd in reference_data]
-                clusters = simhash_clustering(
-                    x_embeddings,
-                    hamming_distance=hamming_distance,
-                    query_signatures=y_embeddings,
-                )
-                for i, cluster in enumerate(tqdm(clusters)):
-                    if len(cluster) <= 1:
-                        continue
-                    for j in cluster:
-                        if (y, i) == (x, j):
-                            continue
-                        records.append(
-                            {
-                                'query': reference_data[i]['__text__'],
-                                'query_id': f'{y}-{i}',
-                                'query_split': y,
-                                'ref': data[j]['__text__'],
-                                'ref_id': f'{x}-{j}',
-                                'ref_split': x,
-                            },
+                if not conf_columns:
+                    for feature, vtype in split_data.info.features.items():
+                        if isinstance(vtype, Value) and vtype.dtype == 'string':
+                            conf_columns.append(feature)
+                logger.info(f'Using columns in {split}: {conf_columns}')
+                if conf_columns:
+                    split_data = split_data.map(
+                        lambda x: {'__text__': ' '.join(x[f] for f in conf_columns)},
+                        num_proc=num_proc,
+                        desc=f'Extracting text...',
+                    )
+                    if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
+                        embedder = (
+                            SimHashEmbedder()
+                            if conf.embedder.name == 'SimHashEmbedder'
+                            else MinHashEmbedder(num_perm=conf.embedder.num_perm)
                         )
-                num_ratio = len(
-                    [c for c in clusters if len(c) > 1],
-                ) / len(y_embeddings)
-                size_ratio = sum(
-                    s for c, s in zip(clusters, sizes) if len(c) > 1
-                ) / sum(
-                    sizes,
-                )
-                results[
-                    f'{x}-{y}'
-                ] = f'{num_ratio * 100:.2f}% of docs, {size_ratio*100:.2f}% of bytes'
-        if not records:
-            console.print(
-                f'[red]No records found for {dataset} {config} {splits} with {hamming_distance} hamming distance[/red]',
-            )
-            continue
-        df = pd.DataFrame(records)
-        df.sort_values(
-            ['query_split', 'ref_split'],
-            ascending=[True, False],
-            inplace=True,
-        )
-        console.print(results)
-        console.print(df[:10])
 
-        output_filename = output.format(
-            dataset=dataset,
-            config=config,
-            columns='_'.join(columns),
-            ngram=ngram_size,
-            distance=hamming_distance,
-        )
-        path = os.path.dirname(output_filename)
-        if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-        df.to_json(output_filename, orient='records', lines=True)
-
-
-@app.command()
-def minhash_dedup(
-    dataset: str = typer.Option(None, '--dataset', '-d'),
-    configs: list[str] = typer.Option([], '--config', '-c'),
-    columns: list[str] = typer.Option([], '--columns', '-f'),
-    num_perm: int = typer.Option(128, '--num-perm', '-p'),
-    threshold: float = typer.Option(0.95, '--threshold', '-t'),
-    ngram_size: int = typer.Option(6, '--ngram-size', '-n'),
-    output: str = typer.Option(
-        'results/minhash-{dataset}-{config}-{columns}-{ngram}-{perm}-{threshold}.jsonl',
-        '--output',
-        '-o',
-    ),
-):
-    num_proc = os.cpu_count()
-    if not configs:
-        configs = get_dataset_config_names(dataset)
-
-    for config in configs:
-        splits = get_dataset_split_names(dataset, config)
-        split_signatures = {}
-        for split in splits:
-            split_data = load_dataset(dataset, config, split=split)
-            columns = []
-            for feature, vtype in split_data.info.features.items():
-                if isinstance(vtype, Value) and vtype.dtype == 'string':
-                    columns.append(feature)
-            if columns:
-                split_data = split_data.map(
-                    lambda x: {'__text__': ' '.join(x[f] for f in columns)},
-                    num_proc=num_proc,
-                )
-                embedder = MinHashEmbedder(num_perm=num_perm)
-                split_data = split_data.map(
-                    lambda x: {
-                        '__signature__': embedder.embed_function(
-                            n_gram=ngram_size,
-                            level='sentencepiece',
-                        )(x['__text__']),
-                    },
-                    num_proc=num_proc,
-                )
-                split_signatures[split] = (split_data['__signature__'], split_data)
-
-        results = {}
-        records = []
-        for x, y in product(['train', 'validation', 'test'], repeat=2):
-            if x not in splits or y not in splits:
-                continue
-            if ['train', 'validation', 'test'].index(x) > [
-                'train',
-                'validation',
-                'test',
-            ].index(y):
-                continue
-
-            if x in split_signatures and y in split_signatures:
-                x_embeddings, data = split_signatures[x]
-                y_embeddings, reference_data = split_signatures[y]
-                sizes = [sys.getsizeof(rd['__text__']) for rd in reference_data]
-                clusters = lsh_clustering(
-                    x_embeddings,
-                    query_signatures=y_embeddings,
-                    threshold=threshold,
-                )
-                for i, cluster in enumerate(tqdm(clusters, desc='Exporting...')):
-                    if len(cluster) <= 1:
-                        continue
-                    for j in cluster:
-                        if (y, i) == (x, j):
-                            continue
-                        records.append(
-                            {
-                                'query': reference_data[i]['__text__'],
-                                'query_id': f'{y}-{i}',
-                                'query_split': y,
-                                'ref': data[j]['__text__'],
-                                'ref_id': f'{x}-{j}',
-                                'ref_split': x,
-                            },
+                        embed_function = embedder.embed_function(  # type: ignore
+                            n_gram=conf.tokenization.ngram_size,
+                            level=conf.tokenization.level,
                         )
-                num_ratio = len(
-                    [c for c in clusters if len(c) > 1],
-                ) / len(y_embeddings)
-                size_ratio = sum(
-                    s for c, s in zip(clusters, sizes) if len(c) > 1
-                ) / sum(
-                    sizes,
-                )
-                results[
-                    f'{x}-{y}'
-                ] = f'{num_ratio * 100:.2f}% of docs, {size_ratio*100:.2f}% of bytes'
-        df = pd.DataFrame(records)
-        df.sort_values(
-            ['query_split', 'ref_split'],
-            ascending=[True, False],
-            inplace=True,
-        )
-        console.print(results)
-        console.print(df[:10])
-        output_filename = output.format(
-            dataset=dataset,
-            config=config,
-            columns='_'.join(columns),
-            ngram=ngram_size,
-            threshold=int(threshold * 100),
-            perm=num_perm,
-        )
-        path = os.path.dirname(output_filename)
-        if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-        df.to_json(output, orient='records', lines=True)
 
-
-@app.command()
-def suffix_dedup(
-    dataset: str = typer.Option(None, '--dataset', '-d'),
-    configs: list[str] = typer.Option([], '--config', '-c'),
-    columns: list[str] = typer.Option([], '--columns', '-f'),
-    k: int = typer.Option(100, '--k', '-k'),
-    skip_existing: bool = typer.Option(False, '--skip-existing', '-s'),
-    cache_dir: str = typer.Option('cache', '--cache-dir'),
-    temp_file_prefix: str = typer.Option(
-        'embed_temp',
-        '--temp-file-prefix',
-        '-t',
-    ),
-    output: str = typer.Option(
-        'results/suffix-{dataset}-{config}-{columns}-{k}.jsonl', '--output', '-o',
-    ),
-):
-    def get_slice_text(text, offset: slice):
-
-        return text.encode('utf-8')[offset].decode('utf-8', errors='ignore')
-
-    num_proc = os.cpu_count()
-    if not configs:
-        configs = get_dataset_config_names(dataset)
-
-    for config in configs:
-        splits = get_dataset_split_names(dataset, config)
-        split_signatures = {}
-        for split in splits:
-            split_data = load_dataset(dataset, config, split=split)
-            columns = []
-            for feature, vtype in split_data.info.features.items():
-                if isinstance(vtype, Value) and vtype.dtype == 'string':
-                    columns.append(feature)
-            if columns:
-                split_data = split_data.map(
-                    lambda x: {'__text__': ' '.join(x[f] for f in columns)},
-                    num_proc=num_proc,
-                )
-                embedder = SuffixArrayEmbedder(k=k)
-                slices = embedder.embed_bash(
-                    split_data['__text__'],
-                    skip_existing=skip_existing,
-                    cache_dir=cache_dir,
-                    temp_file_prefix=temp_file_prefix,
-                )
-                split_signatures[split] = (slices, split_data)
-
-        records = []
-        total = 0
-        duplicated = 0
-        for x in ['train', 'validation', 'test']:
-            if x not in splits:
-                continue
-            if x in split_signatures:
-                slices, data = split_signatures[x]
-                for i, (segments, segment_data) in enumerate(zip(slices, data)):
-                    total += len(segment_data['__text__'].encode('utf-8'))
-                    for segment in segments:
-                        duplicated += segment.stop - segment.start
-                        records.append(
-                            {
-                                'query': segment_data['__text__'],
-                                'query_id': f'{x}-{i}',
-                                'query_split': x,
-                                'substring': get_slice_text(
-                                    segment_data['__text__'],
-                                    segment,
+                        split_data = split_data.map(
+                            lambda x: {
+                                '__signature__': serialize(  # type: ignore
+                                    embed_function(x['__text__']),
                                 ),
                             },
+                            num_proc=num_proc,
+                            desc=f'Embedding...',
                         )
-        df = pd.DataFrame(records)
-        console.print(f'Duplication ratio: {duplicated / total * 100:.2f}%')
-        console.print(df[:10])
-        output_filename = output.format(
-            dataset=dataset,
-            config=config,
-            columns='_'.join(columns),
-            k=k,
-        )
-        path = os.path.dirname(output_filename)
-        if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-        df.to_json(output, orient='records', lines=True)
+                        split_signatures[split] = split_data
+
+                    elif conf.embedder.name == 'SuffixArrayEmbedder':
+                        embedder = SuffixArrayEmbedder(k=conf.embedder.k)
+                        slices = embedder.embed_bash(
+                            split_data['__text__'],
+                            skip_existing=conf.embedder.skip_existing,
+                            cache_dir=conf.embedder.cache_dir,
+                            temp_file_prefix=conf.embedder.temp_file_prefix,
+                        )
+                        split_signatures[split] = (slices, split_data)
+            records: List[Dict[str, Any]] = []
+            if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
+                # All pair combinations
+                for x, y in product(SPLITS, repeat=2):
+                    if x not in split_signatures or y not in split_signatures:
+                        continue
+                    if SPLITS.index(x) > SPLITS.index(y):
+                        continue
+                    logger.info(f'Processing {x} and {y}')
+                    base_data = split_signatures[x]
+                    query_data = split_signatures[y]
+
+                    clusters: List[List[int]] = (
+                        simhash_clustering(
+                            list(map(deserialize, base_data['__signature__'])),
+                            hamming_distance=conf.embedder.hamming_distance,
+                            query_signatures=list(
+                                map(deserialize, query_data['__signature__']),
+                            ),
+                        )
+                        if conf.embedder.name == 'SimHashEmbedder'
+                        else lsh_clustering(
+                            base_data['__signature__'],
+                            threshold=conf.embedder.threshold,
+                            query_signatures=query_data['__signature__'],
+                        )
+                    )
+                    duplicated_count = 0
+                    total_count = 0
+                    duplicated_size = 0
+                    total_size = 0
+                    query_docs = query_data['__text__']
+                    base_docs = base_data['__text__']
+                    for i, cluster in enumerate(
+                        track(clusters, description='Post-processing...'),
+                    ):
+                        total_count += 1
+                        total_size += get_byte_size(query_docs[i])
+                        if len(cluster) <= 1:
+                            continue
+                        duplicated_count += 1
+                        duplicated_size += get_byte_size(query_docs[i])
+                        cluster = [j for j in cluster if (x, j) != (y, i)]
+                        records.append(
+                            {
+                                'query': query_docs[i],
+                                'query_id': f'{y}-{i}',
+                                'query_split': y,
+                                'references': [
+                                    {
+                                        'ref': base_docs[j],
+                                        'ref_id': f'{x}-{j}',
+                                        'ref_split': x,
+                                    }
+                                    for j in cluster
+                                ],
+                            },
+                        )
+                    logger.info(
+                        f'{x}-{y}: {duplicated_count/total_count*100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size/total_size*100:.2f}% ({duplicated_size}) duplicated bytes',
+                    )
+                    del query_docs
+                    del base_docs
+
+                if not records:
+                    continue
+
+                with open('results.bin', 'wb') as f:
+                    f.write(orjson.dumps(records))
+            elif conf.embedder.name == 'SuffixArrayEmbedder':
+                duplicated_size = 0
+                duplicated_count = 0
+                total_count = 0
+                total_size = 0
+                for x in SPLITS:
+                    if x not in split_signatures:
+                        continue
+                    slices, base_data = split_signatures[x]
+                    for i, (segments, segment_data) in enumerate(
+                        zip(slices, base_data),
+                    ):
+                        total_size += get_byte_size(segment_data['__text__'])
+                        total_count += 1
+                        duplicated_count += 1 if segments else 0
+                        for segment in segments:
+                            duplicated_size += segment.stop - segment.start
+                            records.append(
+                                {
+                                    'query': segment_data['__text__'],
+                                    'query_id': f'{x}-{i}',
+                                    'query_split': x,
+                                    'substring': get_slice_text(
+                                        segment_data['__text__'],
+                                        segment,
+                                    ),
+                                },
+                            )
+                logger.info(
+                    f'{duplicated_count/total_count*100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size/total_size*100:.2f}% ({duplicated_size}) duplicated bytes',
+                )
+
+                with open('results.bin', 'wb') as f:
+                    f.write(orjson.dumps(records))
+        else:
+            logger.error(f'Unknown embedder: {conf.embedder}')
+
+    logger.info(f'Done in {time.time() - start_time:.2f} seconds')
 
 
 if __name__ == '__main__':
 
-    app()
+    main()
