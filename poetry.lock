@@ -732,17 +732,6 @@ optional = false
 python-versions = "*"
 
 [[package]]
-name = "simhash"
-version = "2.1.2"
-description = "A Python implementation of Simhash Algorithm"
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-numpy = "*"
-
-[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -950,7 +939,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.10"
-content-hash = "b62256210ec76568138c83d5f7f3badebafbcbb7bc0cce62ae25f660bea20ba3"
+content-hash = "8549b93529d21bd9cabb557fc5c5b2676c97d6e194a87f57d0974ce5fba8cd86"
 
 [metadata.files]
 aiohttp = [
@@ -1729,13 +1718,6 @@ sentencepiece = [
     {file = "sentencepiece-0.1.96-pp37-pypy37_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:dadccb2e49244b6e64b4527d13ec14d5e094a90b41cf9b963e457e64182f1941"},
     {file = "sentencepiece-0.1.96-pp37-pypy37_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:48c6d13b3bfff08060c138248e85df60f6fad11135ad7a8fc2ef6005aacca839"},
     {file = "sentencepiece-0.1.96.tar.gz", hash = "sha256:9bdf097d5bd1d8ce42dfee51f6ff05f5578b96e48c6f6006aa4eff69edfa3639"},
-]
-simhash = [
-    {file = "simhash-2.1.2-py2-none-any.whl", hash = "sha256:49c5d81f31254f7e3f71dc2f5a245625c3d6143584478fdf4ffd2e63e4929366"},
-    {file = "simhash-2.1.2-py2.7.egg", hash = "sha256:634f41eb63d1c2dd1719459a859a985b2e0f2457670c9739c4d831a218409e8c"},
-    {file = "simhash-2.1.2-py3-none-any.whl", hash = "sha256:968de16c82c227a631aa00e57ab58f9e4ee9e47e8408486199a9eb59c1d6979b"},
-    {file = "simhash-2.1.2-py3.9.egg", hash = "sha256:a1dd9c4e2688fac260b5a810434326395bd23a566f5a8d5b9eac1336cc746d7f"},
-    {file = "simhash-2.1.2.tar.gz", hash = "sha256:533bc8cf41e4e6dd83f0b1847363516bf3323e0fa92e63d9e6df4e281e882e1b"},
 ]
 six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},

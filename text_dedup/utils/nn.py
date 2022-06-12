@@ -11,7 +11,8 @@ import numpy as np
 from annoy import AnnoyIndex
 from datasketch import MinHash, MinHashLSH
 from mpire import WorkerPool
-from simhash import Simhash, SimhashIndex
+
+from text_dedup.utils.simhash_redis import SimhashIndex
 
 # from typing import List
 # from tqdm import tqdm
@@ -159,7 +160,7 @@ def lsh_clustering(
 def simhash_clustering(
     signatures: List[int],
     hamming_distance: int = 3,
-    # num_blocks: Optional[int] = 5,
+    num_blocks: int = 5,
     query_signatures: List[int] | None = None,
     index_basename: Optional[str] = None,
     skip_indexing_if_exists: bool = False,
@@ -188,10 +189,11 @@ def simhash_clustering(
     if index_basename is None or not skip_indexing_if_exists or MEMORY.get(index_basename, None) is None:
         index = SimhashIndex(
             [
-                (i, Simhash(value=signature))
+                (i, signature)
                 for i, signature in enumerate(signatures)
             ],
             k=hamming_distance,
+            b=num_blocks,
         )
 
     if index_basename is not None:
@@ -204,7 +206,7 @@ def simhash_clustering(
     with WorkerPool(n_jobs=os.cpu_count()) as pool:
         neighbors = pool.map(
             lambda signature: list(
-                map(int, index.get_near_dups(Simhash(value=signature))),
+                map(int, index.get_near_dups(signature)),
             ), query_signatures, progress_bar=False,
         )
 
