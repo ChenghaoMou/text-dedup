@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, List, Optional
 
 import numpy as np
 from datasketch import MinHash
@@ -27,7 +27,7 @@ class MinHashEmbedder(Embedder):
 
     num_perm: int = 128
 
-    def embed(self, corpus: list[str], **kwargs) -> np.ndarray:
+    def embed(self, corpus: List[str], **kwargs) -> np.ndarray:
         """
         Embed a list of strings.
 

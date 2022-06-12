@@ -3,8 +3,9 @@
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
+import logging
 import os
-from typing import Literal
+from typing import Dict, List, Literal, Optional
 
 import numpy as np
 from annoy import AnnoyIndex
@@ -15,9 +16,12 @@ from simhash import Simhash, SimhashIndex
 # from typing import List
 # from tqdm import tqdm
 
+logger: logging.Logger = logging.getLogger('text_dedup')
+MEMORY: Dict[str, SimhashIndex] = {}
+
 
 def annoy_clustering(
-    embeddings: list[np.ndarray],
+    embeddings: List[np.ndarray],
     f: int = 128,
     metric: Literal[
         'angular', 'euclidean',
@@ -26,8 +30,8 @@ def annoy_clustering(
     num_trees: int = 64,
     top_k: int = 100,
     distance_threshold: float = 0.5,
-    query_embeddings: list[np.ndarray] | None = None,
-) -> list[list[int]]:
+    query_embeddings: List[np.ndarray] | None = None,
+) -> List[List[int]]:
     """Cluster embeddings with annoy.
 
     Parameters
@@ -55,13 +59,13 @@ def annoy_clustering(
         t.add_item(i, v)
     t.build(num_trees)
 
-    neighbors: list[list[int]] = []
+    neighbors: List[List[int]] = []
 
     if query_embeddings is None:
         query_embeddings = embeddings
 
     for i, v in enumerate(embeddings):
-        current: list[int] = []
+        current: List[int] = []
         for j, dist in zip(
             *t.get_nns_by_vector(
                 v, top_k, search_k=-1,
@@ -76,11 +80,15 @@ def annoy_clustering(
 
 
 def lsh_clustering(
-    signatures: list[np.ndarray],
+    signatures: List[np.ndarray],
     threshold: float = 0.5,
     num_perm: int = 128,
-    query_signatures: list[np.ndarray] | None = None,
-) -> list[list[int]]:
+    query_signatures: Optional[List[np.ndarray]] = None,
+    redis_basename: Optional[str] = None,
+    redis_host: Optional[str] = None,
+    redis_port: Optional[int] = None,
+    skip_indexing_if_exists: bool = False,
+) -> List[List[int]]:
     """
     Cluster embeddings with LSH.
 
@@ -94,20 +102,35 @@ def lsh_clustering(
         Number of permutations to use, by default 128
     query_signatures : Optional[List[np.ndarray]], optional
         List of query embeddings, by default None
+    redis_basename : Optional[str], optional
+        Redis basename, by default None
+    redis_host : Optional[str], optional
+        Redis host, by default None
+    redis_port : Optional[int], optional
+        Redis port, by default None
+    skip_indexing_if_exists : bool, optional
+        Skip indexing if exists, by default False
 
     Returns
     -------
     List[List[int]]
         List of neighbors
     """
-    lsh = MinHashLSH(threshold=threshold, num_perm=num_perm)
-    with lsh.insertion_session() as session:
-        for key, minhash in enumerate(signatures):
-            session.insert(
-                f'id-{key}', MinHash(num_perm=num_perm, hashvalues=minhash),
-            )
+    lsh = MinHashLSH(threshold=threshold, num_perm=num_perm, storage_config={
+        'type': 'redis',
+        'basename': redis_basename.encode('utf-8'),
+        'redis': {'host': redis_host, 'port': redis_port},
+    } if redis_basename is not None else None)
+    if lsh.is_empty() or not skip_indexing_if_exists:
+        with lsh.insertion_session() as session:
+            for key, minhash in enumerate(signatures):
+                session.insert(
+                    f'id-{key}', MinHash(num_perm=num_perm, hashvalues=minhash),
+                )
+        logger.debug(
+            f'LSH index already exists (size: {lsh.get_counts()}), skipped indexing')
 
-    neighbors: list[list[int]] = []
+    neighbors: List[List[int]] = []
 
     if query_signatures is None:
         query_signatures = signatures
@@ -118,7 +141,7 @@ def lsh_clustering(
                 int(x.split('-')[1]) for x in lsh.query(
                     MinHash(num_perm=num_perm, hashvalues=signature),
                 )
-            ], query_signatures, progress_bar=True,
+            ], query_signatures, progress_bar=False,
         )
 
     # for signature in tqdm(query_signatures, desc="Querying..."):
@@ -134,11 +157,13 @@ def lsh_clustering(
 
 
 def simhash_clustering(
-    signatures: list[int],
+    signatures: List[int],
     hamming_distance: int = 3,
     # num_blocks: Optional[int] = 5,
-    query_signatures: list[int] | None = None,
-) -> list[list[int]]:
+    query_signatures: List[int] | None = None,
+    index_basename: Optional[str] = None,
+    skip_indexing_if_exists: bool = False,
+) -> List[List[int]]:
     """
     Cluster embeddings with simhash.
 
@@ -152,29 +177,35 @@ def simhash_clustering(
     #     Number of blocks, by default 5
     query_signatures : Optional[List[int]], optional
         List of query embeddings, by default None
+    skip_indexing_if_exists : bool, optional
+        Skip indexing if exists, by default False
 
     Returns
     -------
     List[List[int]]
         List of neighbors
     """
-    index = SimhashIndex(
-        [
-            (i, Simhash(value=signature))
-            for i, signature in enumerate(signatures)
-        ],
-        k=hamming_distance,
-    )
+    if index_basename is None or not skip_indexing_if_exists or MEMORY.get(index_basename, None) is None:
+        index = SimhashIndex(
+            [
+                (i, Simhash(value=signature))
+                for i, signature in enumerate(signatures)
+            ],
+            k=hamming_distance,
+        )
+
+    if index_basename is not None:
+        MEMORY[index_basename] = index
 
     if query_signatures is None:
         query_signatures = signatures
 
-    neighbors: list[list[int]] = []
+    neighbors: List[List[int]] = []
     with WorkerPool(n_jobs=os.cpu_count()) as pool:
         neighbors = pool.map(
             lambda signature: list(
                 map(int, index.get_near_dups(Simhash(value=signature))),
-            ), query_signatures,
+            ), query_signatures, progress_bar=False,
         )
 
     return neighbors

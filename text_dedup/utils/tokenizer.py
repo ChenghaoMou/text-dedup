@@ -3,13 +3,15 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
+from typing import List
+
 from nltk.util import ngrams
 from transformers import T5Tokenizer
 
 tokenizer = T5Tokenizer.from_pretrained('google/mt5-base')
 
 
-def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> list[str]:
+def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> List[str]:
     """
     Tokenize the text into a sequence of strings.
 

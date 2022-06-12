@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, List
 
 import numpy as np
 
@@ -36,7 +36,7 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
     return int.from_bytes(h, byteorder='big', signed=False)
 
 
-def _compute(hashes: list[int], bit_length: int = 64) -> int:
+def _compute(hashes: List[int], bit_length: int = 64) -> int:
     """
     Compute the Simhash of a list of hashes.
 
@@ -75,7 +75,7 @@ class SimHashEmbedder(Embedder):
     Embedding text using SimHash.
     """
 
-    def embed(self, corpus: list[str], **kwargs) -> list[int]:
+    def embed(self, corpus: List[str], **kwargs) -> List[int]:
         """
         Embed a list of strings.
 

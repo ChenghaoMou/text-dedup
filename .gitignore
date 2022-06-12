@@ -131,17 +131,18 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+.DS_Store
+.idea
 .storage
 .shared
+.lightning*
 return_values
+cache
+docs
+results*
+outputs
+*rdb
+*jsonl
 app.py
 benchmark.py
-cache
-.DS_Store
-docs
-*jsonl
-results
-.lightning*
-outputs/
-results.bin
 visualize.py

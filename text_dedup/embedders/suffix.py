@@ -7,6 +7,7 @@ import os
 import subprocess
 from collections import deque
 from dataclasses import dataclass
+from typing import List
 
 from loguru import logger
 from tqdm import tqdm
@@ -17,8 +18,8 @@ from text_dedup.utils.suffix_restore import restore
 
 
 def _merge_intervals(
-    slices: list[slice], merge_strategy: str = 'overlapping',
-) -> list[slice]:
+    slices: List[slice], merge_strategy: str = 'overlapping',
+) -> List[slice]:
     """Merge overlapping intervals.
 
     Parameters
@@ -45,7 +46,7 @@ def _merge_intervals(
         key=lambda x: (x.start, -x.stop),
     )
 
-    merged: list[slice] = []
+    merged: List[slice] = []
     q = deque(slices)
 
     while q:
@@ -84,8 +85,8 @@ class SuffixArrayEmbedder(Embedder):
     k: int = 100
 
     def embed(
-        self, corpus: list[str], merge: bool = False, merge_strategy: str = 'longest',
-    ) -> list[list[slice]]:
+        self, corpus: List[str], merge: bool = False, merge_strategy: str = 'longest',
+    ) -> List[List[slice]]:
         """
         Find duplicate byte slices using suffix array.
 
@@ -127,10 +128,10 @@ class SuffixArrayEmbedder(Embedder):
                 slices.append(slice(y, y + matched_length))
         q = deque(sorted(slices, key=lambda x: x.start))
         start = 0
-        ans: list[list[slice]] = []
+        ans: List[List[slice]] = []
         for _, length in enumerate(lengths):
             end = start + length
-            curr: list[slice] = []
+            curr: List[slice] = []
             while q and q[0].start < end:
                 s = q.popleft()
                 if s.start < start:
@@ -159,11 +160,11 @@ class SuffixArrayEmbedder(Embedder):
 
     def embed_bash(
         self,
-        corpus: list[str],
+        corpus: List[str],
         skip_existing: bool = True,
         cache_dir: str = 'cache',
         temp_file_prefix: str = 'embed_temp',
-    ) -> list[list[slice]]:
+    ) -> List[List[slice]]:
         """
         Find duplicate byte slices using suffix array, with the origianl Google scripts.
 
@@ -230,7 +231,7 @@ class SuffixArrayEmbedder(Embedder):
                 f"cargo run collect --data-file {os.path.join(cache_dir, temp_file_prefix + f'.{self.k}.txt')} --length-threshold {self.k} --cache-dir {cache_dir} > {os.path.join(cache_dir, temp_file_prefix + f'.{self.k}.byterange')}",
             )
 
-        results: list[list[slice]] = [[] for _ in corpus]
+        results: List[List[slice]] = [[] for _ in corpus]
 
         for idx, (x, y) in restore(
             offsets, os.path.join(

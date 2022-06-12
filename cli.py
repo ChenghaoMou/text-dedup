@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import hashlib
 import logging
 import os
 import sys
@@ -8,27 +7,29 @@ from itertools import product
 from typing import Any, Dict, List
 
 import hydra
-import orjson
+import pandas as pd
 from datasets import (Value, get_dataset_config_names, get_dataset_split_names,
                       load_dataset)
-from omegaconf import DictConfig
-from rich.logging import RichHandler
-from rich.progress import track
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
 from text_dedup.utils.nn import lsh_clustering, simhash_clustering
 
-logging.getLogger('simhash').setLevel(logging.ERROR)
-# logging.getLogger("datasets").setLevel(logging.ERROR)
-logging.basicConfig(
-    level='INFO', format='%(message)s', datefmt='[%X]', handlers=[RichHandler()],
-)
-logger = logging.getLogger('text_dedup')
+TOKEN = os.environ.get('HF_ACCESS_TOKEN', True)
 
 
-SPLITS = ['train', 'validation', 'test']
+def disable_logging(library: str):
+    logging.getLogger(library).setLevel(logging.ERROR)
+
+
+disable_logging('simhash')
+# disable_logging("datasets")
+
+logger: logging.Logger = logging.getLogger('text_dedup')
+SPLITS: List[str] = ['train', 'validation', 'test']
 
 
 def get_byte_size(x: str) -> int:
@@ -39,6 +40,13 @@ def get_slice_text(text: str, offset: slice) -> str:
     return text.encode('utf-8')[offset].decode('utf-8', errors='ignore')
 
 
+def dict_hash(dictionary: DictConfig) -> str:
+    dhash = hashlib.md5()
+    encoded = OmegaConf.to_yaml(dictionary).encode()
+    dhash.update(encoded)
+    return dhash.hexdigest()
+
+
 @hydra.main(config_name='config', config_path='configs', version_base='1.2')
 def main(conf: DictConfig):
     start_time = time.time()
@@ -47,15 +55,16 @@ def main(conf: DictConfig):
 
     if not conf.configs:
         logger.info('No configs specified, using all available configs')
-        conf.configs = get_dataset_config_names(conf.dataset, use_auth_token=True)
+        conf.configs = get_dataset_config_names(conf.dataset, use_auth_token=TOKEN)
 
     for config in conf.configs:
-        splits = get_dataset_split_names(conf.dataset, config, use_auth_token=True)
+        splits = get_dataset_split_names(conf.dataset, config, use_auth_token=TOKEN)
         if conf.embedder.name in {
             'SimHashEmbedder',
             'MinHashEmbedder',
             'SuffixArrayEmbedder',
         }:
+
             def serialize(x: Any) -> Any:
                 if conf.embedder.name == 'SimHashEmbedder':
                     return str(x)
@@ -65,6 +74,11 @@ def main(conf: DictConfig):
                 if conf.embedder.name == 'SimHashEmbedder':
                     return int(x)
                 return x
+
+            def extract_text(row, columns) -> Dict[str, str]:
+
+                return {'__text__': ' '.join(row[f] for f in columns)}
+
             split_signatures: Dict[str, Any] = {}
             conf_columns: List[str] = conf.columns or []
             for split in splits:
@@ -72,8 +86,8 @@ def main(conf: DictConfig):
                     conf.dataset,
                     config,
                     split=split,
-                    use_auth_token=True,
-                    cache_dir='.cache',
+                    use_auth_token=TOKEN,
+                    cache_dir=conf.cache_dir,
                 )
                 if not conf_columns:
                     for feature, vtype in split_data.info.features.items():
@@ -82,8 +96,11 @@ def main(conf: DictConfig):
                 logger.info(f'Using columns in {split}: {conf_columns}')
                 if conf_columns:
                     split_data = split_data.map(
-                        lambda x: {'__text__': ' '.join(x[f] for f in conf_columns)},
+                        extract_text,
+                        fn_kwargs={'columns': conf_columns},
                         num_proc=num_proc,
+                        cache_file_name=f"{conf.cache_dir.rstrip('/')}/{conf.dataset.replace('/', '_')}-{dict_hash(conf)}-extract.cache",
+                        load_from_cache_file=True,
                         desc=f'Extracting text...',
                     )
                     if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
@@ -105,6 +122,8 @@ def main(conf: DictConfig):
                                 ),
                             },
                             num_proc=num_proc,
+                            cache_file_name=f"{conf.cache_dir.rstrip('/')}/{conf.dataset.replace('/', '_')}-{dict_hash(conf)}-embed.cache",
+                            load_from_cache_file=True,
                             desc=f'Embedding...',
                         )
                         split_signatures[split] = split_data
@@ -137,12 +156,18 @@ def main(conf: DictConfig):
                             query_signatures=list(
                                 map(deserialize, query_data['__signature__']),
                             ),
+                            index_basename=f'{dict_hash(conf)}-{x}-{y}',
+                            skip_indexing_if_exists=True,
                         )
                         if conf.embedder.name == 'SimHashEmbedder'
                         else lsh_clustering(
                             base_data['__signature__'],
                             threshold=conf.embedder.threshold,
                             query_signatures=query_data['__signature__'],
+                            redis_basename=f'{dict_hash(conf)}-{x}-{y}',
+                            redis_host='localhost',
+                            redis_port=6379,
+                            skip_indexing_if_exists=True,
                         )
                     )
                     duplicated_count = 0
@@ -150,9 +175,9 @@ def main(conf: DictConfig):
                     duplicated_size = 0
                     total_size = 0
                     query_docs = query_data['__text__']
-                    base_docs = base_data['__text__']
+                    # base_docs = base_data['__text__']
                     for i, cluster in enumerate(
-                        track(clusters, description='Post-processing...'),
+                        tqdm(clusters, desc='Post-processing...'),
                     ):
                         total_count += 1
                         total_size += get_byte_size(query_docs[i])
@@ -163,30 +188,26 @@ def main(conf: DictConfig):
                         cluster = [j for j in cluster if (x, j) != (y, i)]
                         records.append(
                             {
-                                'query': query_docs[i],
+                                # 'query': query_docs[i],
                                 'query_id': f'{y}-{i}',
-                                'query_split': y,
+                                # 'query_split': y,
                                 'references': [
                                     {
-                                        'ref': base_docs[j],
+                                        # 'ref': base_docs[j],
                                         'ref_id': f'{x}-{j}',
-                                        'ref_split': x,
+                                        # 'ref_split': x,
                                     }
                                     for j in cluster
                                 ],
                             },
                         )
                     logger.info(
-                        f'{x}-{y}: {duplicated_count/total_count*100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size/total_size*100:.2f}% ({duplicated_size}) duplicated bytes',
+                        f'{x}-{y}: {duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
                     )
-                    del query_docs
-                    del base_docs
 
                 if not records:
                     continue
 
-                with open('results.bin', 'wb') as f:
-                    f.write(orjson.dumps(records))
             elif conf.embedder.name == 'SuffixArrayEmbedder':
                 duplicated_size = 0
                 duplicated_count = 0
@@ -206,9 +227,9 @@ def main(conf: DictConfig):
                             duplicated_size += segment.stop - segment.start
                             records.append(
                                 {
-                                    'query': segment_data['__text__'],
+                                    # 'query': segment_data['__text__'],
                                     'query_id': f'{x}-{i}',
-                                    'query_split': x,
+                                    # 'query_split': x,
                                     'substring': get_slice_text(
                                         segment_data['__text__'],
                                         segment,
@@ -216,11 +237,11 @@ def main(conf: DictConfig):
                                 },
                             )
                 logger.info(
-                    f'{duplicated_count/total_count*100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size/total_size*100:.2f}% ({duplicated_size}) duplicated bytes',
+                    f'{duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
                 )
 
-                with open('results.bin', 'wb') as f:
-                    f.write(orjson.dumps(records))
+            # TODO: Save the results
+            pd.DataFrame(records).to_json('outputs.jsonl', lines=True, orient='records')
         else:
             logger.error(f'Unknown embedder: {conf.embedder}')
 
@@ -228,5 +249,4 @@ def main(conf: DictConfig):
 
 
 if __name__ == '__main__':
-
     main()

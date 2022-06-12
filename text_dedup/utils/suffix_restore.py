@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Deque
-from typing import Generator
+from typing import Deque, Generator, List
 
 
 def restore(
-    offsets: list[tuple[int, int]], seg_file: str,
+    offsets: List[tuple[int, int]], seg_file: str,
 ) -> Generator:
     """
     Restore the original text from the offsets.
