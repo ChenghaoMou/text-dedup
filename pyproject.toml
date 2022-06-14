@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "text-dedup"
-version = "0.0.15"
+version = "0.0.16"
 description = ""
 authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
 license = "MIT"
