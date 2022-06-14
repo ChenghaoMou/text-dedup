@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import os
 import sys
@@ -7,7 +8,6 @@ from itertools import product
 from typing import Any, Dict, List
 
 import hydra
-import pandas as pd
 from datasets import (Value, get_dataset_config_names, get_dataset_split_names,
                       load_dataset)
 from omegaconf import DictConfig, OmegaConf
@@ -25,9 +25,7 @@ def disable_logging(library: str):
     logging.getLogger(library).setLevel(logging.ERROR)
 
 
-disable_logging('simhash')
 # disable_logging("datasets")
-
 logger: logging.Logger = logging.getLogger('text_dedup')
 SPLITS: List[str] = ['train', 'validation', 'test']
 
@@ -156,8 +154,6 @@ def main(conf: DictConfig):
                             query_signatures=list(
                                 map(deserialize, query_data['__signature__']),
                             ),
-                            index_basename=f'{dict_hash(conf)}-{x}-{y}',
-                            skip_indexing_if_exists=True,
                         )
                         if conf.embedder.name == 'SimHashEmbedder'
                         else lsh_clustering(
@@ -175,7 +171,6 @@ def main(conf: DictConfig):
                     duplicated_size = 0
                     total_size = 0
                     query_docs = query_data['__text__']
-                    # base_docs = base_data['__text__']
                     for i, cluster in enumerate(
                         tqdm(clusters, desc='Post-processing...'),
                     ):
@@ -188,14 +183,10 @@ def main(conf: DictConfig):
                         cluster = [j for j in cluster if (x, j) != (y, i)]
                         records.append(
                             {
-                                # 'query': query_docs[i],
                                 'query_id': f'{y}-{i}',
-                                # 'query_split': y,
                                 'references': [
                                     {
-                                        # 'ref': base_docs[j],
                                         'ref_id': f'{x}-{j}',
-                                        # 'ref_split': x,
                                     }
                                     for j in cluster
                                 ],
@@ -227,9 +218,7 @@ def main(conf: DictConfig):
                             duplicated_size += segment.stop - segment.start
                             records.append(
                                 {
-                                    # 'query': segment_data['__text__'],
                                     'query_id': f'{x}-{i}',
-                                    # 'query_split': x,
                                     'substring': get_slice_text(
                                         segment_data['__text__'],
                                         segment,
@@ -240,8 +229,8 @@ def main(conf: DictConfig):
                     f'{duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
                 )
 
-            # TODO: Save the results
-            pd.DataFrame(records).to_json('outputs.jsonl', lines=True, orient='records')
+            with open('outputs.json', 'w') as f:
+                json.dump(records, f)
         else:
             logger.error(f'Unknown embedder: {conf.embedder}')
 

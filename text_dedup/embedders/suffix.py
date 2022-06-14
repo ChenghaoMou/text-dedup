@@ -3,18 +3,20 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from collections import deque
 from dataclasses import dataclass
 from typing import List
 
-from loguru import logger
 from tqdm import tqdm
 
 from text_dedup.embedders import Embedder
 from text_dedup.utils.sa import construct_sa
 from text_dedup.utils.suffix_restore import restore
+
+logger = logging.getLogger('text-dedup')
 
 
 def _merge_intervals(
@@ -31,6 +33,13 @@ def _merge_intervals(
     -------
     List[slice]
         List of merged intervals
+
+    Examples
+    --------
+    >>> _merge_intervals([slice(0, 2), slice(2, 4), slice(4, 5)], 'overlapping')
+    [slice(0, 5, None)]
+    >>> _merge_intervals([slice(0, 4), slice(2, 4), slice(4, 5)], 'longest')
+    [slice(0, 4, None), slice(4, 5, None)]
     """
     if len(slices) == 0:
         return []

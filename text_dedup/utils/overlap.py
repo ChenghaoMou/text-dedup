@@ -18,6 +18,15 @@ def get_overlap(s1: str, s2: str) -> str:
     -------
     str
         Longest overlap.
+
+    Examples
+    --------
+    >>> get_overlap("hello", "hello world")
+    'hello'
+    >>> get_overlap("hello", "world")
+    'l'
+    >>> get_overlap("hello", " safd helo sfasd hello")
+    'hello'
     """
     s = difflib.SequenceMatcher(None, s1, s2)
     pos_a, _, size = s.find_longest_match(0, len(s1), 0, len(s2))

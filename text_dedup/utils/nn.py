@@ -5,28 +5,28 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 import numpy as np
 from annoy import AnnoyIndex
 from datasketch import MinHash, MinHashLSH
-from mpire import WorkerPool
+from multiprocess import Pool
+from tqdm import tqdm
 
-from text_dedup.utils.simhash_redis import SimhashIndex
-
-# from typing import List
-# from tqdm import tqdm
+from text_dedup.utils.simhash_index import SimhashIndex
 
 logger: logging.Logger = logging.getLogger('text_dedup')
-MEMORY: Dict[str, SimhashIndex] = {}
 
 
 def annoy_clustering(
     embeddings: List[np.ndarray],
     f: int = 128,
     metric: Literal[
-        'angular', 'euclidean',
-        'manhattan', 'hamming', 'dot',
+        'angular',
+        'euclidean',
+        'manhattan',
+        'hamming',
+        'dot',
     ] = 'angular',
     num_trees: int = 64,
     top_k: int = 100,
@@ -69,7 +69,9 @@ def annoy_clustering(
         current: List[int] = []
         for j, dist in zip(
             *t.get_nns_by_vector(
-                v, top_k, search_k=-1,
+                v,
+                top_k,
+                search_k=-1,
                 include_distances=True,
             ),
         ):
@@ -117,42 +119,43 @@ def lsh_clustering(
     List[List[int]]
         List of neighbors
     """
-    lsh = MinHashLSH(threshold=threshold, num_perm=num_perm, storage_config={
-        'type': 'redis',
-        'basename': redis_basename.encode('utf-8'),
-        'redis': {'host': redis_host, 'port': redis_port},
-    } if redis_basename is not None else None)
+    lsh = MinHashLSH(
+        threshold=threshold,
+        num_perm=num_perm,
+        storage_config={
+            'type': 'redis',
+            'basename': redis_basename.encode('utf-8'),
+            'redis': {'host': redis_host, 'port': redis_port},
+        }
+        if redis_basename is not None
+        else None,
+    )
     if lsh.is_empty() or not skip_indexing_if_exists:
         with lsh.insertion_session() as session:
             for key, minhash in enumerate(signatures):
                 session.insert(
-                    f'id-{key}', MinHash(num_perm=num_perm, hashvalues=minhash),
+                    f'id-{key}',
+                    MinHash(num_perm=num_perm, hashvalues=minhash),
                 )
         logger.debug(
-            f'LSH index already exists (size: {lsh.get_counts()}), skipped indexing')
+            f'LSH index already exists (size: {lsh.get_counts()}), skipped indexing'
+        )
 
     neighbors: List[List[int]] = []
 
     if query_signatures is None:
         query_signatures = signatures
 
-    with WorkerPool(n_jobs=os.cpu_count()) as pool:
+    with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
-            lambda *signature: [
-                int(x.split('-')[1]) for x in lsh.query(
+            lambda signature: [
+                int(x.split('-')[1])
+                for x in lsh.query(
                     MinHash(num_perm=num_perm, hashvalues=signature),
                 )
-            ], query_signatures, progress_bar=False,
+            ],
+            tqdm(query_signatures, desc='Querying...'),
         )
-
-    # for signature in tqdm(query_signatures, desc="Querying..."):
-    #     neighbors.append(
-    #         [
-    #             int(x.split('-')[1]) for x in lsh.query(
-    #                 MinHash(num_perm=num_perm, hashvalues=signature),
-    #             )
-    #         ]
-    #     )
 
     return neighbors
 
@@ -162,8 +165,6 @@ def simhash_clustering(
     hamming_distance: int = 3,
     num_blocks: int = 5,
     query_signatures: List[int] | None = None,
-    index_basename: Optional[str] = None,
-    skip_indexing_if_exists: bool = False,
 ) -> List[List[int]]:
     """
     Cluster embeddings with simhash.
@@ -174,8 +175,8 @@ def simhash_clustering(
         List of embeddings
     hamming_distance : int, optional
         Hamming distance, by default 3
-    # num_blocks : Optional[int], optional
-    #     Number of blocks, by default 5
+    num_blocks : Optional[int], optional
+        Number of blocks, by default 5
     query_signatures : Optional[List[int]], optional
         List of query embeddings, by default None
     skip_indexing_if_exists : bool, optional
@@ -186,28 +187,22 @@ def simhash_clustering(
     List[List[int]]
         List of neighbors
     """
-    if index_basename is None or not skip_indexing_if_exists or MEMORY.get(index_basename, None) is None:
-        index = SimhashIndex(
-            [
-                (i, signature)
-                for i, signature in enumerate(signatures)
-            ],
-            k=hamming_distance,
-            b=num_blocks,
-        )
-
-    if index_basename is not None:
-        MEMORY[index_basename] = index
+    index = SimhashIndex(
+        [(i, signature) for i, signature in enumerate(signatures)],
+        k=hamming_distance,
+        b=num_blocks,
+    )
 
     if query_signatures is None:
         query_signatures = signatures
 
     neighbors: List[List[int]] = []
-    with WorkerPool(n_jobs=os.cpu_count()) as pool:
+    with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
             lambda signature: list(
                 map(int, index.get_near_dups(signature)),
-            ), query_signatures, progress_bar=False,
+            ),
+            tqdm(query_signatures, desc='Querying...'),
         )
 
     return neighbors
