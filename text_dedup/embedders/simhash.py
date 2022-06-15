@@ -9,7 +9,6 @@ from typing import Callable, List
 
 import numpy as np
 
-from text_dedup.embedders import Embedder
 from text_dedup.utils.tokenizer import tokenize
 
 
@@ -30,6 +29,11 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
     -------
     int
         The hash of the object.
+
+    Examples
+    --------
+    >>> _unsigned_hash(b'hello world', 64)
+    13352372148217134600
     """
     assert bit_length == 64, 'Only 64-bit hashes are supported.'
     h = hashlib.sha256(obj).digest()[: bit_length // 8]
@@ -51,6 +55,11 @@ def _compute(hashes: List[int], bit_length: int = 64) -> int:
     -------
     int
         The Simhash of the list of hashes.
+
+    Examples
+    --------
+    >>> _compute([13352372148217134600], 64)
+    13352372148217134600
     """
     assert bit_length == 64, 'Only 64-bit hashes are supported.'
     counts = np.zeros(bit_length, dtype=np.int64)
@@ -69,7 +78,7 @@ def _compute(hashes: List[int], bit_length: int = 64) -> int:
 
 
 @dataclass
-class SimHashEmbedder(Embedder):
+class SimHashEmbedder():
 
     """
     Embedding text using SimHash.
@@ -90,6 +99,13 @@ class SimHashEmbedder(Embedder):
         -------
         List[int]
             Fingerprints of the corpus.
+
+        Examples
+        --------
+        >>> embedder = SimHashEmbedder()
+        >>> embeddings = embedder.embed(["hello", "hello world! This is a test."])
+        >>> embeddings
+        [4051436901025898700, 13943988908483280899]
         """
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
@@ -103,6 +119,13 @@ class SimHashEmbedder(Embedder):
         ----------
         kwargs : dict
             Additional keyword arguments for tokenization.
+
+        Examples
+        --------
+        >>> embedder = SimHashEmbedder()
+        >>> hashes = embedder.embed_function()("hello world! This is a test string.")
+        >>> hashes
+        13950746197979717635
         """
 
         def wrapper(doc: str) -> int:

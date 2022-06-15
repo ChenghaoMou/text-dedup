@@ -12,7 +12,6 @@ from typing import List
 
 from tqdm import tqdm
 
-from text_dedup.embedders import Embedder
 from text_dedup.utils.sa import construct_sa
 from text_dedup.utils.suffix_restore import restore
 
@@ -20,7 +19,8 @@ logger = logging.getLogger('text-dedup')
 
 
 def _merge_intervals(
-    slices: List[slice], merge_strategy: str = 'overlapping',
+    slices: List[slice],
+    merge_strategy: str = 'overlapping',
 ) -> List[slice]:
     """Merge overlapping intervals.
 
@@ -47,9 +47,8 @@ def _merge_intervals(
     slices = sorted(
         list(
             map(
-                lambda s: slice(s[0], s[1]), {
-                    (s.start, s.stop) for s in slices
-                },
+                lambda s: slice(s[0], s[1]),
+                {(s.start, s.stop) for s in slices},
             ),
         ),
         key=lambda x: (x.start, -x.stop),
@@ -80,7 +79,7 @@ def _merge_intervals(
 
 
 @dataclass
-class SuffixArrayEmbedder(Embedder):
+class SuffixArrayEmbedder:
 
     """
     Find duplicate byte slices using suffix array.
@@ -94,7 +93,10 @@ class SuffixArrayEmbedder(Embedder):
     k: int = 100
 
     def embed(
-        self, corpus: List[str], merge: bool = False, merge_strategy: str = 'longest',
+        self,
+        corpus: List[str],
+        merge: bool = False,
+        merge_strategy: str = 'longest',
     ) -> List[List[slice]]:
         """
         Find duplicate byte slices using suffix array.
@@ -123,7 +125,9 @@ class SuffixArrayEmbedder(Embedder):
         slices = []
 
         for x, y in tqdm(
-            zip(sa[:-1], sa[1:]), total=len(sa) - 1, desc='Suffix array querying',
+            zip(sa[:-1], sa[1:]),
+            total=len(sa) - 1,
+            desc='Suffix array querying',
         ):
             matched_length = 0
             while (
@@ -159,10 +163,7 @@ class SuffixArrayEmbedder(Embedder):
                     ),
                 )
             else:
-                ans.append([
-                    slice(s.start - start, s.stop - start)
-                    for s in curr
-                ])
+                ans.append([slice(s.start - start, s.stop - start) for s in curr])
             start += length
 
         return ans
@@ -173,7 +174,7 @@ class SuffixArrayEmbedder(Embedder):
         skip_existing: bool = True,
         cache_dir: str = 'cache',
         temp_file_prefix: str = 'embed_temp',
-    ) -> List[List[slice]]:
+    ) -> List[List[slice]]:  # pragma: no cover
         """
         Find duplicate byte slices using suffix array, with the origianl Google scripts.
 
@@ -201,7 +202,8 @@ class SuffixArrayEmbedder(Embedder):
         offsets = []
         start = 0
         with open(
-            os.path.join(cache_dir, temp_file_prefix + f'.{self.k}.txt'), 'wb',
+            os.path.join(cache_dir, temp_file_prefix + f'.{self.k}.txt'),
+            'wb',
         ) as f:
             for doc in corpus:
                 doc_bytes = doc.encode('utf-8')
@@ -243,8 +245,10 @@ class SuffixArrayEmbedder(Embedder):
         results: List[List[slice]] = [[] for _ in corpus]
 
         for idx, (x, y) in restore(
-            offsets, os.path.join(
-                cache_dir, temp_file_prefix + f'.{self.k}.byterange',
+            offsets,
+            os.path.join(
+                cache_dir,
+                temp_file_prefix + f'.{self.k}.byterange',
             ),
         ):
             if y - x >= self.k:

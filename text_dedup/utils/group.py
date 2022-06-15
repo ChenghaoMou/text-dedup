@@ -20,6 +20,11 @@ def get_group_indices(neighbors: List[List[int]]) -> List[int]:
     -------
     List[int]
         List of group indices
+
+    Examples
+    --------
+    >>> get_group_indices([[0, 1], [0, 2], [1, 2]])
+    [0, 0, 0]
     """
     finder = UF(len(neighbors))
     for i, n in enumerate(neighbors):

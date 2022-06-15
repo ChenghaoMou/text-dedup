@@ -7,10 +7,9 @@ from typing import List
 
 import numpy as np
 import torch
-from text_dedup.embedders import Embedder
 
 
-class TransformerEmbedder(Embedder):
+class TransformerEmbedder():
     def __init__(self, tokenizer, model):
         """
         Embedding text using Transformer.
@@ -43,12 +42,12 @@ class TransformerEmbedder(Embedder):
         """
         embeddings = []
         for i in range(0, len(corpus), batch_size):
-            batch = corpus[i : i + batch_size]
+            batch = corpus[i: i + batch_size]
             encodings = self.tokenizer(
                 batch,
                 padding=True,
                 truncation=True,
-                return_tensors="pt",
+                return_tensors='pt',
             )
 
             with torch.no_grad():

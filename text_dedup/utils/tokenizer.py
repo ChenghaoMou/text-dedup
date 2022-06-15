@@ -1,22 +1,44 @@
 #!/usr/bin/env python
 # @Date    : 2022-05-22 11:33:39
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-from __future__ import annotations
-
-from itertools import tee
-from typing import List
+from typing import Generator, List
 
 from transformers import T5Tokenizer
 
 tokenizer = T5Tokenizer.from_pretrained('google/mt5-base')
 
 
-def ngrams(sequence: List[str], n: int):
-    iterables = tee(sequence, n)
-    for i, sub_iterable in enumerate(iterables):  # For each window,
-        for _ in range(i):  # iterate through every order of ngrams
-            next(sub_iterable, None)  # generate the ngrams within the window.
-    return zip(*iterables)  # Unpack and flattens the iterables.
+def ngrams(sequence: List[str], n: int) -> List[List[str]]:
+    """Generate n-grams from a sequence of tokens.
+
+    Parameters
+    ----------
+    sequence : List[str]
+        List of tokens.
+    n : int
+        The size of the n-grams to use.
+
+    Returns
+    -------
+    List[List[str]]
+        The list of n-grams.
+
+    Examples
+    --------
+    >>> list(ngrams(['a', 'b', 'c'], n=1))
+    [['a'], ['b'], ['c']]
+    >>> list(ngrams(['a', 'b', 'c'], n=6))
+    [['a', 'b', 'c']]
+    """
+    assert len(sequence) >= 1, f'Sequence is too short: {sequence}'
+
+    if len(sequence) <= n:
+        return [sequence]
+
+    results = []
+    for i in range(len(sequence) - n + 1):
+        results.append(sequence[i: i + n])
+    return results
 
 
 def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> List[str]:
@@ -39,6 +61,8 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> List[s
 
     Examples
     --------
+    >>> tokenize("Hello world!")
+    ['▁Hello▁world!']
     >>> tokenize("This is a test.", n_gram=2)
     ['▁This▁is', '▁is▁', '▁a', 'a▁test', '▁test.']
     >>> tokenize("This is a test.", n_gram=2, level='char')

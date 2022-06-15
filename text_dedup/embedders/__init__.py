@@ -2,36 +2,15 @@
 # @Date         : 2021-06-05 14:51:48
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 """Embedding models for text."""
-from __future__ import annotations
 
-# from typing import Any
-# from typing import List
-# from typing import Union
+from text_dedup.embedders.minhash import MinHashEmbedder
+from text_dedup.embedders.simhash import SimHashEmbedder
+from text_dedup.embedders.suffix import SuffixArrayEmbedder
+from text_dedup.embedders.transformer import TransformerEmbedder
 
-# import numpy as np
-
-
-class Embedder:
-    # def embed(
-    #     self, corpus: List[Any], **kwargs: Any
-    # ) -> Union[np.ndarray, List[int], List[np.ndarray], List[slice]]:
-    #     """Embed a corpus.
-
-    #     Parameters
-    #     ----------
-    #     corpus : List[Any]
-    #         Corpus to embed.
-
-    #     Returns
-    #     -------
-    #     Union[np.ndarray, List[int], List[np.ndarray], List[slice]]
-    #         Embeddings/fingerprints/duplicated slices of the corpus.
-    #     """
-    #     raise NotImplementedError
-
-    # def embed_function(self, **kwargs):
-    #     def wrapper(doc: Any) -> np.ndarray:
-    #         raise NotImplementedError
-
-    #     return wrapper
-    pass
+__all__ = [
+    'MinHashEmbedder',
+    'SimHashEmbedder',
+    'SuffixArrayEmbedder',
+    'TransformerEmbedder',
+]

@@ -30,15 +30,15 @@ logger: logging.Logger = logging.getLogger('text_dedup')
 SPLITS: List[str] = ['train', 'validation', 'test']
 
 
-def get_byte_size(x: str) -> int:
+def get_byte_size(x: str) -> int:  # pragma: no cover
     return sys.getsizeof(x)
 
 
-def get_slice_text(text: str, offset: slice) -> str:
+def get_slice_text(text: str, offset: slice) -> str:  # pragma: no cover
     return text.encode('utf-8')[offset].decode('utf-8', errors='ignore')
 
 
-def dict_hash(dictionary: DictConfig) -> str:
+def dict_hash(dictionary: DictConfig) -> str:  # pragma: no cover
     dhash = hashlib.md5()
     encoded = OmegaConf.to_yaml(dictionary).encode()
     dhash.update(encoded)
@@ -46,7 +46,7 @@ def dict_hash(dictionary: DictConfig) -> str:
 
 
 @hydra.main(config_name='config', config_path='configs', version_base='1.2')
-def main(conf: DictConfig):
+def main(conf: DictConfig):  # pragma: no cover
     start_time = time.time()
     conf = conf.method
     num_proc: int = conf.num_proc or os.cpu_count() or 1

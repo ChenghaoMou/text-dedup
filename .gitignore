@@ -143,6 +143,9 @@ results*
 outputs
 *rdb
 *jsonl
-# app.py
+app.py
+temp.py
+outputs.json
 benchmark.py
 visualize.py
+requirements.txt

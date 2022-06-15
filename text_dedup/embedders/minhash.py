@@ -10,12 +10,11 @@ from typing import Callable, List, Optional
 import numpy as np
 from datasketch import MinHash
 
-from text_dedup.embedders import Embedder
 from text_dedup.utils.tokenizer import tokenize
 
 
 @dataclass
-class MinHashEmbedder(Embedder):
+class MinHashEmbedder:
     """
     Embedding text using MinHash.
 
@@ -42,6 +41,13 @@ class MinHashEmbedder(Embedder):
         -------
         np.ndarray
             Embedding of the corpus.
+
+        Examples
+        --------
+        >>> embedder = MinHashEmbedder(128)
+        >>> embeddings = embedder.embed(["hello world", "hello world"])
+        >>> embeddings.shape
+        (2, 128)
         """
         f = self.embed_function(**kwargs)
         return np.array([f(doc) for doc in corpus])
@@ -59,6 +65,13 @@ class MinHashEmbedder(Embedder):
         -------
         Callable
             Embedding function.
+
+        Examples
+        --------
+        >>> embedder = MinHashEmbedder(128)
+        >>> hashes = embedder.embed_function()("hello world")
+        >>> hashes.shape
+        (128,)
         """
 
         def wrapper(doc: str) -> np.ndarray:
