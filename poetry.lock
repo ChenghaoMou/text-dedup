@@ -114,24 +114,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
-name = "colorlog"
-version = "6.6.0"
-description = "Add colours to the output of Python's logging module."
-category = "dev"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-colorama = {version = "*", markers = "sys_platform == \"win32\""}
-
-[package.extras]
-development = ["black", "flake8", "mypy", "pytest", "types-colorama"]
-
-[[package]]
 name = "commonmark"
 version = "0.9.1"
 description = "Python parser for the CommonMark Markdown spec"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -309,18 +295,6 @@ quality = ["black (>=22.0,<23.0)", "isort (>=5.5.4)", "flake8 (>=3.8.3)"]
 tensorflow = ["tensorflow", "pydot", "graphviz"]
 testing = ["pytest", "datasets", "soundfile"]
 torch = ["torch"]
-
-[[package]]
-name = "hydra-colorlog"
-version = "1.2.0"
-description = "Enables colorlog for Hydra apps"
-category = "dev"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-colorlog = "*"
-hydra-core = ">=1.0.0"
 
 [[package]]
 name = "hydra-core"
@@ -511,7 +485,7 @@ numpy = ">=1.16.6"
 name = "pygments"
 version = "2.12.0"
 description = "Pygments is a syntax highlighting package written in Python."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -636,7 +610,7 @@ tests = ["pytest (>=4.6)", "coverage (>=6.0.0)", "pytest-cov", "pytest-localserv
 name = "rich"
 version = "12.4.4"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6.3,<4.0.0"
 
@@ -847,7 +821,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.10"
-content-hash = "0bf3e01deb35d8a0504832e98d804adb94b2108e250e516e80dd8f3e49f14700"
+content-hash = "a35f0343fc648ba10a311899e55250ee442a773d1359f52be1272e8e64cb045d"
 
 [metadata.files]
 aiohttp = [
@@ -962,10 +936,6 @@ charset-normalizer = [
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},
     {file = "colorama-0.4.4.tar.gz", hash = "sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b"},
-]
-colorlog = [
-    {file = "colorlog-6.6.0-py2.py3-none-any.whl", hash = "sha256:351c51e866c86c3217f08e4b067a7974a678be78f07f85fc2d55b8babde6d94e"},
-    {file = "colorlog-6.6.0.tar.gz", hash = "sha256:344f73204009e4c83c5b6beb00b3c45dc70fcdae3c80db919e0a4171d006fde8"},
 ]
 commonmark = [
     {file = "commonmark-0.9.1-py2.py3-none-any.whl", hash = "sha256:da2f38c92590f83de410ba1a3cbceafbc74fee9def35f9251ba9a971d6d66fd9"},
@@ -1102,10 +1072,6 @@ fsspec = [
 huggingface-hub = [
     {file = "huggingface_hub-0.7.0-py3-none-any.whl", hash = "sha256:fd448fd0b738d803411c79bdf9f12f0ba171fecd24a59edf88c1391b473bc2c0"},
     {file = "huggingface_hub-0.7.0.tar.gz", hash = "sha256:8154dc2fad84b32a4bca18372a647d9381ed8550a80b11050758357b8fcea639"},
-]
-hydra-colorlog = [
-    {file = "hydra-colorlog-1.2.0.tar.gz", hash = "sha256:d44f85008fabd2448c7e3b496c31b44d7610560f6fff74f3673afaa949870899"},
-    {file = "hydra_colorlog-1.2.0-py3-none-any.whl", hash = "sha256:33d05fc11ca9bc7a5d69cfb3c8fb395a1bc52fa1dfe7aca6a6f5ffb57f6e7c4b"},
 ]
 hydra-core = [
     {file = "hydra-core-1.2.0.tar.gz", hash = "sha256:4990721ce4ac69abafaffee566d6b63a54faa6501ecce65b338d3251446ff634"},

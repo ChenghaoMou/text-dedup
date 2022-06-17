@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import textwrap
 import time
 from itertools import product
 from typing import Any, Dict, List, Union
@@ -11,8 +12,9 @@ import hydra
 from datasets import (Value, get_dataset_config_names, get_dataset_split_names,
                       load_dataset)
 from omegaconf import DictConfig, OmegaConf
+from rich import print
+from rich.table import Table
 from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
 
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
@@ -33,7 +35,7 @@ SPLITS: List[str] = ['train', 'validation', 'test']
 
 
 def clear_screen():  # pragma: no cover
-    tqdm.write('\n')
+    # tqdm.write("\n")
     sys.stderr.flush()
     sys.stdout.flush()
 
@@ -151,7 +153,7 @@ def main(conf: DictConfig):  # pragma: no cover
                     num_proc=num_proc,
                     cache_file_name=f'{storage_prefix}-{embed_config_md5}.cache',
                     load_from_cache_file=True,
-                    remove_columns=['__text__'],
+                    # remove_columns=["__text__"],
                     desc=f'Embedding...',
                 )
                 split_results[split] = split_data
@@ -163,6 +165,8 @@ def main(conf: DictConfig):  # pragma: no cover
                     cache_dir=conf.embedder.cache_dir,
                     temp_file_prefix=conf.embedder.temp_file_prefix,
                 )
+                # TODO: Speed up this part
+                # slices = embedder.embed(split_data["__text__"], merge=True)
                 split_results[split] = (slices, split_data['__size__'])
 
         clear_screen()
@@ -219,6 +223,7 @@ def main(conf: DictConfig):  # pragma: no cover
                 total_count = 0
                 duplicated_size = 0
                 total_size = 0
+                examples = 5
                 query_sizes = query_data['__size__']
 
                 for i, cluster in enumerate(tqdm(clusters, desc='Post-processing...')):
@@ -237,6 +242,31 @@ def main(conf: DictConfig):  # pragma: no cover
                             'reference_split': x,
                         }
                     )
+                    if examples > 0:
+                        table = Table(title='Examples', show_lines=True)
+                        table.add_column('Query Split', justify='left',
+                                         style='cyan', no_wrap=False)
+                        table.add_column('Query Index', justify='left',
+                                         style='cyan', no_wrap=False)
+                        table.add_column('Query Instance', justify='left',
+                                         style='cyan', no_wrap=False)
+                        table.add_column('Duplicate Split', justify='left',
+                                         style='cyan', no_wrap=False)
+                        table.add_column('Duplicate Index', justify='left',
+                                         style='cyan', no_wrap=False)
+                        table.add_column('Duplicate', justify='left', style='magenta')
+                        for ref_id, reference in zip(cluster[:10], base_data.select(cluster)['__text__']):
+                            table.add_row(
+                                y,
+                                str(i),
+                                textwrap.shorten(query_data.select(
+                                    [i])['__text__'][0], width=512),
+                                x,
+                                str(ref_id),
+                                textwrap.shorten(reference, width=512),
+                            )
+                        print(table)
+                        examples -= 1
                 logger.info(
                     f'{x}-{y}: {duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
                 )

@@ -1,0 +1,8 @@
+version: 1
+handlers:
+  console:
+    class: rich.logging.RichHandler
+root:
+  handlers: [console]
+
+disable_existing_loggers: false
