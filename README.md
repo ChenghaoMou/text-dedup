@@ -26,6 +26,7 @@ python cli.py method=minhash method.tokenization.ngram_size=12 method.dataset=os
 Refer to `configs` to more details. Configurations are parsed with [hydra](https://hydra.cc).
 
 ### Hash-based Near Deduplication
+
 ```python
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.utils.nn import lsh_clustering
@@ -140,7 +141,4 @@ if __name__ == "__main__":
     # [0, 0, 2, 2]
 ```
 
-
 ## Dataset Duplication Report
-
-[ ] TODO

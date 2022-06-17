@@ -121,7 +121,7 @@ def main(conf: DictConfig):  # pragma: no cover
                 cache_file_name=f'{storage_prefix}-{compute_md5(extract_config_md5)}.cache',
                 load_from_cache_file=True,
                 remove_columns=split_data.column_names,
-                desc=f'Extracting text...',
+                desc='Extracting text...',
             )
 
             if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
@@ -154,7 +154,7 @@ def main(conf: DictConfig):  # pragma: no cover
                     cache_file_name=f'{storage_prefix}-{embed_config_md5}.cache',
                     load_from_cache_file=True,
                     # remove_columns=["__text__"],
-                    desc=f'Embedding...',
+                    desc='Embedding...',
                 )
                 split_results[split] = split_data
             else:

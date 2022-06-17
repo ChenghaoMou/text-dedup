@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # @Date    : 2022-05-22 11:33:39
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-from typing import Generator, List
+from typing import List
 
 from transformers import T5Tokenizer
 

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 import numpy as np
 from datasketch import MinHash
