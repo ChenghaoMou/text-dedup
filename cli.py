@@ -5,18 +5,19 @@ import os
 import sys
 import time
 from itertools import product
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import hydra
 from datasets import (Value, get_dataset_config_names, get_dataset_split_names,
                       load_dataset)
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
-from text_dedup.utils.nn import lsh_clustering, simhash_clustering
+from text_dedup.utils.clustering import lsh_clustering, simhash_clustering
 
 TOKEN = os.environ.get('HF_ACCESS_TOKEN', True)
 
@@ -25,214 +26,249 @@ def disable_logging(library: str):
     logging.getLogger(library).setLevel(logging.ERROR)
 
 
-# disable_logging("datasets")
-logger: logging.Logger = logging.getLogger('text_dedup')
+logger: logging.Logger = logging.getLogger(
+    'text_dedup',
+)
 SPLITS: List[str] = ['train', 'validation', 'test']
+
+
+def clear_screen():  # pragma: no cover
+    tqdm.write('\n')
+    sys.stderr.flush()
+    sys.stdout.flush()
 
 
 def get_byte_size(x: str) -> int:  # pragma: no cover
     return sys.getsizeof(x)
 
 
-def get_slice_text(text: str, offset: slice) -> str:  # pragma: no cover
-    return text.encode('utf-8')[offset].decode('utf-8', errors='ignore')
+def get_slice_text(text: str, byte_slice: slice) -> str:  # pragma: no cover
+    return text.encode('utf-8')[byte_slice].decode('utf-8', errors='ignore')
 
 
-def dict_hash(dictionary: DictConfig) -> str:  # pragma: no cover
-    dhash = hashlib.md5()
-    encoded = OmegaConf.to_yaml(dictionary).encode()
-    dhash.update(encoded)
-    return dhash.hexdigest()
+def compute_md5(obj: Any) -> str:  # pragma: no cover
+    if isinstance(obj, DictConfig):
+        return hashlib.md5(OmegaConf.to_yaml(obj).encode('utf-8')).hexdigest()
+    return hashlib.md5(json.dumps(obj, sort_keys=True).encode('utf-8')).hexdigest()
 
 
 @hydra.main(config_name='config', config_path='configs', version_base='1.2')
 def main(conf: DictConfig):  # pragma: no cover
     start_time = time.time()
     conf = conf.method
+    conf.cache_dir = conf.cache_dir.rstrip('/')
+    storage_prefix: str = f"{conf.cache_dir}/{conf.dataset.replace('/', '_')}"
     num_proc: int = conf.num_proc or os.cpu_count() or 1
 
     if not conf.configs:
-        logger.info('No configs specified, using all available configs')
         conf.configs = get_dataset_config_names(conf.dataset, use_auth_token=TOKEN)
+        logger.warning(
+            f'No configs specified, using all available configs {conf.configs}')
+    else:
+        logger.info(f'Using configs {conf.configs}')
+
+    if conf.embedder.name not in {
+        'SimHashEmbedder',
+        'MinHashEmbedder',
+        'SuffixArrayEmbedder',
+    }:
+        raise ValueError(f'Unknown embedder {conf.embedder.name}')
 
     for config in conf.configs:
+
         splits = get_dataset_split_names(conf.dataset, config, use_auth_token=TOKEN)
-        if conf.embedder.name in {
-            'SimHashEmbedder',
-            'MinHashEmbedder',
-            'SuffixArrayEmbedder',
-        }:
 
-            def serialize(x: Any) -> Any:
-                if conf.embedder.name == 'SimHashEmbedder':
-                    return str(x)
-                return x
+        def extract_text(row: Dict[str, Any], columns: List[str]) -> Dict[str, Any]:
+            text = ' '.join(str(row[f]) for f in columns)
+            return {'__text__': text, '__size__': get_byte_size(text)}
 
-            def deserialize(x: Any) -> Any:
-                if conf.embedder.name == 'SimHashEmbedder':
-                    return int(x)
-                return x
+        split_results: Dict[str, Any] = {}
+        conf_columns: List[str] = list(conf.columns) or []
 
-            def extract_text(row, columns) -> Dict[str, str]:
+        for split in splits:
+            split_data = load_dataset(
+                conf.dataset,
+                config,
+                split=split,
+                use_auth_token=TOKEN,
+                cache_dir=conf.cache_dir,
+            )
+            if not conf_columns:
+                # Use all string columns as text
+                for feature, vtype in split_data.info.features.items():
+                    if isinstance(vtype, Value) and vtype.dtype == 'string':
+                        conf_columns.append(feature)
 
-                return {'__text__': ' '.join(row[f] for f in columns)}
+            if not conf_columns:
+                raise ValueError(f'No columns specified in {split}')
 
-            split_signatures: Dict[str, Any] = {}
-            conf_columns: List[str] = conf.columns or []
-            for split in splits:
-                split_data = load_dataset(
-                    conf.dataset,
-                    config,
-                    split=split,
-                    use_auth_token=TOKEN,
-                    cache_dir=conf.cache_dir,
-                )
-                if not conf_columns:
-                    for feature, vtype in split_data.info.features.items():
-                        if isinstance(vtype, Value) and vtype.dtype == 'string':
-                            conf_columns.append(feature)
-                logger.info(f'Using columns in {split}: {conf_columns}')
-                if conf_columns:
-                    split_data = split_data.map(
-                        extract_text,
-                        fn_kwargs={'columns': conf_columns},
-                        num_proc=num_proc,
-                        cache_file_name=f"{conf.cache_dir.rstrip('/')}/{conf.dataset.replace('/', '_')}-{dict_hash(conf)}-extract.cache",
-                        load_from_cache_file=True,
-                        desc=f'Extracting text...',
-                    )
-                    if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
-                        embedder = (
-                            SimHashEmbedder()
-                            if conf.embedder.name == 'SimHashEmbedder'
-                            else MinHashEmbedder(num_perm=conf.embedder.num_perm)
-                        )
+            clear_screen()
+            logger.info(f'Using columns in {split}: {conf_columns}')
 
-                        embed_function = embedder.embed_function(  # type: ignore
-                            n_gram=conf.tokenization.ngram_size,
-                            level=conf.tokenization.level,
-                        )
+            extract_config_md5 = compute_md5(
+                {
+                    'config': config,
+                    'split': split,
+                    'columns': conf_columns,
+                }
+            )
+            split_data = split_data.map(
+                extract_text,
+                fn_kwargs={'columns': conf_columns},
+                num_proc=num_proc,
+                cache_file_name=f'{storage_prefix}-{compute_md5(extract_config_md5)}.cache',
+                load_from_cache_file=True,
+                remove_columns=split_data.column_names,
+                desc=f'Extracting text...',
+            )
 
-                        split_data = split_data.map(
-                            lambda x: {
-                                '__signature__': serialize(  # type: ignore
-                                    embed_function(x['__text__']),
-                                ),
-                            },
-                            num_proc=num_proc,
-                            cache_file_name=f"{conf.cache_dir.rstrip('/')}/{conf.dataset.replace('/', '_')}-{dict_hash(conf)}-embed.cache",
-                            load_from_cache_file=True,
-                            desc=f'Embedding...',
-                        )
-                        split_signatures[split] = split_data
-
-                    elif conf.embedder.name == 'SuffixArrayEmbedder':
-                        embedder = SuffixArrayEmbedder(k=conf.embedder.k)
-                        slices = embedder.embed_bash(
-                            split_data['__text__'],
-                            skip_existing=conf.embedder.skip_existing,
-                            cache_dir=conf.embedder.cache_dir,
-                            temp_file_prefix=conf.embedder.temp_file_prefix,
-                        )
-                        split_signatures[split] = (slices, split_data)
-            records: List[Dict[str, Any]] = []
             if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
-                # All pair combinations
-                for x, y in product(SPLITS, repeat=2):
-                    if x not in split_signatures or y not in split_signatures:
-                        continue
-                    if SPLITS.index(x) > SPLITS.index(y):
-                        continue
-                    logger.info(f'Processing {x} and {y}')
-                    base_data = split_signatures[x]
-                    query_data = split_signatures[y]
+                embedder: Union[SimHashEmbedder, MinHashEmbedder] = SimHashEmbedder()
+                if conf.embedder.name == 'MinHashEmbedder':
+                    embedder = MinHashEmbedder(num_perm=conf.embedder.num_perm)
 
-                    clusters: List[List[int]] = (
-                        simhash_clustering(
-                            list(map(deserialize, base_data['__signature__'])),
-                            hamming_distance=conf.embedder.hamming_distance,
-                            query_signatures=list(
-                                map(deserialize, query_data['__signature__']),
-                            ),
-                        )
-                        if conf.embedder.name == 'SimHashEmbedder'
-                        else lsh_clustering(
-                            base_data['__signature__'],
-                            threshold=conf.embedder.threshold,
-                            query_signatures=query_data['__signature__'],
-                            redis_basename=f'{dict_hash(conf)}-{x}-{y}',
-                            redis_host='localhost',
-                            redis_port=6379,
-                            skip_indexing_if_exists=True,
-                        )
-                    )
-                    duplicated_count = 0
-                    total_count = 0
-                    duplicated_size = 0
-                    total_size = 0
-                    query_docs = query_data['__text__']
-                    for i, cluster in enumerate(
-                        tqdm(clusters, desc='Post-processing...'),
-                    ):
-                        total_count += 1
-                        total_size += get_byte_size(query_docs[i])
-                        if len(cluster) <= 1:
-                            continue
-                        duplicated_count += 1
-                        duplicated_size += get_byte_size(query_docs[i])
-                        cluster = [j for j in cluster if (x, j) != (y, i)]
-                        records.append(
-                            {
-                                'query_id': f'{y}-{i}',
-                                'references': [
-                                    {
-                                        'ref_id': f'{x}-{j}',
-                                    }
-                                    for j in cluster
-                                ],
-                            },
-                        )
-                    logger.info(
-                        f'{x}-{y}: {duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
-                    )
+                embed_function = embedder.embed_function(
+                    n_gram=conf.tokenization.ngram_size,
+                    level=conf.tokenization.level,
+                    use_str=conf.embedder.name == 'SimHashEmbedder',
+                )
 
-                if not records:
+                embed_config_md5 = compute_md5(
+                    {
+                        'config': config,
+                        'split': split,
+                        'columns': conf_columns,
+                        'ngram_size': conf.tokenization.ngram_size,
+                        'level': conf.tokenization.level,
+                        'embedder': repr(embedder),
+                    }
+                )
+
+                split_data = split_data.map(
+                    lambda x: {
+                        '__signature__': embed_function(x['__text__']),
+                    },
+                    num_proc=num_proc,
+                    cache_file_name=f'{storage_prefix}-{embed_config_md5}.cache',
+                    load_from_cache_file=True,
+                    remove_columns=['__text__'],
+                    desc=f'Embedding...',
+                )
+                split_results[split] = split_data
+            else:
+                embedder = SuffixArrayEmbedder(k=conf.embedder.k)  # type: ignore
+                slices = embedder.embed_bash(  # type: ignore
+                    split_data['__text__'],
+                    skip_existing=conf.embedder.skip_existing,
+                    cache_dir=conf.embedder.cache_dir,
+                    temp_file_prefix=conf.embedder.temp_file_prefix,
+                )
+                split_results[split] = (slices, split_data['__size__'])
+
+        clear_screen()
+        records: List[Dict[str, Any]] = []
+
+        if conf.embedder.name in {'SimHashEmbedder', 'MinHashEmbedder'}:
+            # All pair combinations
+            for x, y in product(SPLITS, repeat=2):
+
+                if x not in split_results or y not in split_results:
+                    continue
+                if SPLITS.index(x) > SPLITS.index(y):
                     continue
 
-            elif conf.embedder.name == 'SuffixArrayEmbedder':
-                duplicated_size = 0
-                duplicated_count = 0
-                total_count = 0
-                total_size = 0
-                for x in SPLITS:
-                    if x not in split_signatures:
-                        continue
-                    slices, base_data = split_signatures[x]
-                    for i, (segments, segment_data) in enumerate(
-                        zip(slices, base_data),
-                    ):
-                        total_size += get_byte_size(segment_data['__text__'])
-                        total_count += 1
-                        duplicated_count += 1 if segments else 0
-                        for segment in segments:
-                            duplicated_size += segment.stop - segment.start
-                            records.append(
-                                {
-                                    'query_id': f'{x}-{i}',
-                                    'substring': get_slice_text(
-                                        segment_data['__text__'],
-                                        segment,
-                                    ),
-                                },
-                            )
-                logger.info(
-                    f'{duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
+                clear_screen()
+                logger.info(f"Looking for {y}'s duplicates in {x}")
+
+                base_data = split_results[x]
+                query_data = split_results[y]
+
+                clustering_config_md5 = compute_md5(
+                    {
+                        'x': x,
+                        'y': y,
+                        'config': config,
+                        'dataset': conf.dataset.replace('/', '_'),
+                        'columns': conf_columns,
+                        'ngram_size': conf.tokenization.ngram_size,
+                        'level': conf.tokenization.level,
+                        'embedder': repr(embedder),
+                    }
                 )
 
-            with open('outputs.json', 'w') as f:
-                json.dump(records, f)
-        else:
-            logger.error(f'Unknown embedder: {conf.embedder}')
+                clusters: List[List[int]] = (
+                    simhash_clustering(
+                        list(map(int, base_data['__signature__'])),
+                        hamming_distance=conf.embedder.hamming_distance,
+                        query_signatures=list(map(int, query_data['__signature__'])),
+                        num_blocks=conf.embedder.num_blocks,
+                    )
+                    if conf.embedder.name == 'SimHashEmbedder'
+                    else lsh_clustering(
+                        base_data['__signature__'],
+                        threshold=conf.embedder.threshold,
+                        query_signatures=query_data['__signature__'],
+                        redis_basename=f'{clustering_config_md5}',
+                        redis_host='localhost',
+                        redis_port=6379,
+                        skip_indexing_if_exists=True,
+                    )
+                )
+
+                duplicated_count = 0
+                total_count = 0
+                duplicated_size = 0
+                total_size = 0
+                query_sizes = query_data['__size__']
+
+                for i, cluster in enumerate(tqdm(clusters, desc='Post-processing...')):
+                    total_count += 1
+                    total_size += query_sizes[i]
+                    if len(cluster) <= 1:  # No duplicates
+                        continue
+                    duplicated_count += 1
+                    duplicated_size += query_sizes[i]
+                    cluster = [j for j in cluster if (x, j) != (y, i)]
+                    records.append(
+                        {
+                            'query_index': i,
+                            'query_split': y,
+                            'references': cluster,
+                            'reference_split': x,
+                        }
+                    )
+                logger.info(
+                    f'{x}-{y}: {duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
+                )
+
+        elif conf.embedder.name == 'SuffixArrayEmbedder':
+            # TOOD Adopt this for all pair combinations
+            duplicated_size = 0
+            duplicated_count = 0
+            total_count = 0
+            total_size = 0
+            for x in SPLITS:
+                if x not in split_results:
+                    continue
+                slices, sizes = split_results[x]
+                for i, (segments, size) in enumerate(zip(slices, sizes)):
+                    total_size += size
+                    total_count += 1
+                    duplicated_count += 1 if segments else 0
+                    duplicated_size += sum(s.stop - s.start for s in segments)
+                    records.append(
+                        {
+                            'query_index': i,
+                            'query_split': x,
+                            'byte_slices': [[s.start, s.stop] for s in segments],
+                        }
+                    )
+            logger.info(
+                f'{duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes',
+            )
+
+        with open('outputs.json', 'w') as f:
+            json.dump(records, f)
 
     logger.info(f'Done in {time.time() - start_time:.2f} seconds')
 

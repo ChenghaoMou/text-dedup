@@ -138,8 +138,7 @@ def lsh_clustering(
                     MinHash(num_perm=num_perm, hashvalues=minhash),
                 )
         logger.debug(
-            f'LSH index already exists (size: {lsh.get_counts()}), skipped indexing'
-        )
+            f'LSH index already exists (size: {lsh.get_counts()}), skipped indexing')
 
     neighbors: List[List[int]] = []
 

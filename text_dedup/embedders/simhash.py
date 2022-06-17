@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Callable, List, Union
 
 import numpy as np
 
@@ -35,7 +35,6 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
     >>> _unsigned_hash(b'hello world', 64)
     13352372148217134600
     """
-    assert bit_length == 64, 'Only 64-bit hashes are supported.'
     h = hashlib.sha256(obj).digest()[: bit_length // 8]
     return int.from_bytes(h, byteorder='big', signed=False)
 
@@ -61,24 +60,14 @@ def _compute(hashes: List[int], bit_length: int = 64) -> int:
     >>> _compute([13352372148217134600], 64)
     13352372148217134600
     """
-    assert bit_length == 64, 'Only 64-bit hashes are supported.'
-    counts = np.zeros(bit_length, dtype=np.int64)
-    for h in hashes:
-        i = 0
-        while i < bit_length and h:
-            counts[i] += (h & 1) * 2 - 1
-            h >>= 1
-            i += 1
-
-    result = 0
-    for i in range(bit_length):
-        if counts[i] > 0:
-            result |= 1 << i
-    return result
+    bits = np.unpackbits(np.array(hashes, dtype='>u8').view(
+        '>u1').reshape(len(hashes), -1), axis=1).astype('>i8')
+    counts = np.where(np.sum(2 * bits - 1, axis=0, dtype='>i8') >= 0, 1, 0).astype('>u1')
+    return np.packbits(counts).view('>u8').item()
 
 
 @dataclass
-class SimHashEmbedder():
+class SimHashEmbedder:
 
     """
     Embedding text using SimHash.
@@ -127,18 +116,26 @@ class SimHashEmbedder():
         >>> hashes
         13950746197979717635
         """
+        use_str = kwargs.pop('use_str', False)
 
-        def wrapper(doc: str) -> int:
-
+        def wrapper(doc: str) -> Union[int, str]:
             tokens = tokenize(doc, **kwargs)
-            return _compute(
+            ans = _compute(
                 list(
                     map(
                         lambda x: _unsigned_hash(
-                            ' '.join(x).encode('utf-8'),
-                        ), tokens,
+                            x.encode('utf-8'),
+                        ),
+                        tokens,
                     ),
                 ),
             )
+            if use_str:
+                return str(ans)
+            return ans
 
         return wrapper
+
+    def __repr__(self) -> str:
+
+        return 'SimHashEmbedder()'

@@ -7,6 +7,7 @@ num_proc: 10
 embedder:
   name: SimHashEmbedder
   hamming_distance: 3
+  num_blocks: 4
 tokenization:
   ngram_size: 12
   level: sentencepiece

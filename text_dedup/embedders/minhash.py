@@ -73,6 +73,7 @@ class MinHashEmbedder:
         >>> hashes.shape
         (128,)
         """
+        _ = kwargs.pop('use_str', False)
 
         def wrapper(doc: str) -> np.ndarray:
             m = MinHash(num_perm=self.num_perm)
@@ -81,3 +82,7 @@ class MinHashEmbedder:
             return m.hashvalues
 
         return wrapper
+
+    def __repr__(self) -> str:
+
+        return f'MinHashEmbedder(num_perm={self.num_perm})'

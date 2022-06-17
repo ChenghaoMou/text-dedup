@@ -23,6 +23,7 @@ pytest = "^7.1.1"
 coverage = "^6.3.2"
 rich = "^12.4.1"
 pdoc = "^12.0.0"
+hydra-colorlog = "^1.2.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -12,7 +12,7 @@ from typing import List
 
 from tqdm import tqdm
 
-from text_dedup.utils.sa import construct_sa
+from text_dedup.utils.suffix_array import construct_sa
 from text_dedup.utils.suffix_restore import restore
 
 logger = logging.getLogger('text-dedup')

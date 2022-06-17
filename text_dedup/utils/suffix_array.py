@@ -17,7 +17,9 @@ class Triple(object):
 
     # todo: input validation, errors
     def __init__(self, T, idx, length):
-        t_i = lambda i: T[i] if i < length else 0
+        def t_i(i):
+            return T[i] if i < length else 0
+
         self._triple = (t_i(idx), t_i(idx + 1), t_i(idx + 2))
         self._index = idx
         self._rank = None
@@ -52,7 +54,7 @@ class Triple(object):
         self._rank = pos
 
     def __repr__(self):
-        return "Triple({0}, {1}, {2})".format(self.triple, self.index, self.rank)
+        return 'Triple({0}, {1}, {2})'.format(self.triple, self.index, self.rank)
 
 
 class NonsamplePair(object):
@@ -105,23 +107,18 @@ def ksa(T):
     R_prime = [suffix.rank for suffix in R]
 
     # recursive call
-    if rank < len(
-        R
-    ):  # we had repeats of characters of R, make a recursive call to sort
+    if rank < len(R):  # we had repeats of characters of R, make a recursive call to sort
         R_prime_suffix_array = ksa(R_prime)
     else:
         # directly form suffix array
         R_prime_suffix_array = [len(R)] + [suffix.rpos for suffix in sorted_suffixes_R]
-    rank_Si = [None] * (
-        length + 3
-    )  # why plus 3? -> additiionally define rank(S_(n+1) = rank(S_(n+2)) = 0
+    # why plus 3? -> additiionally define rank(S_(n+1) = rank(S_(n+2)) = 0
+    rank_Si = [None] * (length + 3)
     rank_Si[-2] = rank_Si[-1] = 0
 
     # build rank(S_i) lookup array
     for i, SAi in enumerate(R_prime_suffix_array):
-        if SAi < len(
-            R
-        ):  # ignore the index pointing to the terminating character of R_prime
+        if SAi < len(R):  # ignore the index pointing to the terminating character of R_prime
             rank_Si[R[SAi].index] = i
 
     sorted_suffixes_R = [R[i] for i in R_prime_suffix_array[1:]]
@@ -139,9 +136,7 @@ def ksa(T):
             return T[idx]
         return 0
 
-    while cur_Sc < len(sorted_suffixes_R) and cur_Sb0 < len(
-        sorted_nonsample_suffix_pairs
-    ):
+    while cur_Sc < len(sorted_suffixes_R) and cur_Sb0 < len(sorted_nonsample_suffix_pairs):
         i = sorted_suffixes_R[cur_Sc].index
         j = sorted_nonsample_suffix_pairs[cur_Sb0].index
         if i % 3 == 1:  # i in B_1
