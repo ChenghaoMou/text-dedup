@@ -9,8 +9,7 @@ from itertools import product
 from typing import Any, Dict, List, Union
 
 import hydra
-from datasets import (Value, get_dataset_config_names, get_dataset_split_names,
-                      load_dataset)
+from datasets import Value, get_dataset_config_names, get_dataset_split_names, load_dataset
 from omegaconf import DictConfig, OmegaConf
 from rich import print
 from rich.table import Table
@@ -64,8 +63,7 @@ def main(conf: DictConfig):  # pragma: no cover
 
     if not conf.configs:
         conf.configs = get_dataset_config_names(conf.dataset, use_auth_token=TOKEN)
-        logger.warning(
-            f'No configs specified, using all available configs {conf.configs}')
+        logger.warning(f'No configs specified, using all available configs {conf.configs}')
     else:
         logger.info(f'Using configs {conf.configs}')
 
@@ -244,23 +242,17 @@ def main(conf: DictConfig):  # pragma: no cover
                     )
                     if examples > 0:
                         table = Table(title='Examples', show_lines=True)
-                        table.add_column('Query Split', justify='left',
-                                         style='cyan', no_wrap=False)
-                        table.add_column('Query Index', justify='left',
-                                         style='cyan', no_wrap=False)
-                        table.add_column('Query Instance', justify='left',
-                                         style='cyan', no_wrap=False)
-                        table.add_column('Duplicate Split', justify='left',
-                                         style='cyan', no_wrap=False)
-                        table.add_column('Duplicate Index', justify='left',
-                                         style='cyan', no_wrap=False)
+                        table.add_column('Query Split', justify='left', style='cyan', no_wrap=False)
+                        table.add_column('Query Index', justify='left', style='cyan', no_wrap=False)
+                        table.add_column('Query Instance', justify='left', style='cyan', no_wrap=False)
+                        table.add_column('Duplicate Split', justify='left', style='cyan', no_wrap=False)
+                        table.add_column('Duplicate Index', justify='left', style='cyan', no_wrap=False)
                         table.add_column('Duplicate', justify='left', style='magenta')
                         for ref_id, reference in zip(cluster[:10], base_data.select(cluster)['__text__']):
                             table.add_row(
                                 y,
                                 str(i),
-                                textwrap.shorten(query_data.select(
-                                    [i])['__text__'][0], width=512),
+                                textwrap.shorten(query_data.select([i])['__text__'][0], width=512),
                                 x,
                                 str(ref_id),
                                 textwrap.shorten(reference, width=512),

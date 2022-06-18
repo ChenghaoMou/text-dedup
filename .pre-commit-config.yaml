@@ -14,6 +14,7 @@ repos:
     rev: v1.6.0
     hooks:
       - id: autopep8
+        args: ["--max-line-length", "120"]
   - repo: https://github.com/PyCQA/flake8
     rev: 4.0.1
     hooks:
@@ -28,3 +29,4 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
+        args: ["-l", "120"]
