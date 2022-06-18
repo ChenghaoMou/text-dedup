@@ -6,7 +6,6 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: debug-statements
-      - id: double-quote-string-fixer
       - id: name-tests-test
         args: ["--django"]
       - id: requirements-txt-fixer
