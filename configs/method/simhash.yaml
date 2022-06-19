@@ -12,3 +12,9 @@ tokenization:
   ngram_size: 12
   level: sentencepiece
 cache_dir: .cache
+storage_config:
+  type: redis
+  redis:
+    host: localhost
+    port: 6379
+# storage_config: null # use null to use dict instead

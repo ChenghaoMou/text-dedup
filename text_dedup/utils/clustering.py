@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import numpy as np
 from annoy import AnnoyIndex
@@ -13,21 +13,22 @@ from datasketch import MinHash, MinHashLSH
 from multiprocess import Pool
 from tqdm import tqdm
 
+from text_dedup.utils.redis_dict import RedisDict
 from text_dedup.utils.simhash_index import SimhashIndex
 
-logger: logging.Logger = logging.getLogger('text_dedup')
+logger: logging.Logger = logging.getLogger("text_dedup")
 
 
 def annoy_clustering(
     embeddings: List[np.ndarray],
     f: int = 128,
     metric: Literal[
-        'angular',
-        'euclidean',
-        'manhattan',
-        'hamming',
-        'dot',
-    ] = 'angular',
+        "angular",
+        "euclidean",
+        "manhattan",
+        "hamming",
+        "dot",
+    ] = "angular",
     num_trees: int = 64,
     top_k: int = 100,
     distance_threshold: float = 0.5,
@@ -87,10 +88,7 @@ def lsh_clustering(
     threshold: float = 0.5,
     num_perm: int = 128,
     query_signatures: Optional[List[np.ndarray]] = None,
-    redis_basename: Optional[str] = None,
-    redis_host: Optional[str] = None,
-    redis_port: Optional[int] = None,
-    skip_indexing_if_exists: bool = False,
+    storage_config: Optional[Dict[str, Any]] = None,
 ) -> List[List[int]]:
     """
     Cluster embeddings with LSH.
@@ -122,23 +120,15 @@ def lsh_clustering(
     lsh = MinHashLSH(
         threshold=threshold,
         num_perm=num_perm,
-        storage_config={
-            'type': 'redis',
-            'basename': redis_basename.encode('utf-8'),
-            'redis': {'host': redis_host, 'port': redis_port},
-        }
-        if redis_basename is not None
-        else None,
+        storage_config=storage_config,
     )
-    if lsh.is_empty() or not skip_indexing_if_exists:
+    if lsh.is_empty():
         with lsh.insertion_session() as session:
             for key, minhash in enumerate(signatures):
                 session.insert(
-                    f'id-{key}',
+                    f"id-{key}",
                     MinHash(num_perm=num_perm, hashvalues=minhash),
                 )
-        logger.debug(
-            f'LSH index already exists (size: {lsh.get_counts()}), skipped indexing')
 
     neighbors: List[List[int]] = []
 
@@ -148,12 +138,12 @@ def lsh_clustering(
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
             lambda signature: [
-                int(x.split('-')[1])
+                int(x.split("-")[1])
                 for x in lsh.query(
                     MinHash(num_perm=num_perm, hashvalues=signature),
                 )
             ],
-            tqdm(query_signatures, desc='Querying...'),
+            tqdm(query_signatures, desc="Querying..."),
         )
 
     return neighbors
@@ -164,6 +154,7 @@ def simhash_clustering(
     hamming_distance: int = 3,
     num_blocks: int = 5,
     query_signatures: List[int] | None = None,
+    storage_config: Optional[Dict[str, Any]] = None,
 ) -> List[List[int]]:
     """
     Cluster embeddings with simhash.
@@ -190,23 +181,28 @@ def simhash_clustering(
         [(i, signature) for i, signature in enumerate(signatures)],
         k=hamming_distance,
         b=num_blocks,
+        storage_config=storage_config,
     )
 
     if query_signatures is None:
         query_signatures = signatures
 
     neighbors: List[List[int]] = []
+    # if isinstance(index.bucket, RedisDict):
+    #     # Redis doesn't seem to work well with multiprocessing
+    #     neighbors = map(index.get_near_dups, tqdm(query_signatures, desc="Querying..."))
+    # else:
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
             lambda signature: list(
                 map(int, index.get_near_dups(signature)),
             ),
-            tqdm(query_signatures, desc='Querying...'),
+            tqdm(query_signatures, desc="Querying..."),
         )
 
     return neighbors
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     print(simhash_clustering([1, 1024, 1231241, 1, 1025]))

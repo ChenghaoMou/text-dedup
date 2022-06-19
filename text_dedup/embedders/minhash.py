@@ -73,16 +73,16 @@ class MinHashEmbedder:
         >>> hashes.shape
         (128,)
         """
-        _ = kwargs.pop('use_str', False)
+        _ = kwargs.pop("use_str", False)
 
         def wrapper(doc: str) -> np.ndarray:
             m = MinHash(num_perm=self.num_perm)
             for ngram in tokenize(doc, **kwargs):
-                m.update(ngram.encode('utf-8'))
+                m.update(ngram.encode("utf-8"))
             return m.hashvalues
 
         return wrapper
 
     def __repr__(self) -> str:
 
-        return f'MinHashEmbedder(num_perm={self.num_perm})'
+        return f"MinHashEmbedder(num_perm={self.num_perm})"

@@ -34,7 +34,6 @@ SPLITS: List[str] = ["train", "validation", "test"]
 
 
 def clear_screen():  # pragma: no cover
-    # tqdm.write("\n")
     sys.stderr.flush()
     sys.stdout.flush()
 
@@ -204,16 +203,32 @@ def main(conf: DictConfig):  # pragma: no cover
                         hamming_distance=conf.embedder.hamming_distance,
                         query_signatures=list(map(int, query_data["__signature__"])),
                         num_blocks=conf.embedder.num_blocks,
+                        storage_config={
+                            "type": conf.storage_config.type,
+                            "redis": {
+                                "host": conf.storage_config.redis.host,
+                                "port": conf.storage_config.redis.port,
+                            },
+                            "basename": compute_md5(clustering_config_md5),
+                        }
+                        if conf.storage_config and conf.storage_config.type == "redis"
+                        else None,
                     )
                     if conf.embedder.name == "SimHashEmbedder"
                     else lsh_clustering(
                         base_data["__signature__"],
                         threshold=conf.embedder.threshold,
                         query_signatures=query_data["__signature__"],
-                        redis_basename=f"{clustering_config_md5}",
-                        redis_host="localhost",
-                        redis_port=6379,
-                        skip_indexing_if_exists=True,
+                        storage_config={
+                            "type": conf.storage_config.type,
+                            "redis": {
+                                "host": conf.storage_config.redis.host,
+                                "port": conf.storage_config.redis.port,
+                            },
+                            "basename": compute_md5(clustering_config_md5).encode("utf-8"),
+                        }
+                        if conf.storage_config and conf.storage_config.type == "redis"
+                        else None,
                     )
                 )
 
@@ -259,8 +274,11 @@ def main(conf: DictConfig):  # pragma: no cover
                             )
                         print(table)
                         examples -= 1
+
+                duplicated_count_ratio: float = duplicated_count / total_count * 100
+                duplicated_byte_ratio: float = duplicated_size / total_size * 100
                 logger.info(
-                    f"{x}-{y}: {duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes",
+                    f"{x}-{y}: {duplicated_count_ratio:.2f}% ({duplicated_count}) duplicated documents, {duplicated_byte_ratio:.2f}% ({duplicated_size}) duplicated bytes",
                 )
 
         elif conf.embedder.name == "SuffixArrayEmbedder":
@@ -285,11 +303,14 @@ def main(conf: DictConfig):  # pragma: no cover
                             "byte_slices": [[s.start, s.stop] for s in segments],
                         }
                     )
+
+            duplicated_count_ratio = duplicated_count / total_count * 100
+            duplicated_byte_ratio = duplicated_size / total_size * 100
             logger.info(
-                f"{duplicated_count / total_count * 100:.2f}% ({duplicated_count}) duplicated documents, {duplicated_size / total_size * 100:.2f}% ({duplicated_size}) duplicated bytes",
+                f"{x}-{y}: {duplicated_count_ratio:.2f}% ({duplicated_count}) duplicated documents, {duplicated_byte_ratio:.2f}% ({duplicated_size}) duplicated bytes",
             )
 
-        with open("outputs.json", "w") as f:
+        with open(f"{storage_prefix}-results.json", "w") as f:
             json.dump(records, f)
 
     logger.info(f"Done in {time.time() - start_time:.2f} seconds")

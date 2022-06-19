@@ -4,11 +4,14 @@ import collections
 import logging
 import math
 from itertools import permutations
-from typing import Any, Dict, Generator, List, Set, Tuple
+from typing import Any, Dict, Generator, List, Set, Tuple, Union
 
+from redis import Redis
 from tqdm import tqdm
 
-logger = logging.getLogger('text_dedup')
+from text_dedup.utils.redis_dict import RedisDict
+
+logger = logging.getLogger("text_dedup")
 
 
 def hamming_distance(a: int, b: int) -> int:
@@ -130,25 +133,25 @@ class SimhashIndex(object):
         f: int = 64,
         k: int = 3,
         b: int = 4,
+        storage_config: Dict[str, Any] = None,
     ):
-        assert b > k, 'b must be greater than k'
+        assert b > k, "b must be greater than k"
 
         self.k = k
         self.b = b
         self.f = f
-        self.bucket: Dict[Tuple[int, int], Set[Tuple[int, int]]
-                          ] = collections.defaultdict(set)
+        self.bucket: Union[Dict[Tuple[int, int], Set[Tuple[int, int]]], RedisDict] = collections.defaultdict(set)
+        if storage_config:
+            self.bucket = RedisDict(storage_config)
         self.permutations = create_permutations(f, k, b)
 
         if len(self.bucket) == 0:
-            for idx, fingerprint in tqdm(fingerprints, desc='Indexing...'):
+            for idx, fingerprint in tqdm(fingerprints, desc="Indexing..."):
                 self.add(idx, fingerprint)
 
-        logger.info(
-            f'Simhash index created with {len(self.bucket)} buckets and {len(self.permutations)} permutations.')
-        largest_bucket: Tuple[int, int] = max(
-            self.bucket, key=lambda x: len(self.bucket[x]))
-        logger.info(f'Maxium bucket size: {len(self.bucket[largest_bucket])}')
+        logger.info(f"Simhash index created with {len(self.bucket)} buckets and {len(self.permutations)} permutations.")
+        largest_bucket: Any = max(self.bucket, key=lambda x: len(self.bucket[x]))
+        logger.info(f"Maxium bucket size: {len(self.bucket[largest_bucket])} with the key {largest_bucket}")
 
     def get_near_dups(self, fingerprint: int) -> List[Any]:
         ans = set()
@@ -160,7 +163,10 @@ class SimhashIndex(object):
 
     def add(self, idx: int, fingerprint: int):
         for key in self.get_keys(fingerprint):
-            self.bucket[key].add((idx, fingerprint))
+            if isinstance(self.bucket, RedisDict):
+                self.bucket.add(key, (idx, fingerprint))
+            else:
+                self.bucket[key].add((idx, fingerprint))
 
     def get_keys(self, fingerprint: int) -> Generator[Tuple[int, int], None, None]:
         for permutation in self.permutations:
