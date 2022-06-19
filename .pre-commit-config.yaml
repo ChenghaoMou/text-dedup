@@ -5,9 +5,6 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-      - id: debug-statements
-      - id: name-tests-test
-        args: ["--django"]
       - id: requirements-txt-fixer
   - repo: https://github.com/pre-commit/mirrors-autopep8
     rev: v1.6.0
@@ -27,4 +24,3 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
-        args: ["-l", "120"]
