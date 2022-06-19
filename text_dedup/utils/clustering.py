@@ -10,10 +10,9 @@ from typing import Any, Dict, List, Literal, Optional
 import numpy as np
 from annoy import AnnoyIndex
 from datasketch import MinHash, MinHashLSH
-from multiprocess import Pool
+from mpire import WorkerPool as Pool
 from tqdm import tqdm
 
-from text_dedup.utils.redis_dict import RedisDict
 from text_dedup.utils.simhash_index import SimhashIndex
 
 logger: logging.Logger = logging.getLogger("text_dedup")
@@ -137,7 +136,7 @@ def lsh_clustering(
 
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
-            lambda signature: [
+            lambda *signature: [
                 int(x.split("-")[1])
                 for x in lsh.query(
                     MinHash(num_perm=num_perm, hashvalues=signature),
@@ -188,15 +187,9 @@ def simhash_clustering(
         query_signatures = signatures
 
     neighbors: List[List[int]] = []
-    # if isinstance(index.bucket, RedisDict):
-    #     # Redis doesn't seem to work well with multiprocessing
-    #     neighbors = map(index.get_near_dups, tqdm(query_signatures, desc="Querying..."))
-    # else:
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
-            lambda signature: list(
-                map(int, index.get_near_dups(signature)),
-            ),
+            index.get_near_dups,
             tqdm(query_signatures, desc="Querying..."),
         )
 

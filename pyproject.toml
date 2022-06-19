@@ -18,6 +18,7 @@ datasets = "^2.2.2"
 sentencepiece = "^0.1.96"
 redis = "^4.3.3"
 rich = "^12.4.4"
+mpire = "^2.4.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.1"
@@ -38,4 +39,4 @@ aggressive = 3
 line-length = 120
 
 [tool.isort]
-line-length = 120
+line_length = 120
