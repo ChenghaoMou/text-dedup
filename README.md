@@ -8,14 +8,19 @@
 
 ## Features
 
--   Support hash-based embeddings (MinHash + LSH, SimHash), `transformers` embeddings, and suffix array from [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499).
--   Support both near-deduplication, semantic deduplication, and substring exact deduplication.
+-   Hash-based methods such as [SimHash](https://www.cs.princeton.edu/courses/archive/spring04/cos598B/bib/CharikarEstim.pdf), [MinHash](https://web.archive.org/web/20150131043133/http://gatekeeper.dec.com/ftp/pub/dec/SRC/publications/broder/positano-final-wpnums.pdf) + [LSH](http://infolab.stanford.edu/~ullman/mmds.html) for near deduplication.
+-   [SuffixArray](http://dl.acm.org/citation.cfm?id=320176.320218)-based method from [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) for substring exact deduplication.
+-   In-memory or [Redis](https://redis.io)/[KeyDB](https://docs.keydb.dev)-cached index.
 
-## Usage
+## Documentation
 
-More examples can be found in `examples`.
+[Github Pages](https://chenghaomou.github.io/text-dedup/text_dedup.html)
 
-### Find Duplicates for any dataset on Huggingface's datasets
+## CLI Usage
+
+`cli.py` is a wrapper tool that identifies duplicates for a given Huggingface's dataset. Currently, only hash-based methods will try to identify all duplicates within the dataset and the suffix array method will only find the duplicate substrings within dataset splits.
+
+By default, the tool uses redis as a cache layer for the hashes. See `configs/method/minhash.yaml` or `configs/method/simhash.yaml` for details. Or you can overwrite the `storage_config` to `null` to use in-memory index. Deduplicating small datasets that fit in your machine's memory should be fine with in-memory index.
 
 ```text
 python cli.py method=suffix  method.dataset=oscar-corpus/OSCAR-2201 method.configs="[gl]"
@@ -23,7 +28,9 @@ python cli.py method=simhash method.tokenization.ngram_size=12 method.dataset=os
 python cli.py method=minhash method.tokenization.ngram_size=12 method.dataset=oscar-corpus/OSCAR-2201 method.configs="[gl]"
 ```
 
-Refer to `configs` to more details. Configurations are parsed with [hydra](https://hydra.cc).
+-   Configurations are parsed with [hydra](https://hydra.cc).
+
+## Programmatic Usage
 
 ### Hash-based Near Deduplication
 
@@ -141,4 +148,18 @@ if __name__ == "__main__":
     # [0, 0, 2, 2]
 ```
 
-## Dataset Duplication Report
+## Benchmarks
+
+## Todos
+
+-   [ ] Wrap suffix array inter-split deduplication
+-   [ ] Wrap inter-dataset deduplication
+-   [ ] Rewrite suffix array in Python
+
+## Thanks
+
+-   [seomoz/simhash-cpp](https://github.com/seomoz/simhash-cpp)
+-   [datasketch](http://ekzhu.com/datasketch/index.html)
+-   [google-research/deduplicate-text-datasets](https://github.com/google-research/deduplicate-text-datasets)
+
+This project is heavily influenced by the deduplication work at BigScience workshop. The original code can be found at [bigscience-workshop/data-preparation](https://github.com/bigscience-workshop/data-preparation/tree/main/preprocessing/filtering/deduplicate).
