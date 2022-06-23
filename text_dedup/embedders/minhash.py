@@ -26,7 +26,7 @@ class MinHashEmbedder:
 
     num_perm: int = 128
 
-    def embed(self, corpus: List[str], **kwargs) -> np.ndarray:
+    def embed(self, corpus: List[str], **kwargs) -> List[np.ndarray]:
         """
         Embed a list of strings.
 
@@ -39,18 +39,18 @@ class MinHashEmbedder:
 
         Returns
         -------
-        np.ndarray
-            Embedding of the corpus.
+        List[np.ndarray]
+            Embeddings of the corpus.
 
         Examples
         --------
         >>> embedder = MinHashEmbedder(128)
         >>> embeddings = embedder.embed(["hello world", "hello world"])
-        >>> embeddings.shape
-        (2, 128)
+        >>> len(embeddings)
+        2
         """
         f = self.embed_function(**kwargs)
-        return np.array([f(doc) for doc in corpus])
+        return [f(doc) for doc in corpus]
 
     def embed_function(self, **kwargs) -> Callable:
         """

@@ -136,7 +136,7 @@ def lsh_clustering(
 
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
-            lambda *signature: [
+            lambda signature: [
                 int(x.split("-")[1])
                 for x in lsh.query(
                     MinHash(num_perm=num_perm, hashvalues=signature),

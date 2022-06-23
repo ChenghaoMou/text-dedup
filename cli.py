@@ -9,6 +9,7 @@ from itertools import product
 from typing import Any, Dict, List, Union
 
 import hydra
+import numpy as np
 from datasets import Value, get_dataset_config_names, get_dataset_split_names, load_dataset
 from omegaconf import DictConfig, OmegaConf
 from rich import print
@@ -216,9 +217,9 @@ def main(conf: DictConfig):  # pragma: no cover
                     )
                     if conf.embedder.name == "SimHashEmbedder"
                     else lsh_clustering(
-                        base_data["__signature__"],
+                        list(map(np.asarray, base_data["__signature__"])),
                         threshold=conf.embedder.threshold,
-                        query_signatures=query_data["__signature__"],
+                        query_signatures=list(map(np.asarray, query_data["__signature__"])),
                         storage_config={
                             "type": conf.storage_config.type,
                             "redis": {

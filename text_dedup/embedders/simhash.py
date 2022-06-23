@@ -39,7 +39,7 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
     return int.from_bytes(h, byteorder='big', signed=False)
 
 
-def _compute(hashes: List[int], bit_length: int = 64) -> int:
+def _compute(hashes: List[int]) -> int:
     """
     Compute the Simhash of a list of hashes.
 
@@ -47,8 +47,6 @@ def _compute(hashes: List[int], bit_length: int = 64) -> int:
     ----------
     hashes : List[int]
         The list of hashes.
-    bit_length : int
-        The bit length of the hash.
 
     Returns
     -------
@@ -57,7 +55,7 @@ def _compute(hashes: List[int], bit_length: int = 64) -> int:
 
     Examples
     --------
-    >>> _compute([13352372148217134600], 64)
+    >>> _compute([13352372148217134600])
     13352372148217134600
     """
     bits = np.unpackbits(np.array(hashes, dtype='>u8').view(
@@ -94,7 +92,7 @@ class SimHashEmbedder:
         >>> embedder = SimHashEmbedder()
         >>> embeddings = embedder.embed(["hello", "hello world! This is a test."])
         >>> embeddings
-        [4051436901025898700, 13943988908483280899]
+        [15473702421686509265, 1924126105804850143]
         """
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
@@ -114,7 +112,7 @@ class SimHashEmbedder:
         >>> embedder = SimHashEmbedder()
         >>> hashes = embedder.embed_function()("hello world! This is a test string.")
         >>> hashes
-        13950746197979717635
+        159449592218796430
         """
         use_str = kwargs.pop('use_str', False)
 
