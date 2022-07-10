@@ -92,7 +92,7 @@ class SimHashEmbedder:
         >>> embedder = SimHashEmbedder()
         >>> embeddings = embedder.embed(["hello", "hello world! This is a test."])
         >>> embeddings
-        [15473702421686509265, 1924126105804850143]
+        [15473702421686509265, 16678727103752857983]
         """
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
@@ -112,7 +112,7 @@ class SimHashEmbedder:
         >>> embedder = SimHashEmbedder()
         >>> hashes = embedder.embed_function()("hello world! This is a test string.")
         >>> hashes
-        159449592218796430
+        14143049876155195771
         """
         use_str = kwargs.pop('use_str', False)
 

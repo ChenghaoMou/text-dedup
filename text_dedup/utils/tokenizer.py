@@ -63,11 +63,11 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> Tuple[
     Examples
     --------
     >>> tokenize("Hello world!")
-    (['▁Hello▁world!'], [[0, 12]])
+    (['▁Hello▁world!'], [(0, 12)])
     >>> tokenize("This is a test.", n_gram=2)
-    (['▁This▁is', '▁is▁a', '▁a▁test', '▁test.'], [[0, 7], [5, 9], [8, 14], [10, 15]])
+    (['▁This▁is', '▁is▁a', '▁a▁test', '▁test.'], [(0, 7), (5, 9), (8, 14), (10, 15)])
     >>> tokenize("test message", n_gram=2, level='char')
-    (['te', 'es', 'st', 't ', ' m', 'me', 'es', 'ss', 'sa', 'ag', 'ge'], [[0, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [6, 8], [7, 9], [8, 10], [9, 11], [10, 12]])
+    (['te', 'es', 'st', 't ', ' m', 'me', 'es', 'ss', 'sa', 'ag', 'ge'], [(0, 2), (1, 3), (2, 4), (3, 5), (4, 6), (5, 7), (6, 8), (7, 9), (8, 10), (9, 11), (10, 12)])
     """
 
     assert level in {'sentencepiece', 'char', 'word'}, f'Invalid level: {level}'
