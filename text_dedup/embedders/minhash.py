@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # @Date    : 2022-04-02 10:53:30
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-# from __future__ import annotations
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable, List
@@ -77,7 +75,8 @@ class MinHashEmbedder:
 
         def wrapper(doc: str) -> np.ndarray:
             m = MinHash(num_perm=self.num_perm)
-            for ngram in tokenize(doc, **kwargs):
+            tokens, _ = tokenize(doc, **kwargs)
+            for ngram in tokens:
                 m.update(ngram.encode("utf-8"))
             return m.hashvalues
 

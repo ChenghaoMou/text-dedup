@@ -2,15 +2,12 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade)
 
-<div align="center" style="display:flex;flex-direction:column;">
-  <img src="./architecture.svg">
-</div>
 
 ## Features
 
 -   Hash-based methods such as [SimHash](https://www.cs.princeton.edu/courses/archive/spring04/cos598B/bib/CharikarEstim.pdf), [MinHash](https://web.archive.org/web/20150131043133/http://gatekeeper.dec.com/ftp/pub/dec/SRC/publications/broder/positano-final-wpnums.pdf) + [LSH](http://infolab.stanford.edu/~ullman/mmds.html) for near deduplication.
 -   [SuffixArray](http://dl.acm.org/citation.cfm?id=320176.320218)-based method from [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) for substring exact deduplication.
--   In-memory or [Redis](https://redis.io)/[KeyDB](https://docs.keydb.dev)-cached index.
+-   In-memory or [Redis](https://redis.io)/[KeyDB](https://docs.keydb.dev)-cached index to handle larger than memory datasets.
 
 ## Documentation
 
@@ -39,22 +36,20 @@ from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.utils.nn import lsh_clustering
 from text_dedup.utils.group import get_group_indices
 
-if __name__ == "__main__":
+corpus = [
+    "The quick brown fox jumps over the lazy dog",
+    "The quick brown fox jumps over the lazy dog",
+    "This is a test",
+    "This is a test",
+]
 
-    corpus = [
-        "The quick brown fox jumps over the lazy dog",
-        "The quick brown fox jumps over the lazy dog",
-        "This is a test",
-        "This is a test",
-    ]
+embedder = MinHashEmbedder()
+embeddings = embedder.embed(corpus)
 
-    embedder = MinHashEmbedder()
-    embeddings = embedder.embed(corpus)
-
-    clusters = lsh_clustering(embeddings)
-    groups = get_group_indices(clusters)
-    print(groups)
-    # [0, 0, 2, 2]
+clusters = lsh_clustering(embeddings)
+groups = get_group_indices(clusters)
+print(groups)
+# [0, 0, 2, 2]
 ```
 
 ```python
@@ -62,22 +57,20 @@ from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.utils.nn import simhash_clustering
 from text_dedup.utils.group import get_group_indices
 
-if __name__ == "__main__":
+corpus = [
+    "The quick brown fox jumps over the lazy dog",
+    "The quick brown fox jumps over the lazy dog",
+    "This is a test",
+    "This is a test",
+]
 
-    corpus = [
-        "The quick brown fox jumps over the lazy dog",
-        "The quick brown fox jumps over the lazy dog",
-        "This is a test",
-        "This is a test",
-    ]
+embedder = SimHashEmbedder()
+embeddings = embedder.embed(corpus)
 
-    embedder = SimHashEmbedder()
-    embeddings = embedder.embed(corpus)
-
-    clusters = simhash_clustering(embeddings)
-    groups = get_group_indices(clusters)
-    print(groups)
-    # [0, 0, 2, 2]
+clusters = simhash_clustering(embeddings)
+groups = get_group_indices(clusters)
+print(groups)
+# [0, 0, 2, 2]
 ```
 
 ### Suffix Array Substring Exact Deduplication
@@ -85,38 +78,36 @@ if __name__ == "__main__":
 ```python
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
 
-if __name__ == "__main__":
-
-    corpus = [
-        "The quick brown fox jumps over the lazy dog",
-        "The quick brown fox jumps over the lazy dog",
-        "This is a test",
-        "This is a test",
-        "This is a random test",
-        "The quick brown fox and a random test"
-    ]
+corpus = [
+    "The quick brown fox jumps over the lazy dog",
+    "The quick brown fox jumps over the lazy dog",
+    "This is a test",
+    "This is a test",
+    "This is a random test",
+    "The quick brown fox and a random test"
+]
 
 
-    embedder = SuffixArrayEmbedder(k=10)
-    slices = embedder.embed(corpus, merge=True, merge_strategy='longest')
-    # or using the original rust code
-    # slices = embedder.embed_bash(corpus)
+embedder = SuffixArrayEmbedder(k=10)
+slices = embedder.embed(corpus, merge=True, merge_strategy='longest')
+# or using the original rust code
+# slices = embedder.embed_bash(corpus)
 
-    for sentence, intervals in zip(corpus, slices):
-        print(sentence)
-        print([sentence[slice] for slice in intervals])
-    # The quick brown fox jumps over the lazy dog
-    # ['The quick brown fox jumps over the lazy dog']
-    # The quick brown fox jumps over the lazy dog
-    # ['The quick brown fox jumps over the lazy dog']
-    # This is a test
-    # ['This is a test']
-    # This is a test
-    # ['This is a test']
-    # This is a random test
-    # ['This is a ', ' a random test']
-    # The quick brown fox and a random test
-    # ['The quick brown fox ', ' a random test']
+for sentence, intervals in zip(corpus, slices):
+    print(sentence)
+    print([sentence[slice] for slice in intervals])
+# The quick brown fox jumps over the lazy dog
+# ['The quick brown fox jumps over the lazy dog']
+# The quick brown fox jumps over the lazy dog
+# ['The quick brown fox jumps over the lazy dog']
+# This is a test
+# ['This is a test']
+# This is a test
+# ['This is a test']
+# This is a random test
+# ['This is a ', ' a random test']
+# The quick brown fox and a random test
+# ['The quick brown fox ', ' a random test']
 ```
 
 ### Transformer Embedding Semantic Deduplication
@@ -126,26 +117,35 @@ from text_dedup.embedders.transformer import TransformerEmbedder
 from text_dedup.utils.nn import annoy_clustering
 from text_dedup.utils.group import get_group_indices
 
-if __name__ == "__main__":
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+corpus = [
+    "The quick brown fox jumps over the dog",
+    "The quick brown fox jumps over the corgi",
+    "This is a test",
+    "This is a test message",
+]
 
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    corpus = [
-        "The quick brown fox jumps over the dog",
-        "The quick brown fox jumps over the corgi",
-        "This is a test",
-        "This is a test message",
-    ]
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased")
 
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased")
+embedder = TransformerEmbedder(tokenizer, model)
+embeddings = embedder.embed(corpus)
 
-    embedder = TransformerEmbedder(tokenizer, model)
-    embeddings = embedder.embed(corpus)
+clusters = annoy_clustering(embeddings, f=768)
+groups = get_group_indices(clusters)
+print(groups)
+# [0, 0, 2, 2]
+```
 
-    clusters = annoy_clustering(embeddings, f=768)
-    groups = get_group_indices(clusters)
-    print(groups)
-    # [0, 0, 2, 2]
+### Best Fuzzy Search
+
+This is useful for ad-hoc fuzzy substring search. Given a long document and a query string, this function will return a best fuzzy match based on Jaccard similarity.
+
+```python
+from text_dedup.utils.search import best_fuzzy_search
+
+best_fuzzy_search("Hello world!", "Random word, Hello word! hello menudo!")
+# (13, 'Hello word!')
 ```
 
 ## Benchmarks

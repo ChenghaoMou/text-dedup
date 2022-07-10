@@ -154,6 +154,7 @@ def simhash_clustering(
     num_blocks: int = 5,
     query_signatures: List[int] | None = None,
     storage_config: Optional[Dict[str, Any]] = None,
+    verbose: bool = False,
 ) -> List[List[int]]:
     """
     Cluster embeddings with simhash.
@@ -190,7 +191,7 @@ def simhash_clustering(
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
             index.get_near_dups,
-            tqdm(query_signatures, desc="Querying..."),
+            tqdm(query_signatures, desc="Querying...", disable=not verbose),
         )
 
     return neighbors

@@ -117,7 +117,7 @@ class SimHashEmbedder:
         use_str = kwargs.pop('use_str', False)
 
         def wrapper(doc: str) -> Union[int, str]:
-            tokens = tokenize(doc, **kwargs)
+            tokens, _ = tokenize(doc, **kwargs)
             ans = _compute(
                 list(
                     map(

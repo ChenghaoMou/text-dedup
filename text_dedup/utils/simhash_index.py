@@ -134,6 +134,7 @@ class SimhashIndex(object):
         k: int = 3,
         b: int = 4,
         storage_config: Dict[str, Any] = None,
+        verbose: bool = False,
     ):
         assert b > k, "b must be greater than k"
 
@@ -146,7 +147,7 @@ class SimhashIndex(object):
         self.permutations = create_permutations(f, k, b)
 
         if len(self.bucket) == 0:
-            for idx, fingerprint in tqdm(fingerprints, desc="Indexing..."):
+            for idx, fingerprint in tqdm(fingerprints, desc="Indexing...", disable=not verbose):
                 self.add(idx, fingerprint)
 
         logger.info(f"Simhash index created with {len(self.bucket)} buckets and {len(self.permutations)} permutations.")
