@@ -20,12 +20,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v3
-      - run: pip install poetry pdoc
+      - run: pip install poetry
       - run: poetry config virtualenvs.create false
       - run: poetry env use system
       - run: poetry install
-      - run: pdoc -d numpy -o docs text_dedup
-      - run: tar --directory docs/ -hcf artifact.tar .
+      - uses: ammaraskar/sphinx-action@master
+        with:
+          docs-folder: "docs/"
+          build-command: "make html"
+      - run: tar --directory docs/build/html -hcf artifact.tar .
       - uses: actions/upload-artifact@v3
         with:
           name: github-pages
