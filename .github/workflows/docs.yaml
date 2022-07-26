@@ -24,10 +24,9 @@ jobs:
       - run: poetry config virtualenvs.create false
       - run: poetry env use system
       - run: poetry install
-      - uses: ammaraskar/sphinx-action@master
-        with:
-          docs-folder: "docs/"
-          build-command: "make html"
+      - name: Running Sphinx
+        working-directory: ./docs
+        run: make html
       - run: tar --directory docs/build/html -hcf artifact.tar .
       - uses: actions/upload-artifact@v3
         with:
