@@ -13,7 +13,7 @@ from datasketch import MinHash, MinHashLSH
 from mpire import WorkerPool as Pool
 from tqdm import tqdm
 
-from text_dedup.utils.simhash_index import SimhashIndex
+from text_dedup.index.simhash_index import SimhashIndex
 
 logger: logging.Logger = logging.getLogger("text_dedup")
 

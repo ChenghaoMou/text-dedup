@@ -4,8 +4,8 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
 from text_dedup.embedders.transformer import TransformerEmbedder
-from text_dedup.utils.clustering import annoy_clustering
-from text_dedup.utils.group import get_group_indices
+from text_dedup.postprocess.clustering import annoy_clustering
+from text_dedup.postprocess.group import get_group_indices
 
 
 def test_transformer():

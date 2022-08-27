@@ -5,7 +5,7 @@
 
 from typing import List
 
-from text_dedup.utils.union_find import UF
+from text_dedup.postprocess.union_find import UF
 
 
 def get_group_indices(neighbors: List[List[int]]) -> List[int]:

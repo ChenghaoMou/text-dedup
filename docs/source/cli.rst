@@ -1,5 +1,5 @@
-cli module
-==========
+CLI References
+==============
 
 .. automodule:: cli
    :members:

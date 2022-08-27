@@ -6,7 +6,7 @@
 text-dedup
 ======================================
 
-Deduplication is a common task in data processing, however, it is not always easy to do for large textual datasets. We already have frameworks for models_, datasets_, and even metrics_. But data analysis and processing is still largedly under-developed. Of course, this is not my ambitious declaraction of conquering those problems but rather a way to contribute to the community.
+Deduplication is a common task in data processing, however, it is not always easy to do for large text datasets. We already have frameworks for models_, datasets_, and even metrics_. But data analysis and processing is still largedly under-developed. Of course, this is not my ambitious declaraction of conquering those problems but rather a way to contribute to the community.
 
 I started this as a side project and later on I joined the `Big Science`_ initiative to work on data dedupication. Now I am putting what I have learned from that experience into this package and hopefully it will be useful to you as well.
 
@@ -15,7 +15,6 @@ Content
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    modules
 

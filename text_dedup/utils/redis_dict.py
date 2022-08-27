@@ -10,6 +10,31 @@ from tqdm import tqdm
 
 
 class RedisDict:
+    """
+    A dictionary-like object backed by Redis.
+
+    Parameters
+    ----------
+    storage_config : Dict[str, Any]
+        Storage configuration.
+
+    Examples
+    --------
+    >>> from text_dedup.utils.redis_dict import RedisDict
+    >>> d = RedisDict(
+    ...     storage_config={
+    ...         "type": "redis",
+    ...         "prefix": "temp",
+    ...         "redis": {"host": "localhost", "port": 6379, "decode_responses": True},
+    ...     },
+    ... )
+    >>> d.clear()
+    >>> d.add((123, 234), (0, 213123124))
+    >>> d.add((123, 234), (1, 213123124))
+    >>> print(sorted(d[(123, 234)]))
+    [(0, 213123124), (1, 213123124)]
+    """
+
     def __init__(self, storage_config: Dict[str, Any]):
 
         if storage_config.get("type", "redis") != "redis":
@@ -52,23 +77,3 @@ class RedisDict:
     def clear(self):
         for k in tqdm(self, desc="Clearing Redis Database..."):
             self.redis.delete(f"{self.basename}:{k}")
-
-
-if __name__ == "__main__":
-
-    d = RedisDict(
-        storage_config={
-            "type": "redis",
-            "prefix": "temp",
-            "redis": {"host": "localhost", "port": 6379, "decode_responses": True},
-        },
-    )
-    d.clear()
-    d.add((123, 234), (0, 213123124))
-    d.add((123, 234), (1, 213123124))
-    d.add((123, 234), (2, 213123124))
-    print(len(d))
-    print(len(d[max(d, key=lambda x: len(d[x]))]))
-    print(len(d[(123, 234)]))
-    print(d[(123, 234)])
-    d.clear()
