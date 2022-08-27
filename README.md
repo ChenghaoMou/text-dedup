@@ -11,7 +11,7 @@
 
 ## Documentation
 
-[Github Pages](https://chenghaomou.github.io/text-dedup/text_dedup.html)
+[Github Pages](https://chenghaomou.github.io/text-dedup/index.html)
 
 ## CLI Usage
 
