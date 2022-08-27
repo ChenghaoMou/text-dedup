@@ -6,7 +6,6 @@ import math
 from itertools import permutations
 from typing import Any, Dict, Generator, List, Set, Tuple, Union
 
-from redis import Redis
 from tqdm import tqdm
 
 from text_dedup.utils.redis_dict import RedisDict

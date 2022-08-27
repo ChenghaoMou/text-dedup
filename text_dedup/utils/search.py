@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 from tqdm import tqdm
 
-from text_dedup.utils.tokenizer import tokenize
+from text_dedup.preprocess.tokenizer import tokenize
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 logger: logging.Logger = logging.getLogger("text_dedup")

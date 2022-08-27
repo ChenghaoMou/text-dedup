@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Callable, List, Union
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 
-from text_dedup.utils.tokenizer import tokenize
+from text_dedup.preprocess.tokenizer import tokenize
 
 
 def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
@@ -58,8 +58,7 @@ def _compute(hashes: List[int]) -> int:
     >>> _compute([13352372148217134600])
     13352372148217134600
     """
-    bits = np.unpackbits(np.array(hashes, dtype='>u8').view(
-        '>u1').reshape(len(hashes), -1), axis=1).astype('>i8')
+    bits = np.unpackbits(np.array(hashes, dtype='>u8').view('>u1').reshape(len(hashes), -1), axis=1).astype('>i8')
     counts = np.where(np.sum(2 * bits - 1, axis=0, dtype='>i8') >= 0, 1, 0).astype('>u1')
     return np.packbits(counts).view('>u8').item()
 
@@ -69,7 +68,14 @@ class SimHashEmbedder:
 
     """
     Embedding text using SimHash.
+
+    Parameters
+    ----------
+    tokenizer : Callable, optional (default=tokenize)
+        Tokenizer function.
     """
+
+    tokenizer: Callable[..., Tuple[List[str], List[Tuple[int, int]]]] = tokenize
 
     def embed(self, corpus: List[str], **kwargs) -> List[int]:
         """
@@ -97,8 +103,7 @@ class SimHashEmbedder:
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
 
-    @staticmethod
-    def embed_function(**kwargs) -> Callable:
+    def embed_function(self, **kwargs) -> Callable:
         """
         Embedding function that takes a string and returns the embedding/fingerprint.
 
@@ -114,10 +119,11 @@ class SimHashEmbedder:
         >>> hashes
         14143049876155195771
         """
+        # This is needed becuase datasets' (arrow) multiprocessing does not pickle int64 values
         use_str = kwargs.pop('use_str', False)
 
         def wrapper(doc: str) -> Union[int, str]:
-            tokens, _ = tokenize(doc, **kwargs)
+            tokens, _ = self.tokenizer(doc, **kwargs)
             ans = _compute(
                 list(
                     map(
@@ -136,4 +142,4 @@ class SimHashEmbedder:
 
     def __repr__(self) -> str:
 
-        return 'SimHashEmbedder()'
+        return f'SimHashEmbedder(tokenizer={self.tokenizer.__name__})'

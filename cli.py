@@ -19,7 +19,7 @@ from tqdm import tqdm
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
-from text_dedup.utils.clustering import lsh_clustering, simhash_clustering
+from text_dedup.postprocess.clustering import lsh_clustering, simhash_clustering
 
 TOKEN = os.environ.get("HF_ACCESS_TOKEN", True)
 
