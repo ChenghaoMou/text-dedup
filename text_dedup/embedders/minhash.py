@@ -14,16 +14,21 @@ from text_dedup.preprocess.tokenizer import tokenize
 @dataclass
 class MinHashEmbedder:
     """
-    Embedding text using MinHash. This is basically a wrapper around the datasketch library.
+    Old but gold MinHash. This is basically a wrapper around the datasketch library.
 
     Parameters
     ----------
     num_perm : int, optional (default=128)
         Number of permutations to use.
     seed : int, optional (default=42)
-        Seed for the random number generator.
+        Seed for the random number generator and permutation.
     tokenizer : Callable, optional (default=tokenize)
         Tokenizer function.
+
+    Examples
+    --------
+    >>> from text_dedup.embedders.minhash import MinHashEmbedder
+    >>> embedder = MinHashEmbedder(128)
     """
 
     num_perm: int = 128
@@ -49,6 +54,7 @@ class MinHashEmbedder:
 
         Examples
         --------
+        >>> from text_dedup.embedders.minhash import MinHashEmbedder
         >>> embedder = MinHashEmbedder(128)
         >>> embeddings = embedder.embed(["hello world", "hello world"])
         >>> len(embeddings)
@@ -73,6 +79,7 @@ class MinHashEmbedder:
 
         Examples
         --------
+        >>> from text_dedup.embedders.minhash import MinHashEmbedder
         >>> embedder = MinHashEmbedder(128)
         >>> hashes = embedder.embed_function()("hello world")
         >>> hashes.shape

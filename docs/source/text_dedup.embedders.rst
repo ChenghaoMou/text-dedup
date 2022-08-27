@@ -1,10 +1,9 @@
-text\_dedup.embedders package
-=============================
+Embedders
+=========
 
-Submodules
-----------
+This module contains different sketching algorithms.
 
-text\_dedup.embedders.minhash module
+MinHashEmbedder
 ------------------------------------
 
 .. automodule:: text_dedup.embedders.minhash
@@ -12,7 +11,8 @@ text\_dedup.embedders.minhash module
    :undoc-members:
    :show-inheritance:
 
-text\_dedup.embedders.simhash module
+
+SimHashEmbedder
 ------------------------------------
 
 .. automodule:: text_dedup.embedders.simhash
@@ -20,7 +20,7 @@ text\_dedup.embedders.simhash module
    :undoc-members:
    :show-inheritance:
 
-text\_dedup.embedders.suffix module
+SuffixEmbedder
 -----------------------------------
 
 .. automodule:: text_dedup.embedders.suffix
@@ -28,18 +28,11 @@ text\_dedup.embedders.suffix module
    :undoc-members:
    :show-inheritance:
 
-text\_dedup.embedders.transformer module
+
+TransformerEmbedder
 ----------------------------------------
 
 .. automodule:: text_dedup.embedders.transformer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: text_dedup.embedders
    :members:
    :undoc-members:
    :show-inheritance:

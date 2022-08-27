@@ -67,12 +67,17 @@ def _compute(hashes: List[int]) -> int:
 class SimHashEmbedder:
 
     """
-    Embedding text using SimHash.
+    Embedding text based on `SimHash <https://www.cs.princeton.edu/courses/archive/spring04/cos598B/bib/CharikarEstim.pdf>`_.
 
     Parameters
     ----------
     tokenizer : Callable, optional (default=tokenize)
         Tokenizer function.
+
+    Examples
+    --------
+    >>> from text_dedup.embedders import SimHashEmbedder
+    >>> embedder = SimHashEmbedder()
     """
 
     tokenizer: Callable[..., Tuple[List[str], List[Tuple[int, int]]]] = tokenize

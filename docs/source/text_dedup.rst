@@ -1,19 +1,13 @@
-text\_dedup package
+API References
 ===================
 
-Subpackages
------------
+Modules
+-------
 
 .. toctree::
    :maxdepth: 4
 
    text_dedup.embedders
    text_dedup.utils
-
-Module contents
----------------
-
-.. automodule:: text_dedup
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   text_dedup.preprocess
+   text_dedup.postprocess

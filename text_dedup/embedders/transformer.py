@@ -10,6 +10,24 @@ import torch
 
 
 class TransformerEmbedder():
+    """
+    Transformer-based embedder.
+
+    Parameters
+    ----------
+    tokenizer : transformers.PreTrainedTokenizer
+        Tokenizer to use.
+    model : transformers.PreTrainedModel
+        Model to use.
+
+    Examples
+    --------
+    >>> from transformers import AutoTokenizer, AutoModel
+    >>> tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+    >>> model = AutoModel.from_pretrained('bert-base-uncased')
+    >>> embedder = TransformerEmbedder(tokenizer, model)
+    """
+
     def __init__(self, tokenizer, model):
         """
         Embedding text using Transformer.

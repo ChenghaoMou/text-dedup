@@ -97,6 +97,11 @@ class SuffixArrayEmbedder:
     ----------
     k: int
         Minimum length of the byte slices.
+
+    Examples
+    --------
+    >>> from text_dedup.embedders.suffix import SuffixArrayEmbedder
+    >>> embedder = SuffixArrayEmbedder(k=100)
     """
 
     k: int = 100
