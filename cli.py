@@ -13,6 +13,7 @@ import numpy as np
 from datasets import Value, get_dataset_config_names, get_dataset_split_names, load_dataset
 from omegaconf import DictConfig, OmegaConf
 from rich import print
+from rich.console import Console
 from rich.table import Table
 from tqdm import tqdm
 
@@ -22,6 +23,7 @@ from text_dedup.embedders.suffix import SuffixArrayEmbedder
 from text_dedup.postprocess.clustering import lsh_clustering, simhash_clustering
 
 TOKEN = os.environ.get("HF_ACCESS_TOKEN", True)
+console = Console()
 
 
 def disable_logging(library: str):
@@ -84,6 +86,13 @@ def main(conf: DictConfig):  # pragma: no cover
 
         split_results: Dict[str, Any] = {}
         conf_columns: List[str] = list(conf.columns) or []
+
+        cm_table = Table(title=f"{config} results")
+        cm_table.add_column("Split", justify="center", style="cyan", no_wrap=True)
+        for split in SPLITS:
+            if split not in splits:
+                continue
+            cm_table.add_column(split, justify="center", style="magenta", no_wrap=True)
 
         for split in splits:
             split_data = load_dataset(
@@ -154,21 +163,12 @@ def main(conf: DictConfig):  # pragma: no cover
                     # remove_columns=["__text__"],
                     desc="Embedding...",
                 )
-                split_results[split] = split_data
-            else:
-                embedder = SuffixArrayEmbedder(k=conf.embedder.k)  # type: ignore
-                slices = embedder.embed_bash(  # type: ignore
-                    split_data["__text__"],
-                    skip_existing=conf.embedder.skip_existing,
-                    cache_dir=conf.embedder.cache_dir,
-                    temp_file_prefix=conf.embedder.temp_file_prefix,
-                )
-                # TODO: Speed up this part
-                # slices = embedder.embed(split_data["__text__"], merge=True)
-                split_results[split] = (slices, split_data["__size__"])
+
+            split_results[split] = split_data
 
         clear_screen()
         records: List[Dict[str, Any]] = []
+        table_rows = {x: {y: "" for y in SPLITS} for x in SPLITS}
 
         if conf.embedder.name in {"SimHashEmbedder", "MinHashEmbedder"}:
             # All pair combinations
@@ -278,42 +278,102 @@ def main(conf: DictConfig):  # pragma: no cover
 
                 duplicated_count_ratio: float = duplicated_count / total_count * 100
                 duplicated_byte_ratio: float = duplicated_size / total_size * 100
+
+                table_rows[x][y] = f"N {duplicated_count_ratio:.2f}% ({duplicated_count}) | B {duplicated_byte_ratio:.2f}% ({duplicated_size})"
+
                 logger.info(
                     f"{x}-{y}: {duplicated_count_ratio:.2f}% ({duplicated_count}) duplicated documents, {duplicated_byte_ratio:.2f}% ({duplicated_size}) duplicated bytes",
                 )
 
         elif conf.embedder.name == "SuffixArrayEmbedder":
-            # TOOD Adopt this for all pair combinations
-            duplicated_size = 0
-            duplicated_count = 0
-            total_count = 0
-            total_size = 0
-            for x in SPLITS:
-                if x not in split_results:
+            # All pair combinations
+            embedder = SuffixArrayEmbedder(k=conf.embedder.k)  # type: ignore
+            for x, y in product(SPLITS, repeat=2):
+                if x not in split_results or y not in split_results:
                     continue
-                slices, sizes = split_results[x]
-                for i, (segments, size) in enumerate(zip(slices, sizes)):
+                if SPLITS.index(x) > SPLITS.index(y):
+                    continue
+
+                clear_screen()
+                logger.info(f"Looking for {y}'s duplicates in {x}")
+
+                base_data = split_results[x]
+                query_data = split_results[y]
+
+                if x == y:
+                    slices_x = embedder.embed_bash(  # type: ignore
+                        base_data["__text__"],
+                        merge=True,
+                        merge_strategy="longest",
+                        skip_existing=conf.embedder.skip_existing,
+                        cache_dir=conf.embedder.cache_dir,
+                        temp_file_prefix=conf.embedder.temp_file_prefix,
+                    )
+                    slices_y = slices_x
+                else:
+                    slices_x, slices_y = embedder.corss_embed_bash(  # type: ignore
+                        base_data["__text__"],
+                        query_data["__text__"],
+                        merge=True,
+                        merge_strategy="longest",
+                        skip_existing=conf.embedder.skip_existing,
+                        cache_dir=conf.embedder.cache_dir,
+                        temp_file_prefix=conf.embedder.temp_file_prefix,
+                    )
+
+                duplicated_count = 0
+                total_count = 0
+                duplicated_size = 0
+                total_size = 0
+
+                for i, (segments, size) in enumerate(zip(slices_x, base_data["__size__"])):
+
                     total_size += size
                     total_count += 1
                     duplicated_count += 1 if segments else 0
-                    duplicated_size += sum(s.stop - s.start for s in segments)
+                    duplicated_size += sum(s.stop - s.start for s in segments) if segments else 0
+
                     records.append(
                         {
                             "query_index": i,
                             "query_split": x,
+                            "reference_split": y,
                             "byte_slices": [[s.start, s.stop] for s in segments],
                         }
                     )
 
-            duplicated_count_ratio = duplicated_count / total_count * 100
-            duplicated_byte_ratio = duplicated_size / total_size * 100
-            logger.info(
-                f"{x}-{y}: {duplicated_count_ratio:.2f}% ({duplicated_count}) duplicated documents, {duplicated_byte_ratio:.2f}% ({duplicated_size}) duplicated bytes",
-            )
+                if x != y:
+                    for i, (segments, size) in enumerate(zip(slices_y, query_data["__size__"])):
+                        total_size += size
+                        total_count += 1
+                        duplicated_count += 1 if segments else 0
+                        duplicated_size += sum(s.stop - s.start for s in segments) if segments else 0
+                        records.append(
+                            {
+                                "query_index": i,
+                                "query_split": y,
+                                "reference_split": x,
+                                "byte_slices": [[s.start, s.stop] for s in segments],
+                            }
+                        )
+
+                duplicated_count_ratio = duplicated_count / total_count * 100
+                duplicated_byte_ratio = duplicated_size / total_size * 100
+
+                table_rows[x][y] = f"N {duplicated_count_ratio:.2f}% ({duplicated_count}) | B {duplicated_byte_ratio:.2f}% ({duplicated_size})"
+
+                logger.info(
+                    f"{x}-{y}: {duplicated_count_ratio:.2f}% ({duplicated_count}) duplicated documents, {duplicated_byte_ratio:.2f}% ({duplicated_size}) duplicated bytes",
+                )
 
         with open(f"{storage_prefix}-results.json", "w") as f:
             json.dump(records, f)
 
+    for x in SPLITS:
+        cm_table.add_row(x, *[table_rows[x][y] or "" for y in SPLITS])
+
+    clear_screen()
+    console.print(cm_table)
     logger.info(f"Done in {time.time() - start_time:.2f} seconds")
 
 
