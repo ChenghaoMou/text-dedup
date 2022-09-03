@@ -16,7 +16,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 logger: logging.Logger = logging.getLogger("text_dedup")
 
 
-class BestFuzyMatcher:
+class BestFuzzyMatcher:
     def __init__(self, query_tokens: List[str], init_doc_tokens: List[str]) -> None:
         """
         Find the best matching window for the query in the document based on Jaccard similarity.
@@ -32,7 +32,7 @@ class BestFuzyMatcher:
         --------
         >>> query_tokens = ['a', 'b', 'c']
         >>> init_doc_tokens = ['e', 'a', 'b']
-        >>> matcher = BestFuzyMatcher(query_tokens, init_doc_tokens)
+        >>> matcher = BestFuzzyMatcher(query_tokens, init_doc_tokens)
         >>> matcher.jaccard_similarity
         0.5
         >>> matcher.update('c', 'e')
@@ -107,7 +107,7 @@ def best_fuzzy_search(query: str, doc: str) -> Tuple[int, str]:
     query_tokens, _ = tokenize(query, n_gram=1)
     tokens, offsets = tokenize(doc, n_gram=1)
 
-    matcher = BestFuzyMatcher(query_tokens, tokens[: len(query_tokens)])
+    matcher = BestFuzzyMatcher(query_tokens, tokens[: len(query_tokens)])
 
     best_score: float = matcher.jaccard_similarity
     best_start: int = 0

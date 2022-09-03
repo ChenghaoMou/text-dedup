@@ -149,9 +149,9 @@ def ksa(T):
                 cur_Sb0 += 1
         else:  # i in B_2
             if (getT(i), getT(i + 1), rank_Si[i + 2]) < (
-                getT(j),
-                getT(j + 1),
-                rank_Si[j + 2],
+                    getT(j),
+                    getT(j + 1),
+                    rank_Si[j + 2],
             ):
                 objs_SA.append(sorted_suffixes_R[cur_Sc])
                 cur_Sc += 1

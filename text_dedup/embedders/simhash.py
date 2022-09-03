@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Tuple
 
 import numpy as np
 
-from text_dedup.preprocess.tokenizer import tokenize
+from text_dedup.embedders.base import Embedder, Fingerprint
+from text_dedup.preprocess.tokenizer import Offset, tokenize
 
 
 def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
@@ -22,7 +23,7 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
     ----------
     obj : bytes
         The object to hash.
-    bit length : int
+    bit_length : int
         The bit length of the hash.
 
     Returns
@@ -58,14 +59,14 @@ def _compute(hashes: List[int]) -> int:
     >>> _compute([13352372148217134600])
     13352372148217134600
     """
-    bits = np.unpackbits(np.array(hashes, dtype='>u8').view('>u1').reshape(len(hashes), -1), axis=1).astype('>i8')
+    bits = np.unpackbits(np.array(hashes, dtype='>u8').view(
+        '>u1').reshape(len(hashes), -1), axis=1).astype('>i8')
     counts = np.where(np.sum(2 * bits - 1, axis=0, dtype='>i8') >= 0, 1, 0).astype('>u1')
     return np.packbits(counts).view('>u8').item()
 
 
 @dataclass
-class SimHashEmbedder:
-
+class SimHashEmbedder(Embedder):
     """
     Embedding text based on `SimHash <https://www.cs.princeton.edu/courses/archive/spring04/cos598B/bib/CharikarEstim.pdf>`_.
 
@@ -80,9 +81,9 @@ class SimHashEmbedder:
     >>> embedder = SimHashEmbedder()
     """
 
-    tokenizer: Callable[..., Tuple[List[str], List[Tuple[int, int]]]] = tokenize
+    tokenizer: Callable[..., Tuple[List[str], List[Offset]]] = tokenize
 
-    def embed(self, corpus: List[str], **kwargs) -> List[int]:
+    def embed(self, corpus: List[str], **kwargs) -> List[Fingerprint]:
         """
         Embed a list of strings.
 
@@ -95,7 +96,7 @@ class SimHashEmbedder:
 
         Returns
         -------
-        List[int]
+        List[Singature]
             Fingerprints of the corpus.
 
         Examples
@@ -108,7 +109,7 @@ class SimHashEmbedder:
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
 
-    def embed_function(self, **kwargs) -> Callable:
+    def embed_function(self, **kwargs) -> Callable[[str], Fingerprint]:
         """
         Embedding function that takes a string and returns the embedding/fingerprint.
 
@@ -117,6 +118,11 @@ class SimHashEmbedder:
         kwargs : dict
             Additional keyword arguments for tokenization.
 
+        Returns
+        -------
+        Callable[[str], Fingerprint]
+            Embedding function.
+
         Examples
         --------
         >>> embedder = SimHashEmbedder()
@@ -124,10 +130,11 @@ class SimHashEmbedder:
         >>> hashes
         14143049876155195771
         """
-        # This is needed becuase datasets' (arrow) multiprocessing does not pickle int64 values
+        # This is needed because datasets' (arrow) multiprocessing does not pickle int64 values
+        # We need to convert it to str first
         use_str = kwargs.pop('use_str', False)
 
-        def wrapper(doc: str) -> Union[int, str]:
+        def wrapper(doc: str) -> Fingerprint:
             tokens, _ = self.tokenizer(doc, **kwargs)
             ans = _compute(
                 list(
@@ -146,5 +153,4 @@ class SimHashEmbedder:
         return wrapper
 
     def __repr__(self) -> str:
-
         return f'SimHashEmbedder(tokenizer={self.tokenizer.__name__})'

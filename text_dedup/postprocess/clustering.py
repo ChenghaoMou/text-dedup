@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # @Date         : 2021-06-05 10:53:26
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
-from __future__ import annotations
 
 import logging
 import os
@@ -13,31 +12,32 @@ from datasketch import MinHash, MinHashLSH
 from mpire import WorkerPool as Pool
 from tqdm import tqdm
 
+from text_dedup.embedders.base import Fingerprint
 from text_dedup.index.simhash_index import SimhashIndex
 
 logger: logging.Logger = logging.getLogger("text_dedup")
 
 
 def annoy_clustering(
-    embeddings: List[np.ndarray],
-    f: int = 128,
-    metric: Literal[
-        "angular",
-        "euclidean",
-        "manhattan",
-        "hamming",
-        "dot",
-    ] = "angular",
-    num_trees: int = 64,
-    top_k: int = 100,
-    distance_threshold: float = 0.5,
-    query_embeddings: List[np.ndarray] | None = None,
+        signatures: List[Fingerprint],
+        f: int = 128,
+        metric: Literal[
+            "angular",
+            "euclidean",
+            "manhattan",
+            "hamming",
+            "dot",
+        ] = "angular",
+        num_trees: int = 64,
+        top_k: int = 100,
+        distance_threshold: float = 0.5,
+        query_signatures: List[Fingerprint] | None = None,
 ) -> List[List[int]]:
     """Cluster embeddings with annoy.
 
     Parameters
     ----------
-    embeddings : List[np.ndarray]
+    signatures : List[Fingerprint]
         List of embeddings
     f : int, optional
         Number of the embedding features, by default 128
@@ -49,6 +49,8 @@ def annoy_clustering(
         Top k values to be returned by annoy, by default 100
     distance_threshold : float, optional
         Distance threshold, by default 0.5
+    query_signatures : List[Fingerprint], optional
+        Embedded queries, by default None
 
     Returns
     -------
@@ -56,24 +58,25 @@ def annoy_clustering(
         List of neighbors
     """
     t = AnnoyIndex(f, metric)
-    for i, v in enumerate(embeddings):
-        t.add_item(i, v)
+    for i, v in enumerate(signatures):
+        t.add_item(i, v)  # type: ignore
     t.build(num_trees)
 
     neighbors: List[List[int]] = []
 
-    if query_embeddings is None:
-        query_embeddings = embeddings
+    if query_signatures is None:
+        # Find self duplicates
+        query_signatures = signatures
 
-    for i, v in enumerate(embeddings):
+    for i, v in enumerate(signatures):
         current: List[int] = []
         for j, dist in zip(
-            *t.get_nns_by_vector(
-                v,
-                top_k,
-                search_k=-1,
-                include_distances=True,
-            ),
+                *t.get_nns_by_vector(  # type: ignore
+                    v,
+                    top_k,
+                    search_k=-1,
+                    include_distances=True,
+                ),
         ):
             if dist < distance_threshold:
                 current.append(j)
@@ -83,33 +86,30 @@ def annoy_clustering(
 
 
 def lsh_clustering(
-    signatures: List[np.ndarray],
-    threshold: float = 0.5,
-    num_perm: int = 128,
-    query_signatures: Optional[List[np.ndarray]] = None,
-    storage_config: Optional[Dict[str, Any]] = None,
+        signatures: List[Fingerprint],
+        threshold: float = 0.5,
+        num_perm: int = 128,
+        query_signatures: Optional[List[Fingerprint]] = None,
+        storage_config: Optional[Dict[str, Any]] = None,
+        verbose: bool = False,
 ) -> List[List[int]]:
     """
-    Cluster embeddings with LSH.
+    Cluster signatures with LSH.
 
     Parameters
     ----------
     signatures : List[np.ndarray]
-        List of embeddings
+        List of signatures
     threshold : float, optional
         Threshold for similarity, by default 0.5
     num_perm : int, optional
         Number of permutations to use, by default 128
     query_signatures : Optional[List[np.ndarray]], optional
-        List of query embeddings, by default None
-    redis_basename : Optional[str], optional
-        Redis basename, by default None
-    redis_host : Optional[str], optional
-        Redis host, by default None
-    redis_port : Optional[int], optional
-        Redis port, by default None
-    skip_indexing_if_exists : bool, optional
-        Skip indexing if exists, by default False
+        List of query signatures, by default None
+    storage_config : Optional[Dict[str, Any]]
+        Storage configuration, by default None
+    verbose : bool, optional
+        Verbose, by default False
 
     Returns
     -------
@@ -121,9 +121,11 @@ def lsh_clustering(
         num_perm=num_perm,
         storage_config=storage_config,
     )
-    if lsh.is_empty():
+    if lsh.is_empty() and not lsh.keys:
         with lsh.insertion_session() as session:
-            for key, minhash in enumerate(signatures):
+            for key, minhash in enumerate(tqdm(signatures, desc="Indexing signatures", disable=not verbose)):
+                if f"id-{key}" in lsh.keys:
+                    continue
                 session.insert(
                     f"id-{key}",
                     MinHash(num_perm=num_perm, hashvalues=minhash),
@@ -142,35 +144,38 @@ def lsh_clustering(
                     MinHash(num_perm=num_perm, hashvalues=signature),
                 )
             ],
-            tqdm(query_signatures, desc="Querying..."),
+            query_signatures,
+            progress_bar=verbose,
         )
 
     return neighbors
 
 
 def simhash_clustering(
-    signatures: List[int],
-    hamming_distance: int = 3,
-    num_blocks: int = 5,
-    query_signatures: List[int] | None = None,
-    storage_config: Optional[Dict[str, Any]] = None,
-    verbose: bool = False,
+        signatures: List[Fingerprint],
+        hamming_distance: int = 3,
+        num_blocks: int = 5,
+        query_signatures: List[Fingerprint] | None = None,
+        storage_config: Optional[Dict[str, Any]] = None,
+        verbose: bool = False,
 ) -> List[List[int]]:
     """
-    Cluster embeddings with simhash.
+    Cluster signatures with simhash.
 
     Parameters
     ----------
     signatures : List[int]
-        List of embeddings
+        List of signatures
     hamming_distance : int, optional
         Hamming distance, by default 3
     num_blocks : Optional[int], optional
         Number of blocks, by default 5
     query_signatures : Optional[List[int]], optional
-        List of query embeddings, by default None
-    skip_indexing_if_exists : bool, optional
-        Skip indexing if exists, by default False
+        List of query signatures, by default None
+    storage_config : Optional[Dict[str, Any]]
+        Storage configuration, by default None
+    verbose : bool, optional
+        Verbose, by default False
 
     Returns
     -------
@@ -178,7 +183,8 @@ def simhash_clustering(
         List of neighbors
     """
     index = SimhashIndex(
-        [(i, signature) for i, signature in enumerate(signatures)],
+        [(i, signature) for i, signature in enumerate(
+            tqdm(signatures, disable=not verbose, desc="Loading signatures"))],
         k=hamming_distance,
         b=num_blocks,
         storage_config=storage_config,
@@ -191,12 +197,8 @@ def simhash_clustering(
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
             index.get_near_dups,
-            tqdm(query_signatures, desc="Querying...", disable=not verbose),
+            query_signatures,
+            progress_bar=verbose,
         )
 
     return neighbors
-
-
-if __name__ == "__main__":
-
-    print(simhash_clustering([1, 1024, 1231241, 1, 1025]))

@@ -3,21 +3,25 @@
 # @Date    : 2022-04-02 11:26:04
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
-from typing import List
+from dataclasses import dataclass
+from typing import Callable, List
 
-import numpy as np
 import torch
+from transformers import PreTrainedModel, PreTrainedTokenizer
+
+from text_dedup.embedders.base import Embedder, Fingerprint
 
 
-class TransformerEmbedder():
+@dataclass
+class TransformerEmbedder(Embedder):
     """
     Transformer-based embedder.
 
     Parameters
     ----------
-    tokenizer : transformers.PreTrainedTokenizer
+    tokenizer: PreTrainedTokenizer
         Tokenizer to use.
-    model : transformers.PreTrainedModel
+    model: PreTrainedModel
         Model to use.
 
     Examples
@@ -28,21 +32,10 @@ class TransformerEmbedder():
     >>> embedder = TransformerEmbedder(tokenizer, model)
     """
 
-    def __init__(self, tokenizer, model):
-        """
-        Embedding text using Transformer.
+    tokenizer: PreTrainedTokenizer
+    model: PreTrainedModel
 
-        Parameters
-        ----------
-        tokenizer : transformers.PreTrainedTokenizer
-            Tokenizer to use.
-        model : transformers.PreTrainedModel
-            Model to use.
-        """
-        self.tokenizer = tokenizer
-        self.model = model
-
-    def embed(self, corpus: List[str], batch_size: int = 8) -> np.ndarray:
+    def embed(self, corpus: List[str], batch_size: int = 8) -> List[Fingerprint]:  # type: ignore
         """
         Embed a list of texts.
 
@@ -55,7 +48,7 @@ class TransformerEmbedder():
 
         Returns
         -------
-        np.ndarray
+        List[Fingerprint]
             Embeddings.
         """
         embeddings = []
@@ -73,4 +66,7 @@ class TransformerEmbedder():
                 hidden = output.hidden_states[-1]
                 embeddings.extend(hidden.mean(dim=1).detach().cpu().numpy())
 
-        return np.asarray(embeddings)
+        return embeddings
+
+    def embed_function(self, **kwargs) -> Callable[[str], Fingerprint]:
+        raise NotImplementedError("This function is not implemented")

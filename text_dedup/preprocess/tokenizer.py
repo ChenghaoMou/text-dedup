@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # @Date    : 2022-05-22 11:33:39
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-from typing import Any, List, Tuple, Union
+from typing import Any, List, NamedTuple, Tuple
 
 from transformers import XLMRobertaTokenizerFast
 
+# Offset = NamedTuple("Offset", [("start", int), ("end", int)])
+Offset = Tuple[int, int]
 tokenizer = XLMRobertaTokenizerFast.from_pretrained('xlm-roberta-base')
+tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
 
 def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
@@ -39,10 +42,7 @@ def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
     return results
 
 
-def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> Tuple[
-    List[str],
-    List[Tuple[int, int]]
-]:
+def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> Tuple[List[str], List[Tuple[int, int]]]:
     """
     Tokenize the text into a sequence of strings.
 
@@ -74,7 +74,8 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> Tuple[
 
     if level == 'sentencepiece':
         tokens = tokenizer.tokenize(text)
-        offsets = tokenizer(text, return_offsets_mapping=True, add_special_tokens=False).pop("offset_mapping")
+        offsets = tokenizer(text, return_offsets_mapping=True,
+                            add_special_tokens=False).pop("offset_mapping")
     elif level == 'char':
         tokens = list(text)
         offsets = []

@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 from collections import deque
 from typing import Deque, Generator, List
 
 
 def restore(
-    offsets: List[tuple[int, int]], seg_file: str,
+        offsets: List[tuple[int, int]], seg_file: str,
 ) -> Generator:
     """
     Restore the original text from the offsets.
@@ -13,7 +11,7 @@ def restore(
     Parameters
     ----------
     offsets : List[Tuple[int, int]]
-        List of (start, end) offsets.
+        List of (start, end) document boundary offsets.
     seg_file : str
         Path to the segmented file with duplicate offsets.
 

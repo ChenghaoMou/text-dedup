@@ -2,17 +2,18 @@
 # @Date    : 2022-04-02 10:53:30
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
+import inspect
 from dataclasses import dataclass
 from typing import Callable, List, Tuple
 
-import numpy as np
 from datasketch import MinHash
 
-from text_dedup.preprocess.tokenizer import tokenize
+from text_dedup.embedders.base import Embedder, Fingerprint
+from text_dedup.preprocess.tokenizer import Offset, tokenize
 
 
 @dataclass
-class MinHashEmbedder:
+class MinHashEmbedder(Embedder):
     """
     Old but gold MinHash. This is basically a wrapper around the datasketch library.
 
@@ -33,9 +34,9 @@ class MinHashEmbedder:
 
     num_perm: int = 128
     seed: int = 42
-    tokenizer: Callable[..., Tuple[List[str], List[Tuple[int, int]]]] = tokenize
+    tokenizer: Callable[..., Tuple[List[str], List[Offset]]] = tokenize
 
-    def embed(self, corpus: List[str], **kwargs) -> List[np.ndarray]:
+    def embed(self, corpus: List[str], **kwargs) -> List[Fingerprint]:
         """
         Embed a list of strings. It applies the embedding function to each string sequentially.
         It is recommended to use the `embed_function` method instead, in parallel, for example.
@@ -49,7 +50,7 @@ class MinHashEmbedder:
 
         Returns
         -------
-        List[np.ndarray]
+        List[Fingerprint]
             Embeddings of the corpus.
 
         Examples
@@ -63,7 +64,7 @@ class MinHashEmbedder:
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
 
-    def embed_function(self, **kwargs) -> Callable:
+    def embed_function(self, **kwargs) -> Callable[[str], Fingerprint]:
         """
         Embedding function that takes a string and returns the embedding/fingerprint.
 
@@ -74,7 +75,7 @@ class MinHashEmbedder:
 
         Returns
         -------
-        Callable
+        Callable[[str], Fingerprint]
             Embedding function.
 
         Examples
@@ -85,10 +86,13 @@ class MinHashEmbedder:
         >>> hashes.shape
         (128,)
         """
-        # This is only needed for simhash but here we do it for consistency
-        kwargs.pop("use_str", None)
+        # Clean up kwargs
+        needed = inspect.signature(self.tokenizer).parameters
+        for key in set(kwargs.keys()):
+            if key not in needed:
+                kwargs.pop(key)
 
-        def wrapper(doc: str) -> np.ndarray:
+        def wrapper(doc: str) -> Fingerprint:
             m: MinHash = MinHash(num_perm=self.num_perm, seed=self.seed)
             tokens, _ = self.tokenizer(doc, **kwargs)
             for ngram in tokens:

@@ -9,7 +9,7 @@ embedder:
   hamming_distance: 3
   num_blocks: 4
 tokenization:
-  ngram_size: 12
+  ngram_size: 2 # This roughly equals to 0.8 jaccard similarity
   level: sentencepiece
 cache_dir: .cache
 storage_config:
@@ -18,3 +18,5 @@ storage_config:
     host: localhost
     port: 6379
 # storage_config: null # use null to use dict instead
+output: results.json
+verbose: true

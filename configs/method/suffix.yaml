@@ -14,3 +14,5 @@ tokenization:
   ngram_size: 12
   level: sentencepiece
 cache_dir: .cache
+output: results.json
+verbose: true

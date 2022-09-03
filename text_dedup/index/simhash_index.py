@@ -47,15 +47,31 @@ def hamming_distance(a: int, b: int) -> int:
 
 class Permutation:
     def __init__(self, f: int, k: int, b: int, masks: List[Tuple[int, int, int, int]]) -> None:
+        """
+        A permutation object for bit manipulation.
+
+        More details about this permutation can be found in https://github.com/seomoz/simhash-py#architecture.
+
+        Parameters
+        ----------
+        f: int
+            The fingerprint bit length
+        k: int
+            The bit difference allowed
+        b: int
+            The number of blocks
+        masks:
+            The block masks generated from `create_permutations`
+        """
         self.f = f
         self.k = k
         self.b = b
 
         width: int = 0
-        self.widths: List[int] = []
-        self.offsets: List[int] = []
-        self.reverse_masks: List[int] = []
-        self.masks: List[int] = []
+        self.widths: List[int] = []  # block widths
+        self.offsets: List[int] = []  # block offsets
+        self.reverse_masks: List[int] = []  # block reverse masks
+        self.masks: List[int] = []  # block masks
         for mask, mask_size, start, _ in masks:
             self.widths.append(mask_size)
             width += mask_size
@@ -76,6 +92,19 @@ class Permutation:
             self.search_mask <<= 1
 
     def permute(self, x: int) -> int:
+        """
+        Permute the fingerprint.
+
+        Parameters
+        ----------
+        x: int
+            The fingerprint to be permuted
+
+        Returns
+        -------
+        int
+            The permuted fingerprint
+        """
         result = 0
 
         for mask, offset in zip(self.masks, self.offsets):
@@ -87,7 +116,19 @@ class Permutation:
         return result
 
     def reverse(self, x: int) -> int:
+        """
+        Reverse the permutation.
 
+        Parameters
+        ----------
+        x: int
+           The fingerprint to be reversed
+
+        Returns
+        -------
+        int
+            The reversed fingerprint
+        """
         result = 0
         for mask, offset in zip(self.reverse_masks, self.offsets):
             if offset > 0:
@@ -98,7 +139,6 @@ class Permutation:
 
 
 def create_permutations(f: int, k: int, b: int) -> List[Permutation]:
-
     block_size: int = math.ceil(f / b)
     masks: List[Tuple[int, int, int, int]] = []
     for i in range(b):
@@ -108,9 +148,9 @@ def create_permutations(f: int, k: int, b: int) -> List[Permutation]:
         masks.append(
             (
                 mask,
-                min((i + 1) * block_size, f) - i * block_size,
-                i * block_size,
-                min((i + 1) * block_size, f),
+                min((i + 1) * block_size, f) - i * block_size,  # mask size in bits
+                i * block_size,  # mask start position
+                min((i + 1) * block_size, f),  # mask end position
             )
         )
 
@@ -127,20 +167,21 @@ def create_permutations(f: int, k: int, b: int) -> List[Permutation]:
 
 class SimhashIndex(object):
     def __init__(
-        self,
-        fingerprints: List[Tuple[int, int]],
-        f: int = 64,
-        k: int = 3,
-        b: int = 4,
-        storage_config: Dict[str, Any] = None,
-        verbose: bool = False,
+            self,
+            fingerprints: List[Tuple[int, int]],
+            f: int = 64,
+            k: int = 3,
+            b: int = 4,
+            storage_config: Dict[str, Any] = None,
+            verbose: bool = False,
     ):
         assert b > k, "b must be greater than k"
 
         self.k = k
         self.b = b
         self.f = f
-        self.bucket: Union[Dict[Tuple[int, int], Set[Tuple[int, int]]], RedisDict] = collections.defaultdict(set)
+        self.bucket: Union[Dict[Tuple[int, int], Set[Tuple[int, int]]],
+                           RedisDict] = collections.defaultdict(set)
         if storage_config:
             self.bucket = RedisDict(storage_config)
         self.permutations = create_permutations(f, k, b)
@@ -149,9 +190,13 @@ class SimhashIndex(object):
             for idx, fingerprint in tqdm(fingerprints, desc="Indexing...", disable=not verbose):
                 self.add(idx, fingerprint)
 
-        logger.info(f"Simhash index created with {len(self.bucket)} buckets and {len(self.permutations)} permutations.")
-        largest_bucket: Any = max(self.bucket, key=lambda x: len(self.bucket[x]))
-        logger.info(f"Maxium bucket size: {len(self.bucket[largest_bucket])} with the key {largest_bucket}")
+        logger.info(
+            f"""Simhash index created with {len(fingerprints)} signatures, {len(self.bucket)} buckets.""")
+
+        if verbose:
+            largest_bucket: Any = max(self.bucket, key=lambda x: len(self.bucket[x]))
+            logger.info(
+                f"Maximum bucket size: {len(self.bucket[largest_bucket])} with the key {largest_bucket}")
 
     def get_near_dups(self, fingerprint: int) -> List[Any]:
         ans = set()

@@ -226,7 +226,8 @@ def test_suffix_corss_bash():
         'This is a random test',
         'The quick brown fox and a random test',
     ]
-    corpus_b = ['The quick brown fox jumps over the lazy dog', 'This is a random string that would have a match.']
+    corpus_b = ['The quick brown fox jumps over the lazy dog',
+                'This is a random string that would have a match.']
     targets_a = [
         [
             slice(
@@ -245,7 +246,7 @@ def test_suffix_corss_bash():
     targets_b = [[slice(0, 43, None)], [slice(0, 17, None)]]
 
     embedder = SuffixArrayEmbedder(k=10)
-    slices_a, slices_b = embedder.corss_embed_bash(
+    slices_a, slices_b = embedder.cross_embed_bash(
         corpus_a, corpus_b, merge=True, merge_strategy='overlapping', skip_existing=False)
 
     for _, intervals, results in zip(corpus_a, slices_a, targets_a):

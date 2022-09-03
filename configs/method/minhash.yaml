@@ -7,7 +7,7 @@ num_proc: 10
 embedder:
   name: MinHashEmbedder
   num_perm: 128
-  threshold: 0.95
+  threshold: 0.8
 tokenization:
   ngram_size: 12
   level: sentencepiece
@@ -18,3 +18,5 @@ storage_config:
     host: localhost
     port: 6379
 # storage_config: null # use null to use dict instead
+output: results.json
+verbose: true

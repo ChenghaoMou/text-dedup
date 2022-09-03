@@ -8,10 +8,11 @@ import os
 import subprocess
 from collections import deque
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 from tqdm import tqdm
 
+from text_dedup.embedders.base import Embedder, Fingerprint
 from text_dedup.postprocess.suffix_restore import restore
 from text_dedup.preprocess.suffix_array import construct_sa
 
@@ -19,8 +20,8 @@ logger = logging.getLogger("text-dedup")
 
 
 def _merge_intervals(
-    slices: List[slice],
-    merge_strategy: str = "overlapping",
+        slices: List[slice],
+        merge_strategy: str = "overlapping",
 ) -> List[slice]:
     """Merge overlapping intervals.
 
@@ -32,7 +33,7 @@ def _merge_intervals(
         Strategy to merge intervals, by default "overlapping"
         "overlapping": merge overlapping intervals
         "longest": only ignore duplicate substrings, this is useful because
-        the merged overlapping intervals may not be duplicates
+        when [2, 4] and [3, 5] are duplicates but [2, 5] might not
 
     Returns
     -------
@@ -88,8 +89,7 @@ def _merge_intervals(
 
 
 @dataclass
-class SuffixArrayEmbedder:
-
+class SuffixArrayEmbedder(Embedder):
     """
     Find duplicate *byte* slices using suffix array.
 
@@ -106,14 +106,14 @@ class SuffixArrayEmbedder:
 
     k: int = 100
 
-    def embed(
-        self,
-        corpus: List[str],
-        merge: bool = False,
-        merge_strategy: str = "longest",
-    ) -> List[List[slice]]:
+    def embed(  # type: ignore
+            self,
+            corpus: List[str],
+            merge: bool = False,
+            merge_strategy: str = "longest",
+    ) -> List[Fingerprint]:
         """
-        Find duplicate byte slices using suffix array.
+        Find duplicate str slices using suffix array.
 
         Parameters
         ----------
@@ -126,11 +126,12 @@ class SuffixArrayEmbedder:
 
         Returns
         -------
-        List[List[slice]]
+        List[Fingerprint]
             List of duplicate byte slices.
         """
 
-        assert merge_strategy in ["longest", "overlapping"], f"Invalid merge strategy: {merge_strategy}"
+        assert merge_strategy in [
+            "longest", "overlapping"], f"Invalid merge strategy: {merge_strategy}"
 
         # This means we need enough memory to store the string
         string = "".join(corpus)
@@ -144,23 +145,23 @@ class SuffixArrayEmbedder:
         # Neighboring suffixes share the same prefix
         # This is where we find the duplicate byte slices
         for x, y in tqdm(
-            zip(sa[:-1], sa[1:]),
-            total=len(sa) - 1,
-            desc="Suffix array querying",
+                zip(sa[:-1], sa[1:]),
+                total=len(sa) - 1,
+                desc="Suffix array querying",
         ):
-            # We only care about the suffixes that are longer than k
+            # Find the longest common prefix length
             matched_length = 0
             while (
-                x + matched_length < len(string)
-                and y + matched_length < len(string)
-                and string[x + matched_length] == string[y + matched_length]
+                    x + matched_length < len(string)
+                    and y + matched_length < len(string)
+                    and string[x + matched_length] == string[y + matched_length]
             ):
                 matched_length += 1
             if matched_length >= self.k:
                 slices.append(slice(x, x + matched_length))
                 slices.append(slice(y, y + matched_length))
 
-        q = deque(sorted(slices, key=lambda x: x.start))
+        q = deque(sorted(slices, key=lambda s: s.start))
 
         # Make sure the slices are respecting the document boundaries
         start = 0
@@ -170,6 +171,7 @@ class SuffixArrayEmbedder:
             curr: List[slice] = []
             while q and q[0].start < end:
                 s = q.popleft()
+                # Anything started before this should be matched already
                 if s.start < start:
                     continue
                 if s.stop > end:
@@ -179,33 +181,35 @@ class SuffixArrayEmbedder:
                     if s.stop - end >= self.k:
                         q.appendleft(slice(end, s.stop))
 
-                if s.stop <= end:
+                if s.stop <= end and s.stop - s.start >= self.k:
                     curr.append(s)
+
+            # Reset the offsets for current document
+            curr = [slice(s.start - start, s.stop - start) for s in curr]
             if merge:
-                ans.append(
-                    _merge_intervals(
-                        [slice(s.start - start, s.stop - start) for s in curr],
-                        merge_strategy,
-                    ),
-                )
+                curr = _merge_intervals(curr, merge_strategy)
             else:
-                ans.append(sorted([slice(s.start - start, s.stop - start)
-                           for s in curr], key=lambda x: (x.start, -x.stop)))
+                curr = sorted(curr, key=lambda s: (s.start, -s.stop))
+
+            ans.append(curr)
             start = end
 
-        return ans
+        return ans  # type: ignore
+
+    def embed_function(self, **kwargs) -> Callable[[str], Fingerprint]:
+        raise NotImplementedError("This function is not implemented")
 
     def embed_bash(
-        self,
-        corpus: List[str],
-        merge: bool = False,
-        merge_strategy: str = "longest",
-        skip_existing: bool = True,
-        cache_dir: str = "cache",
-        temp_file_prefix: str = "embed_temp",
-    ) -> List[List[slice]]:  # pragma: no cover
+            self,
+            corpus: List[str],
+            merge: bool = False,
+            merge_strategy: str = "longest",
+            skip_existing: bool = True,
+            cache_dir: str = "cache",
+            temp_file_prefix: str = "embed_temp",
+    ) -> List[Fingerprint]:  # pragma: no cover
         """
-        Find duplicate byte slices using suffix array, with the origianl Google scripts.
+        Find duplicate byte slices using suffix array, with the original Google scripts.
 
         Parameters
         ----------
@@ -224,10 +228,11 @@ class SuffixArrayEmbedder:
 
         Returns
         -------
-        List[List[slice]]
+        List[Fingerprint]
             List of duplicate byte slices.
         """
-        assert merge_strategy in ["longest", "overlapping"], f"Invalid merge strategy: {merge_strategy}"
+        assert merge_strategy in [
+            "longest", "overlapping"], f"Invalid merge strategy: {merge_strategy}"
         cache_dir = os.path.abspath(cache_dir)
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
@@ -235,8 +240,8 @@ class SuffixArrayEmbedder:
         offsets = []
         start = 0
         with open(
-            os.path.join(cache_dir, temp_file_prefix + f".{self.k}.txt"),
-            "wb",
+                os.path.join(cache_dir, temp_file_prefix + f".{self.k}.txt"),
+                "wb",
         ) as f:
             for doc in corpus:
                 doc_bytes = doc.encode("utf-8")
@@ -260,7 +265,7 @@ class SuffixArrayEmbedder:
                 logger.error(f"Error running command: {cmd}")
 
         if not skip_existing or not os.path.exists(
-            os.path.join(cache_dir, temp_file_prefix + f".{self.k}.byterange"),
+                os.path.join(cache_dir, temp_file_prefix + f".{self.k}.byterange"),
         ):
             run_command(
                 f"cargo run make --data-file {os.path.join(cache_dir, temp_file_prefix + f'.{self.k}.txt')}",
@@ -278,11 +283,11 @@ class SuffixArrayEmbedder:
         results: List[List[slice]] = [[] for _ in corpus]
 
         for idx, (x, y) in restore(
-            offsets,
-            os.path.join(
-                cache_dir,
-                temp_file_prefix + f".{self.k}.byterange",
-            ),
+                offsets,
+                os.path.join(
+                    cache_dir,
+                    temp_file_prefix + f".{self.k}.byterange",
+                ),
         ):
             if y - x >= self.k:
                 results[int(idx)].append(slice(x, y))
@@ -291,20 +296,20 @@ class SuffixArrayEmbedder:
             for i in range(len(results)):
                 results[i] = _merge_intervals(results[i], merge_strategy)
 
-        return results
+        return results  # type: ignore
 
-    def corss_embed_bash(
-        self,
-        corpus: List[str],
-        query_corpus: List[str],
-        merge: bool = False,
-        merge_strategy: str = "longest",
-        skip_existing: bool = True,
-        cache_dir: str = "cache",
-        temp_file_prefix: str = "embed_temp",
-    ) -> Tuple[List[List[slice]], List[List[slice]]]:
+    def cross_embed_bash(
+            self,
+            corpus: List[str],
+            query_corpus: List[str],
+            merge: bool = False,
+            merge_strategy: str = "longest",
+            skip_existing: bool = True,
+            cache_dir: str = "cache",
+            temp_file_prefix: str = "embed_temp",
+    ) -> Tuple[List[Fingerprint], List[Fingerprint]]:
         """
-        Find duplicate byte slices for two datasets using suffix array, with the origianl Google scripts.
+        Find duplicate byte slices for two datasets using suffix array, with the original Google scripts.
 
         Parameters
         ----------
@@ -329,22 +334,27 @@ class SuffixArrayEmbedder:
             List of duplicate byte slices for corpus and query_corpus.
         """
 
-        assert merge_strategy in ["longest", "overlapping"], f"Invalid merge strategy: {merge_strategy}"
+        assert merge_strategy in [
+            "longest", "overlapping"], f"Invalid merge strategy: {merge_strategy}"
 
         cache_dir = os.path.abspath(cache_dir)
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
 
-        corpus_a_path = os.path.join(cache_dir, temp_file_prefix + f".corpus_a.{self.k}.txt")
-        corpus_b_path = os.path.join(cache_dir, temp_file_prefix + f".corpus_b.{self.k}.txt")
-        corpus_a_output = os.path.join(cache_dir, temp_file_prefix + f".corpus_a.{self.k}.byterange")
-        corpus_b_output = os.path.join(cache_dir, temp_file_prefix + f".corpus_b.{self.k}.byterange")
+        corpus_a_path = os.path.join(
+            cache_dir, temp_file_prefix + f".corpus_a.{self.k}.txt")
+        corpus_b_path = os.path.join(
+            cache_dir, temp_file_prefix + f".corpus_b.{self.k}.txt")
+        corpus_a_output = os.path.join(
+            cache_dir, temp_file_prefix + f".corpus_a.{self.k}.byterange")
+        corpus_b_output = os.path.join(
+            cache_dir, temp_file_prefix + f".corpus_b.{self.k}.byterange")
 
         offsets_a = []
         start = 0
         with open(
-            corpus_a_path,
-            "wb",
+                corpus_a_path,
+                "wb",
         ) as f:
             for doc in corpus:
                 doc_bytes = doc.encode("utf-8")
@@ -356,8 +366,8 @@ class SuffixArrayEmbedder:
         offsets_b = []
         start = 0
         with open(
-            corpus_b_path,
-            "wb",
+                corpus_b_path,
+                "wb",
         ) as f:
             for doc in query_corpus:
                 doc_bytes = doc.encode("utf-8")
@@ -408,15 +418,15 @@ class SuffixArrayEmbedder:
         results_b: List[List[slice]] = [[] for _ in query_corpus]
 
         for idx, (x, y) in restore(
-            offsets_a,
-            corpus_a_output,
+                offsets_a,
+                corpus_a_output,
         ):
             if y - x >= self.k:
                 results_a[int(idx)].append(slice(x, y))
 
         for idx, (x, y) in restore(
-            offsets_b,
-            corpus_b_output,
+                offsets_b,
+                corpus_b_output,
         ):
             if y - x >= self.k:
                 results_b[int(idx)].append(slice(x, y))
@@ -426,4 +436,35 @@ class SuffixArrayEmbedder:
                 results_a[i] = _merge_intervals(results_a[i], merge_strategy)
             for i in range(len(results_b)):
                 results_b[i] = _merge_intervals(results_b[i], merge_strategy)
-        return results_a, results_b
+        return results_a, results_b  # type: ignore
+
+    def google_embed(
+            self,
+            corpus: List[str],
+            query_corpus: List[str] = None,
+            merge: bool = False,
+            merge_strategy: str = "longest",
+            skip_existing: bool = True,
+            cache_dir: str = "cache",
+            temp_file_prefix: str = "embed_temp",
+    ) -> Tuple[List[Fingerprint], List[Fingerprint]]:
+        if query_corpus is None:
+            slices = self.embed_bash(
+                corpus,
+                merge=merge,
+                merge_strategy=merge_strategy,
+                skip_existing=skip_existing,
+                cache_dir=cache_dir,
+                temp_file_prefix=temp_file_prefix,
+            )
+            return slices, slices
+
+        return self.cross_embed_bash(
+            corpus,
+            query_corpus,
+            merge=merge,
+            merge_strategy=merge_strategy,
+            skip_existing=skip_existing,
+            cache_dir=cache_dir,
+            temp_file_prefix=temp_file_prefix,
+        )
