@@ -19,11 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-      - run: pip install poetry
-      - run: poetry config virtualenvs.create false
-      - run: poetry env use system
-      - run: poetry install
+      - name: Install Python, pipenv and Pipfile packages
+        uses: palewire/install-python-pipenv-pipfile@v2
+        with:
+          python-version: 3.10
       - name: Running Sphinx
         working-directory: ./docs
         run: make html

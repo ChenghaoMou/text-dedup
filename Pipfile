@@ -18,11 +18,14 @@ rich = "*"
 mpire = "*"
 pytest-benchmark = "*"
 coverage = "*"
+sphinx = "*"
 
 [dev-packages]
 humanize = "*"
 pytest = "*"
 coverage = "*"
+sphinx = "*"
+furo = "*"
 
 [requires]
 python_version = "3.10"
