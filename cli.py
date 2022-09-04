@@ -6,14 +6,21 @@ import sys
 import textwrap
 from itertools import product
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
 
 import hydra
 import numpy as np
 import rich
-from datasets import (get_dataset_config_names, get_dataset_split_names,
-                      load_dataset)
-from omegaconf import DictConfig, OmegaConf
+from datasets import get_dataset_config_names
+from datasets import get_dataset_split_names
+from datasets import load_dataset
+from omegaconf import DictConfig
+from omegaconf import OmegaConf
 from rich import print
 from rich.console import Console
 from rich.table import Table
@@ -22,11 +29,12 @@ from tqdm import tqdm
 from text_dedup.embedders.minhash import MinHashEmbedder
 from text_dedup.embedders.simhash import SimHashEmbedder
 from text_dedup.embedders.suffix import SuffixArrayEmbedder
-from text_dedup.postprocess.clustering import (lsh_clustering,
-                                               simhash_clustering)
-from text_dedup.utils.hf_datasets.helpers import (dataset_get,
-                                                  dataset_get_all_str_columns,
-                                                  dataset_map, extract_text)
+from text_dedup.postprocess.clustering import lsh_clustering
+from text_dedup.postprocess.clustering import simhash_clustering
+from text_dedup.utils.hf_datasets.helpers import dataset_get
+from text_dedup.utils.hf_datasets.helpers import dataset_get_all_str_columns
+from text_dedup.utils.hf_datasets.helpers import dataset_map
+from text_dedup.utils.hf_datasets.helpers import extract_text
 
 
 def __clear_screen():  # pragma: no cover
