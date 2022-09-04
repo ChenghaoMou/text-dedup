@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from datasets import Dataset, IterableDataset, Value
 from tqdm import tqdm
@@ -21,7 +21,7 @@ def dataset_map(ds, **kwargs):
     return ds.map(**kwargs)
 
 
-def dataset_get(ds, key: str, transform: Callable | None = None):
+def dataset_get(ds, key: str, transform: Optional[Callable] = None):
     # Return a column from a dataset
     if transform is None:
         def transform(x):
