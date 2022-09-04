@@ -24,11 +24,3 @@ Suffix Restore
    :members:
    :undoc-members:
    :show-inheritance:
-
-UnionFind
-------------------------------------------
-
-.. automodule:: text_dedup.postprocess.union_find
-   :members:
-   :undoc-members:
-   :show-inheritance:

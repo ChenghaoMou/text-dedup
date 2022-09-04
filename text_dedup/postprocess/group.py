@@ -6,36 +6,9 @@ from typing import List
 
 
 class UF:  # pragma: no cover
-    """An implementation of union find data structure.
-    It uses weighted quick union by rank with path compression.
-
-    Source: https://python-algorithms.readthedocs.io/en/stable/_modules/python_algorithms/basic/union_find.html
-
-    An union find data structure can keep track of a set of elements into a number
-    of disjoint (nonoverlapping) subsets. That is why it is also known as the
-    disjoint set data structure. Mainly two useful operations on such a data
-    structure can be performed. A *find* operation determines which subset a
-    particular element is in. This can be used for determining if two
-    elements are in the same subset. An *union* Join two subsets into a
-    single subset.
-
-    The complexity of these two operations depend on the particular implementation.
-    It is possible to achieve constant time (O(1)) for any one of those operations
-    while the operation is penalized. A balance between the complexities of these
-    two operations is desirable and achievable following two enhancements:
-
-    1.  Using union by rank -- always attach the smaller tree to the root of the
-        larger tree.
-    2.  Using path compression -- flattening the structure of the tree whenever
-        find is used on it.
-
-    complexity:
-        * find -- :math:`O(\\alpha(N))` where :math:`\\alpha(n)` is
-        `inverse ackerman function
-        <http://en.wikipedia.org/wiki/Ackermann_function#Inverse>`_.
-        * union -- :math:`O(\\alpha(N))` where :math:`\\alpha(n)` is
-        `inverse ackerman function
-        <http://en.wikipedia.org/wiki/Ackermann_function#Inverse>`_.
+    """
+    An implementation of union find data structure. It uses weighted quick union by rank with path compression, based on
+    https://python-algorithms.readthedocs.io/en/stable/_modules/python_algorithms/basic/union_find.html.
     """
 
     def __init__(self, N):
