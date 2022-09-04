@@ -24,4 +24,4 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
-        args: ["-sl"]
+        args: ["--force-single-line-imports"]
