@@ -2,8 +2,12 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2022-06-18 09:37:54
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-
-from typing import Any, Dict, List, Tuple, Union
+import doctest
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
 
 from redis import Redis
 from tqdm import tqdm
@@ -77,3 +81,6 @@ class RedisDict:
     def clear(self):
         for k in tqdm(self, desc="Clearing Redis Database..."):
             self.redis.delete(f"{self.basename}:{k}")
+
+
+doctest.testmod(optionflags=doctest.SKIP, verbose=True)
