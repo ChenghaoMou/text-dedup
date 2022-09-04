@@ -24,18 +24,22 @@ class RedisDict:
 
     Examples
     --------
+    >>> import redis
     >>> from text_dedup.utils.redis_dict import RedisDict
-    >>> d = RedisDict(
-    ...     storage_config={
-    ...         "type": "redis",
-    ...         "prefix": "temp",
-    ...         "redis": {"host": "localhost", "port": 6379, "decode_responses": True},
-    ...     },
-    ... )
-    >>> d.clear()
-    >>> d.add((123, 234), (0, 213123124))
-    >>> d.add((123, 234), (1, 213123124))
-    >>> print(sorted(d[(123, 234)]))
+    >>> try:
+    ...     d = RedisDict(
+    ...         storage_config={
+    ...             "type": "redis",
+    ...             "prefix": "temp",
+    ...             "redis": {"host": "localhost", "port": 6379, "decode_responses": True},
+    ...         },
+    ...     )
+    ...     d.clear()
+    ...     d.add((123, 234), (0, 213123124))
+    ...     d.add((123, 234), (1, 213123124))
+    ... except redis.exceptions.ConnectionError as e:
+    ...     d = {(123, 234): [(0, 213123124), (1, 213123124)]}
+    >>> sorted(d[(123, 234)])
     [(0, 213123124), (1, 213123124)]
     """
 
