@@ -4,11 +4,16 @@
 
 import logging
 import os
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Literal
+from typing import Optional
 
 import numpy as np
 from annoy import AnnoyIndex
-from datasketch import MinHash, MinHashLSH
+from datasketch import MinHash
+from datasketch import MinHashLSH
 from mpire import WorkerPool as Pool
 from tqdm import tqdm
 
@@ -146,6 +151,7 @@ def lsh_clustering(
             ],
             query_signatures,
             progress_bar=verbose,
+            progress_bar_options={"desc": "Querying..."},
         )
 
     return neighbors
@@ -199,6 +205,7 @@ def simhash_clustering(
             index.get_near_dups,
             query_signatures,
             progress_bar=verbose,
+            progress_bar_options={"desc": "Querying..."},
         )
 
     return neighbors

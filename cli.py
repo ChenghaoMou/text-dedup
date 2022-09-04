@@ -373,7 +373,7 @@ if __name__ == "__main__":
         from humanize import naturalsize
     except ImportError:
         def naturalsize(x):
-            return x
+            return f"{x} B"
 
     tracemalloc.start()
 

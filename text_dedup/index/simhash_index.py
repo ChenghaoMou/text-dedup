@@ -4,9 +4,16 @@ import collections
 import logging
 import math
 from itertools import permutations
-from typing import Any, Dict, Generator, List, Set, Tuple, Union
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Set
+from typing import Tuple
+from typing import Union
 
 from tqdm import tqdm
+from yaspin import yaspin
 
 from text_dedup.utils.redis_dict import RedisDict
 
@@ -183,7 +190,9 @@ class SimhashIndex(object):
         self.bucket: Union[Dict[Tuple[int, int], Set[Tuple[int, int]]],
                            RedisDict] = collections.defaultdict(set)
         if storage_config:
-            self.bucket = RedisDict(storage_config)
+            with yaspin(text="Loading index from Redis...", color="yellow") as spinner:
+                self.bucket = RedisDict(storage_config)
+                spinner.ok("✔")
         self.permutations = create_permutations(f, k, b)
 
         if len(self.bucket) == 0:

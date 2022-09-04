@@ -19,6 +19,7 @@ mpire = "*"
 pytest-benchmark = "*"
 coverage = "*"
 sphinx = "*"
+yaspin = "*"
 
 [dev-packages]
 humanize = "*"

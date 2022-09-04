@@ -25,5 +25,4 @@
 -   [datasketch](http://ekzhu.com/datasketch/index.html)
 -   [google-research/deduplicate-text-datasets](https://github.com/google-research/deduplicate-text-datasets)
 -   Developed with OSS license from [JetBrains](https://jb.gg/OpenSourceSupport)
-
-This project is heavily influenced by the deduplication work at BigScience workshop. The original code can be found at [bigscience-workshop/data-preparation](https://github.com/bigscience-workshop/data-preparation/tree/main/preprocessing/filtering/deduplicate).
+-   This project is heavily influenced by the deduplication work at BigScience workshop. The original code can be found at [bigscience-workshop/data-preparation](https://github.com/bigscience-workshop/data-preparation/tree/main/preprocessing/filtering/deduplicate).
