@@ -21,8 +21,9 @@ sentencepiece = "^0.1.97"
 redis = "^4.3.4"
 rich = "^12.5.1"
 mpire = "^2.6.0"
-yaspin = "^2.2.0"
 scipy = "1.9.1"
+xxhash = "^3.0.0"
+sentence-transformers = "^2.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.3"

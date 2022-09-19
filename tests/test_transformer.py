@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2022-04-02 12:54:28
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+from typing import List
 
-from text_dedup.embedders.transformer import TransformerEmbedder
-from text_dedup.postprocess.clustering import annoy_clustering
-from text_dedup.postprocess.group import get_group_indices
+from text_dedup.postprocess import annoy_clustering
+from text_dedup.postprocess import get_group_indices
+from text_dedup.semantic_dedup import TransformerEmbedder
 
 
 def test_transformer():
 
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
     corpus = [
         'The quick brown fox jumps over the dog',
         'The quick brown fox jumps over the corgi',
@@ -18,12 +18,9 @@ def test_transformer():
         'This is a test message',
     ]
 
-    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-    model = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased')
-
-    embedder = TransformerEmbedder(tokenizer, model)
+    embedder = TransformerEmbedder('bert-base-uncased')
     embeddings = embedder.embed(corpus)
 
-    clusters = annoy_clustering(embeddings, f=768)
+    clusters: List[List[int]] = annoy_clustering(embeddings, f=768)
     groups = get_group_indices(clusters)
     assert groups == [0, 0, 2, 2]

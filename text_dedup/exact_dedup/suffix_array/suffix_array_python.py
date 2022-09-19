@@ -8,8 +8,13 @@
 ########################################################################
 
 from typing import List
+from typing import Sequence
 
 from tqdm import tqdm
+
+from text_dedup.base import Fingerprint
+from text_dedup.exact_dedup.suffix_array.base import SuffixArrayDeduplicator
+from text_dedup.exact_dedup.suffix_array.utils import restore_and_merge
 
 
 class Triple(object):
@@ -165,7 +170,67 @@ def ksa(T):
     return SA
 
 
-def construct_sa(text: str) -> List[int]:
-    myT = list(map(ord, tqdm(text, total=len(text))))
-    sa = ksa(myT)
-    return sa
+# Python Implementation of SuffixArrayDeduplicator
+class PythonSuffixArrayDeduplicator(SuffixArrayDeduplicator):
+
+    def fit(self, data: Sequence[str]):
+        raise NotImplementedError(
+            "fit is not implemented for PythonSuffixArrayDeduplicator")
+
+    def predict(self, data: Sequence[str]) -> List[List[slice]]:
+        raise NotImplementedError(
+            "predict is not implemented for PythonSuffixArrayDeduplicator")
+
+    def fit_predict(self, data: Sequence[str]) -> List[List[slice]]:
+        """
+        Fit and predict in one step.
+
+        Parameters
+        ----------
+        data: Sequence[str]
+            A sequence of strings to be fingerprinted.
+
+        Returns
+        -------
+        List[List[slice]]
+            A list of lists of slices, where each slice is a duplicate.
+
+        Examples
+        --------
+        >>> PythonSuffixArrayDeduplicator(k=1).fit_predict(["abc", "abc", "abc"])
+        [[slice(0, 3, None)], [slice(0, 3, None)], [slice(0, 3, None)]]
+        """
+        encoded_data: List[bytes] = [d.encode('utf-8') for d in data]
+        text: bytes = b''.join(encoded_data)
+        sequence: List[int] = [b for b in text]
+        sa = ksa(sequence)
+        n: int = len(text)
+
+        boundaries: List[slice] = []
+        start = 0
+        for d in encoded_data:
+            length = len(d)
+            boundaries.append(slice(start, start + length))
+            start += length
+
+        slices = []
+        for x, y in tqdm(
+                zip(sa[:-1], sa[1:]),
+                total=len(sa) - 1,
+                desc="Querying...",
+        ):
+            matched_length: int = 0
+            while (
+                    x + matched_length < n
+                    and y + matched_length < n
+                    and text[x + matched_length] == text[y + matched_length]
+            ):
+                matched_length += 1
+
+            if matched_length >= self.k:
+                slices.append(slice(x, x + matched_length))
+                slices.append(slice(y, y + matched_length))
+
+        segments = sorted(map(lambda x: slice(x[0], x[1]), {
+                          (s.start, s.stop) for s in slices}), key=lambda s: (s.start, - s.stop))
+        return restore_and_merge(boundaries, segments, self.k, self.merge_strategy)

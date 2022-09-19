@@ -1,6 +1,14 @@
 API References
 ===================
 
+CLI Reference
+-------------
+
+.. toctree::
+   :maxdepth: 1
+
+   cli
+
 Modules
 -------
 

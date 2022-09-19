@@ -6,13 +6,9 @@ columns:
 num_proc: 10
 embedder:
   name: SuffixArrayEmbedder
-  k: 50
-  skip_existing: true
+  k: 100
   cache_dir: outputs
   temp_file_prefix: sa
-tokenization:
-  ngram_size: 12
-  level: sentencepiece
 cache_dir: .cache
 output: results.json
 verbose: true

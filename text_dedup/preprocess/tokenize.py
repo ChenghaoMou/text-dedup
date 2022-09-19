@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # @Date    : 2022-05-22 11:33:39
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-from typing import Any, List, NamedTuple, Tuple
+from typing import Any
+from typing import List
+from typing import Literal
 
 from transformers import XLMRobertaTokenizerFast
 
-# Offset = NamedTuple("Offset", [("start", int), ("end", int)])
-Offset = Tuple[int, int]
 tokenizer = XLMRobertaTokenizerFast.from_pretrained('xlm-roberta-base')
 tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
@@ -42,7 +42,11 @@ def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
     return results
 
 
-def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> Tuple[List[str], List[Tuple[int, int]]]:
+def tokenize(
+        text: str,
+        n_gram: int = 6,
+        level: Literal["sentencepiece", "char", "word"] = 'sentencepiece'
+) -> List[str]:
     """
     Tokenize the text into a sequence of strings.
 
@@ -52,52 +56,35 @@ def tokenize(text: str, n_gram: int = 6, level: str = 'sentencepiece') -> Tuple[
         The text to tokenize.
     n_gram : int, optional (default=6)
         The size of the n-grams to use.
-    level : str, optional (default='sentencepiece')
+    level : Literal["sentencepiece", "char", "word"], optional (default='sentencepiece')
         The level of tokenization to use.
 
     Returns
     -------
-    Tuple[List[str], List[Tuple[int, int]]]
+    List[str]
         The list of tokens, and the list of token boundaries.
 
     Examples
     --------
     >>> tokenize("Hello world!")
-    (['▁Hello▁world!'], [(0, 12)])
+    ['▁Hello▁world!']
     >>> tokenize("This is a test.", n_gram=2)
-    (['▁This▁is', '▁is▁a', '▁a▁test', '▁test.'], [(0, 7), (5, 9), (8, 14), (10, 15)])
+    ['▁This▁is', '▁is▁a', '▁a▁test', '▁test.']
     >>> tokenize("test message", n_gram=2, level='char')
-    (['te', 'es', 'st', 't ', ' m', 'me', 'es', 'ss', 'sa', 'ag', 'ge'], [(0, 2), (1, 3), (2, 4), (3, 5), (4, 6), (5, 7), (6, 8), (7, 9), (8, 10), (9, 11), (10, 12)])
+    ['te', 'es', 'st', 't ', ' m', 'me', 'es', 'ss', 'sa', 'ag', 'ge']
     """
-
-    assert level in {'sentencepiece', 'char', 'word'}, f'Invalid level: {level}'
-
     if level == 'sentencepiece':
         tokens = tokenizer.tokenize(text)
-        offsets = tokenizer(text, return_offsets_mapping=True,
-                            add_special_tokens=False).pop("offset_mapping")
     elif level == 'char':
         tokens = list(text)
-        offsets = []
-        for token in tokens:
-            if not offsets:
-                offsets.append((0, len(token)))
-                continue
-            offsets.append((offsets[-1][1], offsets[-1][1] + len(token)))
     elif level == "word":
         tokens = text.split(" ")
-        offsets = []
-        for token in tokens:
-            if not offsets:
-                offsets.append((0, len(token)))
-                continue
-            offsets.append((offsets[-1][1] + 1, offsets[-1][1] + len(token) + 1))
+    else:
+        raise ValueError(f"Invalid level: {level}")
 
     output_tokens = []
-    output_offsets = []
 
-    for window_tokens, window_offsets in zip(ngrams(tokens, n_gram), ngrams(offsets, n_gram)):
+    for window_tokens in ngrams(tokens, n_gram):
         output_tokens.append(''.join(window_tokens))
-        output_offsets.append((window_offsets[0][0], window_offsets[-1][1]))
 
-    return output_tokens, output_offsets
+    return output_tokens

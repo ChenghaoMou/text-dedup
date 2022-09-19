@@ -11,23 +11,23 @@ class UF:  # pragma: no cover
     https://python-algorithms.readthedocs.io/en/stable/_modules/python_algorithms/basic/union_find.html.
     """
 
-    def __init__(self, N):
+    def __init__(self, n):
         """Initialize an empty union find object with N items.
 
         Args:
-            N: Number of items in the union find object.
+            n: Number of items in the union find object.
         """
 
-        self._id = list(range(N))
-        self._count = N
-        self._rank = [0] * N
+        self._id = list(range(n))
+        self._count = n
+        self._rank = [0] * n
 
     def find(self, p):
         """Find the set identifier for the item p."""
 
-        id = self._id
-        while p != id[p]:
-            p = id[p] = id[id[p]]  # Path compression using halving.
+        id_ = self._id
+        while p != id_[p]:
+            p = id_[p] = id_[id_[p]]  # Path compression using halving.
         return p
 
     def count(self):

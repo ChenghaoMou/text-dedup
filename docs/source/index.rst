@@ -17,6 +17,7 @@ Content
    :maxdepth: 2
 
    modules
+   results
 
 Concepts
 --------

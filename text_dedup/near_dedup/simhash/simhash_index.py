@@ -1,6 +1,5 @@
 # Created by 1e0n in 2013
 # modified by Chenghao Mou in 2022
-import collections
 import logging
 import math
 from itertools import permutations
@@ -8,19 +7,19 @@ from typing import Any
 from typing import Dict
 from typing import Generator
 from typing import List
-from typing import Set
+from typing import Optional
 from typing import Tuple
-from typing import Union
 
 from tqdm import tqdm
-from yaspin import yaspin
 
-from text_dedup.utils.redis_dict import RedisDict
+from text_dedup.base import Fingerprint
+from text_dedup.utils import StorageDict
+from text_dedup.utils import create_storage
 
 logger = logging.getLogger("text_dedup")
 
 
-def hamming_distance(a: int, b: int) -> int:
+def _hamming_distance(a: int, b: int) -> int:
     """
     Compute the Hamming distance between two integers.
 
@@ -38,9 +37,9 @@ def hamming_distance(a: int, b: int) -> int:
 
     Examples
     --------
-    >>> hamming_distance(0b1010, 0b0101)
+    >>> _hamming_distance(0b1010, 0b0101)
     4
-    >>> hamming_distance(0b1010, 0b1010)
+    >>> _hamming_distance(0b1010, 0b1010)
     0
     """
 
@@ -68,7 +67,7 @@ class Permutation:
         b: int
             The number of blocks
         masks:
-            The block masks generated from `create_permutations`
+            The block masks generated from `_create_permutations`
         """
         self.f = f
         self.k = k
@@ -145,19 +144,37 @@ class Permutation:
         return result
 
 
-def create_permutations(f: int, k: int, b: int) -> List[Permutation]:
+def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
+    """
+    Create permutations for f bit, b blocks, and k bit difference allowed.
+
+    Parameters
+    ----------
+    f: int
+        The fingerprint to be permuted
+    k: int
+        The bit difference allowed
+    b: int
+        The number of blocks
+
+    Returns
+    -------
+    List[Permutation]
+        The permutations
+    """
     block_size: int = math.ceil(f / b)
     masks: List[Tuple[int, int, int, int]] = []
     for i in range(b):
-        mask = 0
-        for j in range(i * block_size, min((i + 1) * block_size, f)):
+        mask: int = 0
+        start, end = i * block_size, min((i + 1) * block_size, f)
+        for j in range(start, end):
             mask |= 1 << j
         masks.append(
             (
                 mask,
-                min((i + 1) * block_size, f) - i * block_size,  # mask size in bits
-                i * block_size,  # mask start position
-                min((i + 1) * block_size, f),  # mask end position
+                end - start,
+                start,
+                end,
             )
         )
 
@@ -172,14 +189,14 @@ def create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     return results
 
 
-class SimhashIndex(object):
+class SimHashIndex(object):
     def __init__(
             self,
-            fingerprints: List[Tuple[int, int]],
+            fingerprints: List[Tuple[int, Fingerprint]],
             f: int = 64,
             k: int = 3,
             b: int = 4,
-            storage_config: Dict[str, Any] = None,
+            storage_config: Optional[Dict[str, Any]] = None,
             verbose: bool = False,
     ):
         assert b > k, "b must be greater than k"
@@ -187,13 +204,9 @@ class SimhashIndex(object):
         self.k = k
         self.b = b
         self.f = f
-        self.bucket: Union[Dict[Tuple[int, int], Set[Tuple[int, int]]],
-                           RedisDict] = collections.defaultdict(set)
-        if storage_config:
-            with yaspin(text="Loading index from Redis...", color="yellow") as spinner:
-                self.bucket = RedisDict(storage_config)
-                spinner.ok("✔")
-        self.permutations = create_permutations(f, k, b)
+
+        self.bucket: StorageDict = create_storage(storage_config)
+        self.permutations = _create_permutations(f, k, b)
 
         if len(self.bucket) == 0:
             for idx, fingerprint in tqdm(fingerprints, desc="Indexing...", disable=not verbose):
@@ -207,20 +220,17 @@ class SimhashIndex(object):
             logger.info(
                 f"Maximum bucket size: {len(self.bucket[largest_bucket])} with the key {largest_bucket}")
 
-    def get_near_dups(self, fingerprint: int) -> List[Any]:
+    def get_near_duplicates(self, fingerprint: int) -> List[Any]:
         ans = set()
         for key in self.get_keys(fingerprint):
             for idx, other_fingerprint in self.bucket[key]:
-                if hamming_distance(fingerprint, other_fingerprint) <= self.k:
+                if _hamming_distance(fingerprint, other_fingerprint) <= self.k:
                     ans.add(idx)
         return list(ans)
 
     def add(self, idx: int, fingerprint: int):
         for key in self.get_keys(fingerprint):
-            if isinstance(self.bucket, RedisDict):
-                self.bucket.add(key, (idx, fingerprint))
-            else:
-                self.bucket[key].add((idx, fingerprint))
+            self.bucket.add(key, (idx, fingerprint))
 
     def get_keys(self, fingerprint: int) -> Generator[Tuple[int, int], None, None]:
         for permutation in self.permutations:

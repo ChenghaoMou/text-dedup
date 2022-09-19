@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # @Date    : 2022-04-02 10:53:30
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
-from typing import Callable, List, Tuple
+from typing import Callable
+from typing import List
+from typing import Sequence
 
 from datasketch import MinHash
 
-from text_dedup.embedders.base import Embedder, Fingerprint
-from text_dedup.preprocess.tokenizer import Offset, tokenize
+from text_dedup.base import Embedder
+from text_dedup.base import Fingerprint
+from text_dedup.preprocess import tokenize
 
 
 @dataclass
@@ -28,15 +31,15 @@ class MinHashEmbedder(Embedder):
 
     Examples
     --------
-    >>> from text_dedup.embedders.minhash import MinHashEmbedder
+    >>> from text_dedup.near_dedup.minhash import MinHashEmbedder
     >>> embedder = MinHashEmbedder(128)
     """
 
     num_perm: int = 128
     seed: int = 42
-    tokenizer: Callable[..., Tuple[List[str], List[Offset]]] = tokenize
+    tokenizer: Callable[..., List[str]] = tokenize
 
-    def embed(self, corpus: List[str], **kwargs) -> List[Fingerprint]:
+    def embed(self, corpus: Sequence[str], **kwargs) -> List[Fingerprint]:
         """
         Embed a list of strings. It applies the embedding function to each string sequentially.
         It is recommended to use the `embed_function` method instead, in parallel, for example.
@@ -55,7 +58,7 @@ class MinHashEmbedder(Embedder):
 
         Examples
         --------
-        >>> from text_dedup.embedders.minhash import MinHashEmbedder
+        >>> from text_dedup.near_dedup.minhash import MinHashEmbedder
         >>> embedder = MinHashEmbedder(128)
         >>> embeddings = embedder.embed(["hello world", "hello world"])
         >>> len(embeddings)
@@ -80,27 +83,19 @@ class MinHashEmbedder(Embedder):
 
         Examples
         --------
-        >>> from text_dedup.embedders.minhash import MinHashEmbedder
+        >>> from text_dedup.near_dedup.minhash import MinHashEmbedder
         >>> embedder = MinHashEmbedder(128)
         >>> hashes = embedder.embed_function()("hello world")
         >>> hashes.shape
         (128,)
         """
-        # Clean up kwargs
-        needed = inspect.signature(self.tokenizer).parameters
-        for key in set(kwargs.keys()):
-            if key not in needed:
-                kwargs.pop(key)
-
         def wrapper(doc: str) -> Fingerprint:
             m: MinHash = MinHash(num_perm=self.num_perm, seed=self.seed)
-            tokens, _ = self.tokenizer(doc, **kwargs)
-            for ngram in tokens:
-                m.update(ngram.encode("utf-8"))
+            tokens = self.tokenizer(doc, **kwargs)
+            m.update_batch([token.encode("utf-8") for token in tokens])
             return m.hashvalues
 
         return wrapper
 
     def __repr__(self) -> str:
-
         return f"MinHashEmbedder(num_perm={self.num_perm}, seed={self.seed}, tokenizer={self.tokenizer.__name__})"

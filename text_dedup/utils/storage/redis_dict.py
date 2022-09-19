@@ -2,18 +2,19 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2022-06-18 09:37:54
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-import doctest
+from __future__ import annotations
+
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Tuple
-from typing import Union
 
 from redis import Redis
-from tqdm import tqdm
+
+from text_dedup.utils.storage.base import StorageDict
 
 
-class RedisDict:
+class RedisDict(StorageDict):
     """
     A dictionary-like object backed by Redis.
 
@@ -25,26 +26,27 @@ class RedisDict:
     Examples
     --------
     >>> import redis
-    >>> from text_dedup.utils.redis_dict import RedisDict
-    >>> try:
-    ...     d = RedisDict(
-    ...         storage_config={
-    ...             "type": "redis",
-    ...             "prefix": "temp",
-    ...             "redis": {"host": "localhost", "port": 6379, "decode_responses": True},
-    ...         },
-    ...     )
-    ...     d.clear()
-    ...     d.add((123, 234), (0, 213123124))
-    ...     d.add((123, 234), (1, 213123124))
-    ... except redis.exceptions.ConnectionError as e:
-    ...     d = {(123, 234): [(0, 213123124), (1, 213123124)]}
-    >>> sorted(d[(123, 234)])
+    >>> from text_dedup.utils.storage.redis_dict import RedisDict
+    >>> def test_func():
+    ...     try:
+    ...         d = RedisDict(
+    ...             storage_config={
+    ...                 "type": "redis",
+    ...                 "prefix": "temp",
+    ...                 "redis": {"host": "localhost", "port": 6379, "decode_responses": True},
+    ...             },
+    ...         )
+    ...         d.clear()
+    ...         d.add((123, 234), (0, 213123124))
+    ...         d.add((123, 234), (1, 213123124))
+    ...     except redis.exceptions.ConnectionError as e:
+    ...         d = {(123, 234): [(0, 213123124), (1, 213123124)]}
+    ...     return sorted(d[(123, 234)])
+    >>> test_func()
     [(0, 213123124), (1, 213123124)]
     """
 
     def __init__(self, storage_config: Dict[str, Any]):
-
         if storage_config.get("type", "redis") != "redis":
             raise ValueError("Only redis is supported")
 
@@ -55,7 +57,7 @@ class RedisDict:
 
         self.redis = Redis(**storage_config["redis"])
 
-    def add(self, key: Union[str, Tuple[int, int]], value: Union[str, Tuple[int, int]]):
+    def add(self, key: str | Tuple[int, int], value: str | Tuple[int, int]):
         if isinstance(key, tuple):
             key = "#".join(map(str, key))
         key = f"{self.basename}:{key}"
@@ -64,14 +66,13 @@ class RedisDict:
         self.redis.sadd(key, value)
 
     def __len__(self):
-
         return sum(1 for _ in self.redis.scan_iter(f"{self.basename}:*"))
 
     def __iter__(self):
         for key in self.redis.scan_iter(f"{self.basename}:*"):
             yield key.split(":", 1)[-1]
 
-    def __getitem__(self, key: Union[str, Tuple[int, int]]) -> List[Tuple[int, ...]]:
+    def __getitem__(self, key: str | Tuple[int, int]) -> List[Tuple[int, ...]]:
         if isinstance(key, tuple):
             key = "#".join(map(str, key))
         key = f"{self.basename}:{key}"
@@ -83,8 +84,5 @@ class RedisDict:
         return results
 
     def clear(self):
-        for k in tqdm(self, desc="Clearing Redis Database..."):
+        for k in self:
             self.redis.delete(f"{self.basename}:{k}")
-
-
-doctest.testmod(optionflags=doctest.SKIP, verbose=True)

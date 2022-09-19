@@ -131,5 +131,4 @@ Transformer Embedding Semantic Deduplication Examples
    :maxdepth: 4
 
 
-   cli
    text_dedup

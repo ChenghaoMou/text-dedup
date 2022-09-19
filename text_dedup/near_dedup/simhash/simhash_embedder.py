@@ -3,28 +3,29 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
-from typing import Callable, List, Tuple
+from typing import Callable
+from typing import List
+from typing import Sequence
 
 import numpy as np
+import xxhash
 
-from text_dedup.embedders.base import Embedder, Fingerprint
-from text_dedup.preprocess.tokenizer import Offset, tokenize
+from text_dedup.base import Embedder
+from text_dedup.base import Fingerprint
+from text_dedup.preprocess import tokenize
 
 
-def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
+def _unsigned_hash(obj: bytes) -> int:
     """
     Compute a 64-bit hash of an object.
 
-    This is a modified version of https://github.com/seomoz/simhash-py/blob/master/simhash/simhash.pyx.
+    It doesn't really matter what hash function to use, as long as it is consistent.
 
     Parameters
     ----------
-    obj : bytes
+    obj: bytes
         The object to hash.
-    bit_length : int
-        The bit length of the hash.
 
     Returns
     -------
@@ -33,16 +34,17 @@ def _unsigned_hash(obj: bytes, bit_length: int = 64) -> int:
 
     Examples
     --------
-    >>> _unsigned_hash(b'hello world', 64)
-    13352372148217134600
+    >>> _unsigned_hash(b'hello world')
+    5020219685658847592
     """
-    h = hashlib.sha256(obj).digest()[: bit_length // 8]
-    return int.from_bytes(h, byteorder='big', signed=False)
+    return xxhash.xxh64(obj).intdigest()
 
 
 def _compute(hashes: List[int]) -> int:
     """
     Compute the Simhash of a list of hashes.
+
+    Notes to myself: You tried porting this to Cython, but it didn't improve the performance.
 
     Parameters
     ----------
@@ -56,19 +58,26 @@ def _compute(hashes: List[int]) -> int:
 
     Examples
     --------
-    >>> _compute([13352372148217134600])
-    13352372148217134600
+    >>> _compute([13352372148217134600, 5020219685658847592])
+    18297957875485474664
     """
-    bits = np.unpackbits(np.array(hashes, dtype='>u8').view(
-        '>u1').reshape(len(hashes), -1), axis=1).astype('>i8')
-    counts = np.where(np.sum(2 * bits - 1, axis=0, dtype='>i8') >= 0, 1, 0).astype('>u1')
-    return np.packbits(counts).view('>u8').item()
+    # Convert integers to 64 bit binary arrays
+    bits = np.unpackbits(np.array(hashes, dtype='u8').view(
+        'u1').reshape(len(hashes), -1), axis=1).astype('i8')
+    # Sum up each dimension of the arrays and take the sign
+    counts = np.where(np.sum(2 * bits - 1, axis=0).astype(dtype='i8')
+                      >= 0, 1, 0).astype('u1')
+    # Convert the binary array back to an integer
+    # Change to
+    # return np.packbits(counts).view('>u8').item()s
+    # to match the code in https://github.com/seomoz/simhash-cpp/, although it doesn't really matter
+    return np.packbits(counts).view('u8').item()
 
 
 @dataclass
 class SimHashEmbedder(Embedder):
     """
-    Embedding text based on `SimHash <https://www.cs.princeton.edu/courses/archive/spring04/cos598B/bib/CharikarEstim.pdf>`_.
+    Embedding text based on `SimHash <https://bit.ly/3TLgzQv>`.
 
     Parameters
     ----------
@@ -77,13 +86,13 @@ class SimHashEmbedder(Embedder):
 
     Examples
     --------
-    >>> from text_dedup.embedders import SimHashEmbedder
+    >>> from text_dedup.near_dedup.simhash import SimHashEmbedder
     >>> embedder = SimHashEmbedder()
     """
 
-    tokenizer: Callable[..., Tuple[List[str], List[Offset]]] = tokenize
+    tokenizer: Callable[..., List[str]] = tokenize
 
-    def embed(self, corpus: List[str], **kwargs) -> List[Fingerprint]:
+    def embed(self, corpus: Sequence[str], **kwargs) -> List[Fingerprint]:
         """
         Embed a list of strings.
 
@@ -104,7 +113,7 @@ class SimHashEmbedder(Embedder):
         >>> embedder = SimHashEmbedder()
         >>> embeddings = embedder.embed(["hello", "hello world! This is a test."])
         >>> embeddings
-        [15473702421686509265, 16678727103752857983]
+        [15336018574513328062, 5455741392207466107]
         """
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
@@ -128,26 +137,11 @@ class SimHashEmbedder(Embedder):
         >>> embedder = SimHashEmbedder()
         >>> hashes = embedder.embed_function()("hello world! This is a test string.")
         >>> hashes
-        14143049876155195771
+        9996463820397055579
         """
-        # This is needed because datasets' (arrow) multiprocessing does not pickle int64 values
-        # We need to convert it to str first
-        use_str = kwargs.pop('use_str', False)
-
         def wrapper(doc: str) -> Fingerprint:
-            tokens, _ = self.tokenizer(doc, **kwargs)
-            ans = _compute(
-                list(
-                    map(
-                        lambda x: _unsigned_hash(
-                            x.encode('utf-8'),
-                        ),
-                        tokens,
-                    ),
-                ),
-            )
-            if use_str:
-                return str(ans)
+            tokens = self.tokenizer(doc, **kwargs)
+            ans = _compute([_unsigned_hash(t.encode('utf-8')) for t in tokens])
             return ans
 
         return wrapper

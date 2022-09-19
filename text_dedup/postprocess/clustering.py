@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # @Date         : 2021-06-05 10:53:26
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
+from __future__ import annotations
 
 import logging
 import os
@@ -10,15 +11,14 @@ from typing import List
 from typing import Literal
 from typing import Optional
 
-import numpy as np
 from annoy import AnnoyIndex
-from datasketch import MinHash
+from datasketch import LeanMinHash
 from datasketch import MinHashLSH
 from mpire import WorkerPool as Pool
 from tqdm import tqdm
 
-from text_dedup.embedders.base import Fingerprint
-from text_dedup.index.simhash_index import SimhashIndex
+from text_dedup.base import Fingerprint
+from text_dedup.near_dedup.simhash import SimHashIndex
 
 logger: logging.Logger = logging.getLogger("text_dedup")
 
@@ -73,7 +73,7 @@ def annoy_clustering(
         # Find self duplicates
         query_signatures = signatures
 
-    for i, v in enumerate(signatures):
+    for i, v in enumerate(query_signatures):
         current: List[int] = []
         for j, dist in zip(
                 *t.get_nns_by_vector(  # type: ignore
@@ -85,13 +85,14 @@ def annoy_clustering(
         ):
             if dist < distance_threshold:
                 current.append(j)
-        neighbors.append(current[:])
+        neighbors.append(current)
 
     return neighbors
 
 
 def lsh_clustering(
         signatures: List[Fingerprint],
+        seed: int,
         threshold: float = 0.5,
         num_perm: int = 128,
         query_signatures: Optional[List[Fingerprint]] = None,
@@ -105,6 +106,8 @@ def lsh_clustering(
     ----------
     signatures : List[np.ndarray]
         List of signatures
+    seed : int
+        Seed for MinHash
     threshold : float, optional
         Threshold for similarity, by default 0.5
     num_perm : int, optional
@@ -133,10 +136,8 @@ def lsh_clustering(
                     continue
                 session.insert(
                     f"id-{key}",
-                    MinHash(num_perm=num_perm, hashvalues=minhash),
+                    LeanMinHash(seed=seed, hashvalues=minhash),
                 )
-
-    neighbors: List[List[int]] = []
 
     if query_signatures is None:
         query_signatures = signatures
@@ -146,7 +147,7 @@ def lsh_clustering(
             lambda signature: [
                 int(x.split("-")[1])
                 for x in lsh.query(
-                    MinHash(num_perm=num_perm, hashvalues=signature),
+                    LeanMinHash(seed=seed, hashvalues=signature),
                 )
             ],
             query_signatures,
@@ -188,7 +189,7 @@ def simhash_clustering(
     List[List[int]]
         List of neighbors
     """
-    index = SimhashIndex(
+    index = SimHashIndex(
         [(i, signature) for i, signature in enumerate(
             tqdm(signatures, disable=not verbose, desc="Loading signatures"))],
         k=hamming_distance,
@@ -199,10 +200,9 @@ def simhash_clustering(
     if query_signatures is None:
         query_signatures = signatures
 
-    neighbors: List[List[int]] = []
     with Pool(os.cpu_count()) as pool:
         neighbors = pool.map(
-            index.get_near_dups,
+            index.get_near_duplicates,
             query_signatures,
             progress_bar=verbose,
             progress_bar_options={"desc": "Querying..."},
