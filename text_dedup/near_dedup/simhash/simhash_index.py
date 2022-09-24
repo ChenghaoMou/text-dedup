@@ -43,12 +43,14 @@ def _hamming_distance(a: int, b: int) -> int:
     0
     """
 
-    c = a ^ b
-    ans = 0
-    while c:
-        ans += 1
-        c &= c - 1
-    return ans
+    # c = a ^ b
+    # ans = 0
+    # while c:
+    #     ans += 1
+    #     c &= c - 1
+    # return ans
+
+    return (a ^ b).bit_count()
 
 
 class Permutation:

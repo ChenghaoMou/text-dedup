@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "text-dedup"
-version = "0.1.1"
+version = "0.2.0"
 description = "All-in-one text deduplication"
 authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
 license = "MIT"
@@ -32,6 +32,7 @@ Sphinx = "^5.1.1"
 furo = "^2022.6.21"
 pre-commit = "^2.20.0"
 isort = "^5.10.1"
+livereload = "^2.6.3"
 
 [build-system]
 requires = ["poetry-core"]

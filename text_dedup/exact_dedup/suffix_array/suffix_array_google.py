@@ -8,7 +8,6 @@ from dataclasses import field
 from typing import List
 from typing import Sequence
 
-from text_dedup.base import Fingerprint
 from text_dedup.exact_dedup.suffix_array.base import SuffixArrayDeduplicator
 from text_dedup.exact_dedup.suffix_array.utils import restore_and_merge
 

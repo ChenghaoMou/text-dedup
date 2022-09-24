@@ -1,20 +1,12 @@
-#!/usr/bin/env python
-
-
-########################################################################
-#                   FastGeneralizedSuffixArrays v0.1                   #
-#                       (c) 2011 Mark Mazumder                         #
-#                             markmaz.com                              #
-########################################################################
-
 from typing import List
 from typing import Sequence
 
 from tqdm import tqdm
 
-from text_dedup.base import Fingerprint
 from text_dedup.exact_dedup.suffix_array.base import SuffixArrayDeduplicator
 from text_dedup.exact_dedup.suffix_array.utils import restore_and_merge
+
+# TODO: update this implementation
 
 
 class Triple(object):

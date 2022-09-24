@@ -12,7 +12,11 @@ Fingerprint = Union[int, List[slice], np.ndarray]
 
 
 class Deduplicator:  # pragma: no cover
-    """Base class for all deduplicators. Deduplicators offsets end-to-end duplicate detection."""
+    """
+    Base class for all deduplicators. Deduplicators offers end-to-end duplicate detection.
+
+    This is designed for datasets that comfortably fit into memory. For larger datasets, use Embedder instead.
+    """
 
     @abstractmethod
     def fit(self, data: Sequence[str]):
@@ -28,7 +32,11 @@ class Deduplicator:  # pragma: no cover
 
 
 class Embedder:  # pragma: no cover
-    """Base class for all embedders. Embedders are used to transform a string into a fingerprint."""
+    """
+    Base class for all embedders. Embedders are used to transform a string into a fingerprint.
+
+    This is often used together with a clustering method to group similar fingerprints.
+    """
     @abstractmethod
     def embed(self, corpus: Sequence[str], **kwargs) -> List[Fingerprint]:
         raise NotImplementedError

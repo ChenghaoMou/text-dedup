@@ -1,18 +1,10 @@
 Preprocessing
 =============
 
-SuffixArray
--------------------------------------------
+Tokenize
+--------
 
-.. automodule:: text_dedup.preprocess.suffix_array
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Tokenizer
----------------------------------------
-
-.. automodule:: text_dedup.preprocess.tokenizer
+.. automodule:: text_dedup.preprocess.tokenize
    :members:
    :undoc-members:
    :show-inheritance:

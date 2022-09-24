@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from dataclasses import field
 from typing import Callable
 from typing import List
-from typing import Optional
 
 from sentence_transformers import SentenceTransformer
 

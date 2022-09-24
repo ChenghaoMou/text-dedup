@@ -153,6 +153,7 @@ def main(conf: DictConfig):  # pragma: no cover
         return res
 
     for config in conf.configs:
+        logger.info(f"Processing config {conf.dataset} {config}")
         splits = get_dataset_split_names(conf.dataset, config, use_auth_token=TOKEN)
         splits = [s for s in SPLITS if s in splits]
 
@@ -169,9 +170,10 @@ def main(conf: DictConfig):  # pragma: no cover
 
         for split in splits:
 
+            logger.info(f"Processing {conf.dataset} {config} {split}")
             split_data = load_dataset(
-                conf.dataset,
-                config,
+                "oscar-corpus/OSCAR-2109",
+                "deduplicated_gl",
                 split=split,
                 use_auth_token=TOKEN,
                 cache_dir=conf.cache_dir if not use_streaming else None,
