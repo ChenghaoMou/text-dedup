@@ -6,9 +6,11 @@ Finding duplicates in a Huggingface dataset
 
 ``cli.py`` is a wrapper tool that identifies duplicates for a given Huggingface's dataset.
 
-By default, the tool uses redis or key-db [1]_ as a cache layer for the hashes. See ``configs/method/minhash.yaml`` or ``configs/method/simhash.yaml`` for examples. Or you can overwrite the `storage_config` to `null` to use in-memory index. Deduplicating small datasets that fit in your machine's memory should be fine with in-memory index.
+By default, the tool uses ``redis`` or ``key-db`` as a cache layer for the hashes. See ``configs/method/minhash.yaml`` or ``configs/method/simhash.yaml`` for examples. Or you can overwrite the `storage_config` to `null` to use in-memory index. Deduplicating small datasets that fit in your machine's memory should be fine with in-memory index.
 
-.. [1] When using ``MinHashEmbedder``, please use redis server instead of key-db. Key-db is not compatible yet with some data types.
+.. warning::
+
+  When using ``MinHashEmbedder``, please use redis server instead of key-db. Key-db is not compatible yet with some data types.
 
 Configuration
 -------------

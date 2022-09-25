@@ -33,6 +33,7 @@ furo = "^2022.6.21"
 pre-commit = "^2.20.0"
 isort = "^5.10.1"
 livereload = "^2.6.3"
+sphinx-copybutton = "^0.5.0"
 
 [build-system]
 requires = ["poetry-core"]

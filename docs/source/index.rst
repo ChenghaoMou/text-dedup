@@ -16,6 +16,7 @@ Documentation
 .. toctree::
    :maxdepth: 2
 
+   installation
    examples
    text_dedup
    results
