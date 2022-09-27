@@ -4,7 +4,7 @@ CLI References
 Finding duplicates in a Huggingface dataset
 -------------------------------------------
 
-``cli.py`` is a wrapper tool that identifies duplicates for a given Huggingface's dataset.
+The package provides a wrapper tool that identifies duplicates for a given Huggingface's dataset.
 
 By default, the tool uses ``redis`` or ``key-db`` as a cache layer for the hashes. See ``configs/method/minhash.yaml`` or ``configs/method/simhash.yaml`` for examples. Or you can overwrite the `storage_config` to `null` to use in-memory index. Deduplicating small datasets that fit in your machine's memory should be fine with in-memory index.
 
@@ -118,17 +118,17 @@ deduplicate the oscar-corpus/OSCAR-2109 dataset using simhash with configs from 
 ::
 
     # make sure to start key-db server first or modify the config first
-    python cli.py method=simhash method.dataset=oscar-corpus/OSCAR-2109 method.configs="[deduplicated_gl]"
+    python -m text_dedup method=simhash method.dataset=oscar-corpus/OSCAR-2109 method.configs="[deduplicated_gl]"
 
 deduplicate the oscar-corpus/OSCAR-2109 dataset using minhash with configs from configs/method/minhash.yaml and some overrides
 
 ::
 
     # make sure to start redis server first or modify the config first
-    python cli.py method=minhash method.dataset=oscar-corpus/OSCAR-2109 method.configs="[deduplicated_gl]"
+    python -m text_dedup method=minhash method.dataset=oscar-corpus/OSCAR-2109 method.configs="[deduplicated_gl]"
 
 deduplicate the oscar-corpus/OSCAR-2109 dataset using suffix array with configs from configs/method/suffix.yaml and some overrides
 
 ::
 
-    python cli.py method=suffix method.dataset=oscar-corpus/OSCAR-2109 method.configs="[deduplicated_gl]"
+    python -m text_dedup method=suffix method.dataset=oscar-corpus/OSCAR-2109 method.configs="[deduplicated_gl]"
