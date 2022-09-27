@@ -172,8 +172,8 @@ def main(conf: DictConfig):  # pragma: no cover
 
             logger.info(f"Processing {conf.dataset} {config} {split}")
             split_data = load_dataset(
-                "oscar-corpus/OSCAR-2109",
-                "deduplicated_gl",
+                conf.dataset,
+                config,
                 split=split,
                 use_auth_token=TOKEN,
                 cache_dir=conf.cache_dir if not use_streaming else None,
