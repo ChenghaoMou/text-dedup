@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import random
 import sys
 import textwrap
 from pathlib import Path
@@ -180,6 +181,11 @@ def main(conf: DictConfig):  # pragma: no cover
                 streaming=use_streaming,
             )
 
+            split_data = split_data.select(range(min(conf.num_samples, len(split_data)))) \
+                if conf.num_samples > 0 else split_data
+
+            # split_data = split_data.select([40, 32769, 32768, 32784, 32775, 32802])
+
             if not conf_columns:
                 conf_columns = dataset_get_all_str_columns(split_data)
             if not conf_columns:
@@ -308,7 +314,11 @@ def main(conf: DictConfig):  # pragma: no cover
                                              style="cyan", no_wrap=False)
                             table.add_column(
                                 "Duplicate", justify="left", style="magenta")
-                            for ref_id, reference in zip(cluster[:10], base_data.select(cluster)["__text__"]):
+                            table.add_column(
+                                "Fingerprint", justify="left", style="magenta")
+
+                            cluster_data = base_data.select(cluster)
+                            for ref_id, reference, sig in zip(cluster[:10], cluster_data["__text__"], cluster_data["__signature__"]):
                                 table.add_row(
                                     y,
                                     str(i),
@@ -317,6 +327,7 @@ def main(conf: DictConfig):  # pragma: no cover
                                     x,
                                     str(ref_id),
                                     textwrap.shorten(reference, width=512),
+                                    bin(int(sig)),
                                 )
                             try:
                                 print(table)

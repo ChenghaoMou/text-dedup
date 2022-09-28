@@ -11,7 +11,7 @@ tokenizer = XLMRobertaTokenizerFast.from_pretrained('xlm-roberta-base')
 tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
 
 
-def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
+def ngrams(sequence: List[Any], n: int, step_size: int = -1) -> List[List[Any]]:
     """Generate n-grams from a sequence.
 
     Parameters
@@ -20,6 +20,8 @@ def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
         List of elements.
     n : int
         The size of the n-grams to use.
+    step_size : int, optional (default=-1)
+        The step size to use when generating n-grams. If -1, then the step size is the same as the n-gram size.
 
     Returns
     -------
@@ -28,16 +30,21 @@ def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
 
     Examples
     --------
+    >>> from text_dedup.preprocess.tokenize import ngrams
     >>> list(ngrams(['a', 'b', 'c'], n=1))
     [['a'], ['b'], ['c']]
     >>> list(ngrams(['a', 'b', 'c'], n=6))
     [['a', 'b', 'c']]
+    >>> list(ngrams(['a', 'b', 'c'], n=2))
+    [['a', 'b'], ['c']]
+    >>> list(ngrams(['a', 'b', 'c'], n=2, step_size=1))
+    [['a', 'b'], ['b', 'c'], ['c']]
     """
     if len(sequence) <= n:
         return [sequence]
 
     results = []
-    for i in range(len(sequence) - n + 1):
+    for i in range(0, len(sequence), step_size if step_size != -1 else n):
         results.append(sequence[i: i + n])
     return results
 
@@ -45,7 +52,8 @@ def ngrams(sequence: List[Any], n: int) -> List[List[Any]]:
 def tokenize(
         text: str,
         n_gram: int = 6,
-        level: Literal["sentencepiece", "char", "word"] = 'sentencepiece'
+        level: Literal["sentencepiece", "char", "word"] = 'sentencepiece',
+        step_size: int = -1,
 ) -> List[str]:
     """
     Tokenize the text into a sequence of strings.
@@ -58,6 +66,8 @@ def tokenize(
         The size of the n-grams to use.
     level : Literal["sentencepiece", "char", "word"], optional (default='sentencepiece')
         The level of tokenization to use.
+    step_size : int, optional (default=-1)
+        The step size to use when generating n-grams. If -1, then the step size is the same as the n-gram size.
 
     Returns
     -------
@@ -69,22 +79,22 @@ def tokenize(
     >>> tokenize("Hello world!")
     ['▁Hello▁world!']
     >>> tokenize("This is a test.", n_gram=2)
-    ['▁This▁is', '▁is▁a', '▁a▁test', '▁test.']
+    ['▁This▁is', '▁a▁test', '.']
     >>> tokenize("test message", n_gram=2, level='char')
-    ['te', 'es', 'st', 't ', ' m', 'me', 'es', 'ss', 'sa', 'ag', 'ge']
+    ['te', 'st', ' m', 'es', 'sa', 'ge']
     """
     if level == 'sentencepiece':
         tokens = tokenizer.tokenize(text)
     elif level == 'char':
         tokens = list(text)
     elif level == "word":
-        tokens = text.split(" ")
+        tokens = [w for w in text.split(" ") if w]  # remove empty strings
     else:
         raise ValueError(f"Invalid level: {level}")
 
     output_tokens = []
 
-    for window_tokens in ngrams(tokens, n_gram):
+    for window_tokens in ngrams(tokens, n_gram, step_size):
         output_tokens.append(''.join(window_tokens))
 
     return output_tokens

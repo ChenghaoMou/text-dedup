@@ -195,6 +195,7 @@ def simhash_clustering(
         k=hamming_distance,
         b=num_blocks,
         storage_config=storage_config,
+        verbose=verbose,
     )
 
     if query_signatures is None:

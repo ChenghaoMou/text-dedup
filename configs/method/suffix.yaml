@@ -4,6 +4,7 @@ configs:
 columns:
   - text
 num_proc: 10
+num_samples: -1
 embedder:
   name: SuffixArrayEmbedder
   k: 100

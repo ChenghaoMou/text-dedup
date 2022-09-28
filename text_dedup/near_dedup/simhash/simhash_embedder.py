@@ -3,6 +3,8 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
+import hashlib
+import struct
 from dataclasses import dataclass
 from typing import Callable
 from typing import List
@@ -14,6 +16,14 @@ import xxhash
 from text_dedup.base import Embedder
 from text_dedup.base import Fingerprint
 from text_dedup.preprocess import tokenize
+
+BIT_MASK: np.ndarray = 2 ** np.arange(64, dtype=np.uint64).reshape([1, 64])
+
+
+def unpackbits(x: np.ndarray, num_bits: int = 64) -> np.ndarray:
+    xshape = list(x.shape)
+    x = x.reshape([-1, 1])
+    return (x & BIT_MASK).astype(bool).astype(int).reshape(xshape + [num_bits])
 
 
 def _unsigned_hash(obj: bytes) -> int:
@@ -39,8 +49,12 @@ def _unsigned_hash(obj: bytes) -> int:
     """
     return xxhash.xxh64(obj).intdigest()
 
+    # digest = hashlib.md5(obj).digest()[:8]
+    # # Unpacks the binary bytes in digest into a Python integer
+    # return struct.unpack('>Q', digest)[0] & 0xFFFFFFFFFFFFFFFF
 
-def _compute(hashes: List[int]) -> int:
+
+def compute(hashes: List[int]) -> int:
     """
     Compute the Simhash of a list of hashes.
 
@@ -58,20 +72,12 @@ def _compute(hashes: List[int]) -> int:
 
     Examples
     --------
-    >>> _compute([13352372148217134600, 5020219685658847592])
-    18297957875485474664
+    >>> compute([13352372148217134600, 5020219685658847592])
+    74633958390507528
     """
-    # Convert integers to 64 bit binary arrays
-    bits = np.unpackbits(np.array(hashes, dtype='u8').view(
-        'u1').reshape(len(hashes), -1), axis=1).astype('i8')
-    # Sum up each dimension of the arrays and take the sign
-    counts = np.where(np.sum(2 * bits - 1, axis=0).astype(dtype='i8')
-                      >= 0, 1, 0).astype('u1')
-    # Convert the binary array back to an integer
-    # Change to
-    # return np.packbits(counts).view('>u8').item()s
-    # to match the code in https://github.com/seomoz/simhash-cpp/, although it doesn't really matter
-    return np.packbits(counts).view('u8').item()
+    bits = 2 * unpackbits(np.asarray(hashes, dtype=np.uint64), 64) - 1
+    res = (np.where(np.sum(bits, axis=0) > 0, 1, 0)[::-1]).astype(np.uint64)
+    return np.packbits(res).view(np.uint64).byteswap().item()
 
 
 @dataclass
@@ -113,7 +119,7 @@ class SimHashEmbedder(Embedder):
         >>> embedder = SimHashEmbedder()
         >>> embeddings = embedder.embed(["hello", "hello world! This is a test."])
         >>> embeddings
-        [15336018574513328062, 5455741392207466107]
+        [15336018574513328062, 3300884242954]
         """
         f = self.embed_function(**kwargs)
         return [f(doc) for doc in corpus]
@@ -137,11 +143,11 @@ class SimHashEmbedder(Embedder):
         >>> embedder = SimHashEmbedder()
         >>> hashes = embedder.embed_function()("hello world! This is a test string.")
         >>> hashes
-        9996463820397055579
+        49566403822960672
         """
         def wrapper(doc: str) -> Fingerprint:
             tokens = self.tokenizer(doc, **kwargs)
-            ans = _compute([_unsigned_hash(t.encode('utf-8')) for t in tokens])
+            ans = compute([_unsigned_hash(t.encode('utf-8')) for t in tokens])
             return ans
 
         return wrapper

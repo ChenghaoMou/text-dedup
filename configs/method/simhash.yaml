@@ -4,13 +4,14 @@ configs:
 columns:
   - text
 num_proc: 10
+num_samples: 400000
 embedder:
   name: SimHashEmbedder
   hamming_distance: 3
   num_blocks: 4
 tokenization:
-  ngram_size: 5 # This roughly equals to 0.8 in jaccard similarity
-  level: char
+  ngram_size: 2
+  level: word
 cache_dir: .cache
 storage_config:
   type: redis

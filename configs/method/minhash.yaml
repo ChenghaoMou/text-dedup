@@ -4,13 +4,14 @@ configs:
 columns:
   - text
 num_proc: 10
+num_samples: 400000
 embedder:
   name: MinHashEmbedder
   num_perm: 128
   threshold: 0.8
 tokenization:
-  ngram_size: 12
-  level: sentencepiece
+  ngram_size: 6
+  level: word
 cache_dir: .cache
 storage_config:
   type: redis

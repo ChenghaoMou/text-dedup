@@ -1,6 +1,9 @@
 .vscode
 .benchmarks
 docs/build
+*json
+temp.ipynb
+hyperparameter.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
