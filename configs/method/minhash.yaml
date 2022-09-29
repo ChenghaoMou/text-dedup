@@ -4,13 +4,13 @@ configs:
 columns:
   - text
 num_proc: 10
-num_samples: 400000
+num_samples: -1
 embedder:
   name: MinHashEmbedder
   num_perm: 128
   threshold: 0.8
 tokenization:
-  ngram_size: 6
+  ngram_size: 2
   level: word
 cache_dir: .cache
 storage_config:
@@ -19,5 +19,5 @@ storage_config:
     host: localhost
     port: 6379
 # storage_config: null # use null to use dict instead
-output: results.json
+output: minhash_results.json
 verbose: true

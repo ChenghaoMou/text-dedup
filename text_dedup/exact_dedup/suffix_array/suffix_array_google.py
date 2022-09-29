@@ -54,9 +54,6 @@ class GoogleSuffixArrayDeduplicator(SuffixArrayDeduplicator):  # pragma: no cove
             data,
         )
         self.__run_command(
-            f"cargo run make --data-file {f'{self.__prefix}.base.{self.k}.txt'}",
-        )
-        self.__run_command(
             f"python scripts/make_suffix_array.py {f'{self.__prefix}.base.{self.k}.txt'}",
         )
         return self
@@ -69,9 +66,6 @@ class GoogleSuffixArrayDeduplicator(SuffixArrayDeduplicator):  # pragma: no cove
         offsets: List[slice] = self.__collect_offsets(
             query_file,
             data,
-        )
-        self.__run_command(
-            f"cargo run make --data-file {query_file}",
         )
         self.__run_command(
             f"python scripts/make_suffix_array.py {query_file}",

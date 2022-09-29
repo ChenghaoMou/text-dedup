@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # @Date    : 2022-05-22 11:33:39
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+import re
 from typing import Any
 from typing import List
 from typing import Literal
@@ -9,6 +10,7 @@ from transformers import XLMRobertaTokenizerFast
 
 tokenizer = XLMRobertaTokenizerFast.from_pretrained('xlm-roberta-base')
 tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
+NON_ALPHA = re.compile("[^A-Za-z_0-9]")
 
 
 def ngrams(sequence: List[Any], n: int, step_size: int = -1) -> List[List[Any]]:
@@ -89,6 +91,8 @@ def tokenize(
         tokens = list(text)
     elif level == "word":
         tokens = [w for w in text.split(" ") if w]  # remove empty strings
+    elif level == "code":
+        tokens = [t for t in NON_ALPHA.split(text) if t.strip()]
     else:
         raise ValueError(f"Invalid level: {level}")
 

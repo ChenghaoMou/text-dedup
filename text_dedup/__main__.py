@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 import os
-import random
 import sys
 import textwrap
 from pathlib import Path
@@ -17,9 +16,11 @@ from typing import Tuple
 
 import hydra
 import numpy as np
+from datasets import DownloadMode
 from datasets import get_dataset_config_names
 from datasets import get_dataset_split_names
 from datasets import load_dataset
+from datasets import load_from_disk
 from omegaconf import DictConfig
 from omegaconf import OmegaConf
 from rich import print
@@ -179,12 +180,13 @@ def main(conf: DictConfig):  # pragma: no cover
                 use_auth_token=TOKEN,
                 cache_dir=conf.cache_dir if not use_streaming else None,
                 streaming=use_streaming,
+                # download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+                # ignore_verifications=True,
+                # revision="6c100811fd6367e9b547d8cff02c6fd52a106776"
             )
 
             split_data = split_data.select(range(min(conf.num_samples, len(split_data)))) \
                 if conf.num_samples > 0 else split_data
-
-            # split_data = split_data.select([40, 32769, 32768, 32784, 32775, 32802])
 
             if not conf_columns:
                 conf_columns = dataset_get_all_str_columns(split_data)
@@ -267,6 +269,7 @@ def main(conf: DictConfig):  # pragma: no cover
                                 base_data, "__signature__", np.asarray),
                             seed=SEED,
                             threshold=conf.embedder.threshold,
+                            num_perm=conf.embedder.num_perm,
                             query_signatures=dataset_get(
                                 query_data, "__signature__", np.asarray),
                             storage_config=storage_config,
@@ -314,9 +317,6 @@ def main(conf: DictConfig):  # pragma: no cover
                                              style="cyan", no_wrap=False)
                             table.add_column(
                                 "Duplicate", justify="left", style="magenta")
-                            table.add_column(
-                                "Fingerprint", justify="left", style="magenta")
-
                             cluster_data = base_data.select(cluster)
                             for ref_id, reference, sig in zip(cluster[:10], cluster_data["__text__"], cluster_data["__signature__"]):
                                 table.add_row(
@@ -327,7 +327,6 @@ def main(conf: DictConfig):  # pragma: no cover
                                     x,
                                     str(ref_id),
                                     textwrap.shorten(reference, width=512),
-                                    bin(int(sig)),
                                 )
                             try:
                                 print(table)
@@ -339,8 +338,8 @@ def main(conf: DictConfig):  # pragma: no cover
                     duplicated_count_ratio: float = duplicated_count / total_count * 100
                     duplicated_byte_ratio: float = duplicated_size / total_size * 100
 
-                    final_count = f"N {duplicated_count_ratio:.2f}% ({duplicated_count})"
-                    final_byte = f"B {duplicated_byte_ratio:.2f}% ({duplicated_size})"
+                    final_count = f"N {duplicated_count_ratio:.2f}% ({duplicated_count}/{total_count})"
+                    final_byte = f"B {duplicated_byte_ratio:.2f}% ({duplicated_size}/{total_size})"
                     table_rows[x][y] = f"{final_count} | {final_byte}"
 
         elif conf.embedder.name == "SuffixArrayEmbedder":

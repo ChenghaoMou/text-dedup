@@ -11,5 +11,5 @@ embedder:
   cache_dir: outputs
   temp_file_prefix: sa
 cache_dir: .cache
-output: results.json
+output: sa_results.json
 verbose: true
