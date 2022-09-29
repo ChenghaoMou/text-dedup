@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "text-dedup"
-version = "0.2.0"
+version = "0.2.1"
 description = "All-in-one text deduplication"
 authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
 license = "MIT"
