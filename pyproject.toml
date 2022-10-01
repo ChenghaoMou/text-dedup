@@ -24,6 +24,8 @@ mpire = "^2.6.0"
 scipy = "1.9.1"
 xxhash = "^3.0.0"
 sentence-transformers = "^2.2.2"
+dpu-utils = "^0.6.1"
+typer = "^0.6.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.3"

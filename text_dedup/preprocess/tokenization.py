@@ -10,6 +10,7 @@ from transformers import XLMRobertaTokenizerFast
 
 tokenizer = XLMRobertaTokenizerFast.from_pretrained('xlm-roberta-base')
 tokenizer.deprecation_warnings["sequence-length-is-longer-than-the-specified-maximum"] = True
+# this is from https://github.com/huggingface/transformers/blob/main/examples/research_projects/codeparrot/scripts/minhash_deduplication.py
 NON_ALPHA = re.compile("[^A-Za-z_0-9]")
 
 
@@ -32,7 +33,7 @@ def ngrams(sequence: List[Any], n: int, step_size: int = -1) -> List[List[Any]]:
 
     Examples
     --------
-    >>> from text_dedup.preprocess.tokenize import ngrams
+    >>> from text_dedup.preprocess.tokenization import ngrams
     >>> list(ngrams(['a', 'b', 'c'], n=1))
     [['a'], ['b'], ['c']]
     >>> list(ngrams(['a', 'b', 'c'], n=6))
@@ -90,11 +91,14 @@ def tokenize(
     elif level == 'char':
         tokens = list(text)
     elif level == "word":
-        tokens = [w for w in text.split(" ") if w]  # remove empty strings
+        tokens = [w for w in text.split(" ") if w]
     elif level == "code":
         tokens = [t for t in NON_ALPHA.split(text) if t.strip()]
     else:
         raise ValueError(f"Invalid level: {level}")
+
+    if n_gram == 1 and step_size == -1:
+        return tokens
 
     output_tokens = []
 

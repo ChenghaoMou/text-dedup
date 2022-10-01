@@ -92,7 +92,7 @@ class MinHashEmbedder(Embedder):
         def wrapper(doc: str) -> Fingerprint:
             m: MinHash = MinHash(num_perm=self.num_perm, seed=self.seed)
             tokens = self.tokenizer(doc, **kwargs)
-            m.update_batch([token.encode("utf-8") for token in tokens])
+            m.update_batch([token.encode("utf-8") for token in set(tokens)])
             return m.hashvalues
 
         return wrapper
