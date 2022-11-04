@@ -10,7 +10,7 @@ from typing import Sequence
 
 from mpire import WorkerPool as Pool
 
-from text_dedup.base import Deduplicator
+from text_dedup.base import DuplicateFinder
 from text_dedup.base import Embedder
 from text_dedup.base import Fingerprint
 from text_dedup.near_dedup.simhash.simhash_embedder import SimHashEmbedder
@@ -19,7 +19,7 @@ from text_dedup.preprocess import tokenize
 
 
 @dataclass
-class SimHashDeduplicator(Deduplicator):
+class SimHashDeduplicator(DuplicateFinder):
     """
     Deduplicate text using SimHash.
 

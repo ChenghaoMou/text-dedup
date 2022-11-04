@@ -1,6 +1,6 @@
 from text_dedup.exact_dedup.suffix_array.suffix_array_google import \
-    GoogleSuffixArrayDeduplicator
+    GoogleSuffixArray
 from text_dedup.exact_dedup.suffix_array.suffix_array_python import \
-    PythonSuffixArrayDeduplicator
+    PythonSuffixArray
 
-__all__ = ['GoogleSuffixArrayDeduplicator', 'PythonSuffixArrayDeduplicator']
+__all__ = ['GoogleSuffixArray', 'PythonSuffixArray']

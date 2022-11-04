@@ -55,8 +55,9 @@ def ngrams(sequence: List[Any], n: int, step_size: int = -1) -> List[List[Any]]:
 def tokenize(
         text: str,
         n_gram: int = 6,
-        level: Literal["sentencepiece", "char", "word"] = 'sentencepiece',
+        level: Literal["sentencepiece", "char", "word", "code"] = 'sentencepiece',
         step_size: int = -1,
+        lower: bool = False,
 ) -> List[str]:
     """
     Tokenize the text into a sequence of strings.
@@ -67,10 +68,12 @@ def tokenize(
         The text to tokenize.
     n_gram : int, optional (default=6)
         The size of the n-grams to use.
-    level : Literal["sentencepiece", "char", "word"], optional (default='sentencepiece')
+    level : Literal["sentencepiece", "char", "word", "code"], optional (default='sentencepiece')
         The level of tokenization to use.
     step_size : int, optional (default=-1)
         The step size to use when generating n-grams. If -1, then the step size is the same as the n-gram size.
+    lower : bool, optional (default=False)
+        Whether to lowercase the text.
 
     Returns
     -------
@@ -86,6 +89,9 @@ def tokenize(
     >>> tokenize("test message", n_gram=2, level='char')
     ['te', 'st', ' m', 'es', 'sa', 'ge']
     """
+    text = text.lower() if lower else text
+    text = text.strip()
+
     if level == 'sentencepiece':
         tokens = tokenizer.tokenize(text)
     elif level == 'char':

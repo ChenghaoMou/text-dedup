@@ -8,14 +8,15 @@ from typing import Union
 
 import numpy as np
 
-Fingerprint = Union[int, List[slice], np.ndarray]
+Fingerprint = Union[List[slice], int, np.ndarray, bool]
+DuplicationResults = List[List[slice]] | List[int] | List[np.ndarray] | List[bool]
 
 
-class Deduplicator:  # pragma: no cover
+class DuplicateFinder:  # pragma: no cover
     """
-    Base class for all deduplicators. Deduplicators offers end-to-end duplicate detection.
+    Base class for all duplicate finders. DuplicateFinders offer end-to-end duplicate detection.
 
-    This is designed for datasets that comfortably fit into memory. For larger datasets, use Embedder instead.
+    Beware that DuplicateFinder does not remove those duplicates.
     """
 
     @abstractmethod
@@ -23,7 +24,7 @@ class Deduplicator:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
-    def predict(self, data: Sequence[str]) -> List[List[slice]] | List[Fingerprint]:
+    def predict(self, data: Sequence[str]) -> DuplicationResults:
         raise NotImplementedError()
 
     @abstractmethod

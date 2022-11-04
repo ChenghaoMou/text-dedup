@@ -8,14 +8,14 @@ from dataclasses import field
 from typing import List
 from typing import Sequence
 
-from text_dedup.exact_dedup.suffix_array.base import SuffixArrayDeduplicator
+from text_dedup.exact_dedup.suffix_array.base import SuffixArray
 from text_dedup.exact_dedup.suffix_array.utils import restore_and_merge
 
 logger = logging.getLogger("text-dedup")
 
 
 @dataclass
-class GoogleSuffixArrayDeduplicator(SuffixArrayDeduplicator):  # pragma: no cover
+class GoogleSuffixArray(SuffixArray):  # pragma: no cover
     """
     A wrapper for https://github.com/google-research/deduplicate-text-datasets.
 
@@ -48,7 +48,7 @@ class GoogleSuffixArrayDeduplicator(SuffixArrayDeduplicator):  # pragma: no cove
             "Make sure you have installed rust/cargo and initialized the submodule.",
         )
 
-    def fit(self, data: Sequence[str]) -> GoogleSuffixArrayDeduplicator:
+    def fit(self, data: Sequence[str]) -> GoogleSuffixArray:
         self.__offsets = self.__collect_offsets(
             self.__base_file,
             data,
@@ -132,4 +132,4 @@ class GoogleSuffixArrayDeduplicator(SuffixArrayDeduplicator):  # pragma: no cove
         )
         code = p.wait()
         if code != 0:
-            logger.error(f"Error running command: {cmd}")
+            raise RuntimeError(f"Command {cmd} failed with code {code}. CWD: {self.google_repo_path}")

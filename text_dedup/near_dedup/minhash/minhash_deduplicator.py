@@ -12,7 +12,7 @@ from datasketch import LeanMinHash
 from datasketch import MinHashLSH
 from mpire import WorkerPool as Pool
 
-from text_dedup.base import Deduplicator
+from text_dedup.base import DuplicateFinder
 from text_dedup.base import Embedder
 from text_dedup.base import Fingerprint
 from text_dedup.near_dedup.minhash.minhash_embedder import MinHashEmbedder
@@ -20,7 +20,7 @@ from text_dedup.preprocess import tokenize
 
 
 @dataclass
-class MinHashDeduplicator(Deduplicator):
+class MinHashDeduplicator(DuplicateFinder):
     """
     Deduplicator using MinHash and MinHashLSH from datasketch.
 

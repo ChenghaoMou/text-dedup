@@ -3,10 +3,12 @@ from typing import Sequence
 
 from tqdm import tqdm
 
-from text_dedup.exact_dedup.suffix_array.base import SuffixArrayDeduplicator
+from text_dedup.exact_dedup.suffix_array.base import SuffixArray
 from text_dedup.exact_dedup.suffix_array.utils import restore_and_merge
 
 # TODO: update this implementation
+# This Karkkainen-Sanders implementation is based on the following implementation:
+# https://github.com/mmaz/FastGeneralizedSuffixArrays
 
 
 class Triple(object):
@@ -163,7 +165,7 @@ def ksa(T):
 
 
 # Python Implementation of SuffixArrayDeduplicator
-class PythonSuffixArrayDeduplicator(SuffixArrayDeduplicator):
+class PythonSuffixArray(SuffixArray):
 
     def fit(self, data: Sequence[str]):
         raise NotImplementedError(
@@ -189,7 +191,7 @@ class PythonSuffixArrayDeduplicator(SuffixArrayDeduplicator):
 
         Examples
         --------
-        >>> PythonSuffixArrayDeduplicator(k=1).fit_predict(["abc", "abc", "abc"])
+        >>> PythonSuffixArray(k=1).fit_predict(["abc", "abc", "abc"])
         [[slice(0, 3, None)], [slice(0, 3, None)], [slice(0, 3, None)]]
         """
         encoded_data: List[bytes] = [d.encode('utf-8') for d in data]

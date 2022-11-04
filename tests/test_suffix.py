@@ -3,7 +3,7 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
-from text_dedup.exact_dedup import PythonSuffixArrayDeduplicator
+from text_dedup.exact_dedup import PythonSuffixArray
 
 
 def test_suffix_longest():
@@ -25,7 +25,7 @@ def test_suffix_longest():
         [slice(0, 20, None), slice(23, 37, None)],
     ]
 
-    embedder = PythonSuffixArrayDeduplicator(k=10, merge_strategy='longest')
+    embedder = PythonSuffixArray(k=10, merge_strategy='longest')
     slices = embedder.fit_predict(corpus)
 
     for _, intervals, results in zip(corpus, slices, targets):
@@ -51,7 +51,7 @@ def test_suffix_overlapping():
         [slice(0, 20, None), slice(23, 37, None)],
     ]
 
-    embedder = PythonSuffixArrayDeduplicator(k=10, merge_strategy='overlapping')
+    embedder = PythonSuffixArray(k=10, merge_strategy='overlapping')
     slices = embedder.fit_predict(corpus)
 
     for _, intervals, results in zip(corpus, slices, targets):

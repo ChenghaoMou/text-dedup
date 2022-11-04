@@ -30,8 +30,8 @@ from rich.table import Table
 from tqdm import tqdm
 
 from text_dedup.base import Embedder
-from text_dedup.exact_dedup import GoogleSuffixArrayDeduplicator
-from text_dedup.exact_dedup import SuffixArrayDeduplicator
+from text_dedup.exact_dedup import GoogleSuffixArray
+from text_dedup.exact_dedup import SuffixArray
 from text_dedup.near_dedup import MinHashEmbedder
 from text_dedup.near_dedup import SimHashEmbedder
 from text_dedup.postprocess import lsh_clustering
@@ -75,13 +75,13 @@ def __compute_md5(obj: Any) -> str:  # pragma: no cover
 
 
 def __get_default_embedder(conf: DictConfig) -> Tuple[
-    Embedder | SuffixArrayDeduplicator,
+    Embedder | SuffixArray,
     Optional[Callable]
 ]:
     """Get the default embedder based on the config."""
 
     embed_function: Optional[Callable] = None
-    embedder: Optional[Embedder | SuffixArrayDeduplicator] = None
+    embedder: Optional[Embedder | SuffixArray] = None
 
     match conf.embedder.name:
         case "MinHashEmbedder":
@@ -91,7 +91,7 @@ def __get_default_embedder(conf: DictConfig) -> Tuple[
                 level=conf.tokenization.level,
             )
         case "SuffixArrayEmbedder":
-            embedder = GoogleSuffixArrayDeduplicator(
+            embedder = GoogleSuffixArray(
                 k=conf.embedder.k,
                 temp_file_prefix=conf.embedder.temp_file_prefix,
                 cache_dir=conf.embedder.cache_dir,

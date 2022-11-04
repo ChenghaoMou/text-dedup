@@ -2,12 +2,12 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import Literal
 
-from text_dedup.base import Deduplicator
+from text_dedup.base import DuplicateFinder
 
 
 # https://github.com/python/mypy/issues/5374
 @dataclass  # type: ignore
-class SuffixArrayDeduplicator(Deduplicator, ABC):
+class SuffixArray(DuplicateFinder, ABC):
     """
     Base class for all suffix array based deduplicators.
 
