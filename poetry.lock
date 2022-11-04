@@ -640,8 +640,8 @@ python-versions = "*"
 [package.dependencies]
 msal = ">=0.4.1,<2.0.0"
 portalocker = [
-    {version = ">=1.6,<3", markers = "python_version >= \"3.5\" and platform_system == \"Windows\""},
     {version = ">=1.0,<3", markers = "python_version >= \"3.5\" and platform_system != \"Windows\""},
+    {version = ">=1.6,<3", markers = "python_version >= \"3.5\" and platform_system == \"Windows\""},
 ]
 
 [[package]]
@@ -680,6 +680,18 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, 
 
 [package.dependencies]
 dill = ">=0.3.5.1"
+
+[[package]]
+name = "networkit"
+version = "10.0"
+description = "NetworKit is a toolbox for high-performance network analysis"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+numpy = "*"
+scipy = "*"
 
 [[package]]
 name = "networkx"
@@ -783,8 +795,8 @@ python-versions = ">=3.8"
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.21.0", markers = "python_version >= \"3.10\""},
     {version = ">=1.20.3", markers = "python_version < \"3.10\""},
+    {version = ">=1.21.0", markers = "python_version >= \"3.10\""},
 ]
 python-dateutil = ">=2.8.1"
 pytz = ">=2020.1"
@@ -1587,7 +1599,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=6)", "pytest-black (>=
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9,<3.12"
-content-hash = "86184071722965d8ccfc2a62e7b0170c33932ec04d38f7646649cff0e511d783"
+content-hash = "feb18db147398eb85ba8419de63be7e99d7fea0222a00e44a0df708b30a67c31"
 
 [metadata.files]
 aiohttp = [
@@ -2258,6 +2270,23 @@ multiprocess = [
     {file = "multiprocess-0.70.13-py38-none-any.whl", hash = "sha256:7be9e320a41d2d0d0eddacfe693cfb07b4cb9c0d3d10007f4304255c15215778"},
     {file = "multiprocess-0.70.13-py39-none-any.whl", hash = "sha256:00ef48461d43d1e30f8f4b2e1b287ecaaffec325a37053beb5503e0d69e5a3cd"},
     {file = "multiprocess-0.70.13.tar.gz", hash = "sha256:2e096dd618a84d15aa369a9cf6695815e5539f853dc8fa4f4b9153b11b1d0b32"},
+]
+networkit = [
+    {file = "networkit-10.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:a1edee63449d7a23150aa042d252fbc167293be0f9598d3b24fad624a65fa7e5"},
+    {file = "networkit-10.0-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:ad96951452b02b37348125e70eafce1bf75b1c2aca81b66141f5cad89937fedc"},
+    {file = "networkit-10.0-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:f58db231ed06bad6264036cac4405ebe8d4d6890480bb23f2a36399799f0ae94"},
+    {file = "networkit-10.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0a6e96ffcc84b10f079d41e4394349df2e26d7b0fd15a3579aafc96e5e69e088"},
+    {file = "networkit-10.0-cp310-cp310-win_amd64.whl", hash = "sha256:52961ec7456f17b71235b867880b64613cac3379c200a0b82ae60a29c0b43188"},
+    {file = "networkit-10.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:d861c44595aa59556a387307ed9a309da89e8c60ac8c3d9304ffbad7afbeeac8"},
+    {file = "networkit-10.0-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:d2c54fbd6bed7c10cb77bb5520db4f8e50c28763c27c66a905c6b858eb9e7400"},
+    {file = "networkit-10.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:1ab8f51c99eccd9b1b32d78000204187b3d04325f6d78653fc91aaf56070643b"},
+    {file = "networkit-10.0-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:06250e34f4d85e11c09366764b5efe13f1329feb5557a2ade80dd1be3dfc8aac"},
+    {file = "networkit-10.0-cp38-cp38-win_amd64.whl", hash = "sha256:5100d3e53623a340b97cff348b6c34571030ab799ddb47de656586320c3ea5a2"},
+    {file = "networkit-10.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:1ac1f2b1406416fc7f55b5b6defceb893ae74355c1171d38664446191d3334d3"},
+    {file = "networkit-10.0-cp39-cp39-macosx_12_0_arm64.whl", hash = "sha256:f1cab5c1f511597d88246c2ddd03eff1866607aa7776f47ea02a2fc502ae0a21"},
+    {file = "networkit-10.0-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:797f8122afeeb164f93ec0428df897d5dc84273eb4cd67b828fabf53a6fec5e2"},
+    {file = "networkit-10.0-cp39-cp39-win_amd64.whl", hash = "sha256:ae398bd9bc1dffa07a230a82c1e5cb03b865896d4a277c52ceabcab283ad6753"},
+    {file = "networkit-10.0.tar.gz", hash = "sha256:6fe69db1178b69305c40836953b6f7731574e211cea53ced52bbc45b9fff2a1d"},
 ]
 networkx = [
     {file = "networkx-2.8.7-py3-none-any.whl", hash = "sha256:15cdf7f7c157637107ea690cabbc488018f8256fa28242aed0fb24c93c03a06d"},
