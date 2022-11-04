@@ -1,5 +1,8 @@
 # text-dedup
 
+> **Warning**
+> Breaking changes will happen very frequently before 1.0. This is also a learning process for me. Please proceed with caution. If you want to use a one-time version, you can check out this https://github.com/bigcode-project/bigcode-analysis/blob/1fe56970240f7547e4bc92f4bc23e0470bdbb9aa/data_analysis/near-deduplication/minhash_deduplication_alt.py.
+
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade)
 
 
@@ -15,6 +18,7 @@
 
 ## Todos
 
+-   [ ] Minimize extra code footprint
 -   [ ] Memory benchmark for streaming processing
 -   [ ] Speed benchmark for in-memory processing
 -   [ ] Inter-dataset deduplication
