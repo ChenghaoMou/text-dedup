@@ -16,7 +16,7 @@ datasets = "^2.4.0"
 rich = "^12.5.1"
 scipy = "1.9.1"
 xxhash = "^3.0.0"
-pybloom-live = "^3.1.1"
+pybloom-live = "^4.0.0"
 networkit = "^10.0"
 
 [tool.poetry.group.dev.dependencies]
