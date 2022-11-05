@@ -350,7 +350,7 @@ def embed_func(content: str, idx: int, *, ngram: int) -> Dict[str, Any]:
     Returns
     -------
     Dict[str, Any]
-        The minhash signature and the index of the text as a dictionary.
+        The simhash signature and the index of the text as a dictionary.
 
     Examples
     --------
@@ -367,18 +367,18 @@ def embed_func(content: str, idx: int, *, ngram: int) -> Dict[str, Any]:
 
 def query_func(idx: int, signature: np.uint64, *, index: SimHashIndex) -> Dict[str, Any]:
     """
-    Query the minhash index.
+    Query the simhash index.
 
     Parameters
     ----------
     idx : int
         The index of the text.
     signature : np.ndarray
-        The minhash signature of the text.
+        The simhash signature of the text.
     index : MinHashLSH
-        The minhash index.
+        The simhash index.
     seed : int
-        The seed for the minhash.
+        The seed for the simhash.
 
     Returns
     -------
@@ -408,8 +408,8 @@ def query_func(idx: int, signature: np.uint64, *, index: SimHashIndex) -> Dict[s
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        prog="text_dedup.minhash",
-        description="Deduplicate text using minhash",
+        prog="text_dedup.simhash",
+        description="Deduplicate text using simhash",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser = add_io_args(parser)
@@ -451,8 +451,8 @@ if __name__ == "__main__":
 
     DATA_SIZE = len(ds)
 
-    # region: minhash
-    elapsed_time["Minhash"] = time.time()
+    # region: simhash
+    elapsed_time["Simhash"] = time.time()
     embedded = ds.map(
         function=embed_func,
         fn_kwargs={"ngram": args.ngram},
@@ -462,7 +462,7 @@ if __name__ == "__main__":
         with_indices=True,
         desc=f"SimHashing...",
     )
-    elapsed_time["Minhash"] = time.time() - elapsed_time["Minhash"]
+    elapsed_time["Simhash"] = time.time() - elapsed_time["Simhash"]
     # endregion
 
     # region: index
