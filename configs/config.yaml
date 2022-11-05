@@ -1,3 +1,0 @@
-defaults:
-  - method: simhash
-  - override hydra/job_logging: custom
