@@ -1,50 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-# text-dedup
-
-> **Warning**
-> Breaking changes will happen very frequently before 1.0. This is also a learning process for me. Please proceed with caution. If you want to use a one-time version, you can check out this https://github.com/bigcode-project/bigcode-analysis/blob/1fe56970240f7547e4bc92f4bc23e0470bdbb9aa/data_analysis/near-deduplication/minhash_deduplication_alt.py.
-
-[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade)
-
-
-## Features
-
--   Hash-based methods such as [SimHash](https://www.cs.princeton.edu/courses/archive/spring04/cos598B/bib/CharikarEstim.pdf), [MinHash](https://web.archive.org/web/20150131043133/http://gatekeeper.dec.com/ftp/pub/dec/SRC/publications/broder/positano-final-wpnums.pdf) + [LSH](http://infolab.stanford.edu/~ullman/mmds.html) for near deduplication.
--   [SuffixArray](http://dl.acm.org/citation.cfm?id=320176.320218)-based method from [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) for substring exact deduplication.
--   In-memory or [Redis](https://redis.io)/[KeyDB](https://docs.keydb.dev)-cached index to handle larger than memory datasets.
-
-## Documentation
-
-[Github Pages](https://chenghaomou.github.io/text-dedup/index.html)
-
-## Todos
-
--   [ ] Minimize extra code footprint
--   [ ] Memory benchmark for streaming processing
--   [ ] Speed benchmark for in-memory processing
--   [ ] Inter-dataset deduplication
--   [ ] Rewrite suffix array in Python
--   [ ] Rewrite simhash with bitarray
--   [ ] Rewrite minhash without datasketch
--   [ ] A collections of deduplication methods used in papers/datasets/projects
--   [ ] SuperMinHash, ProbMinHash, TreeMinHash, BagMinHash, [Optimal Densification for Fast and Accurate Minwise Hashing](https://arxiv.org/abs/1703.04664), [Fast Similarity Sketching](https://arxiv.org/abs/1704.04370)
-
-## Thanks
-
--   [seomoz/simhash-cpp](https://github.com/seomoz/simhash-cpp) (MIT)
--   [datasketch](http://ekzhu.com/datasketch/index.html) (MIT)
--   [google-research/deduplicate-text-datasets](https://github.com/google-research/deduplicate-text-datasets) (Apache-2.0)
--   Developed with OSS license from [JetBrains](https://jb.gg/OpenSourceSupport)
--   This project is heavily influenced by the deduplication work at BigScience workshop. The original code can be found at [bigscience-workshop/data-preparation](https://github.com/bigscience-workshop/data-preparation/tree/main/preprocessing/filtering/deduplicate) (Apache-2.0)
-
-## License
-
-License was changed from MIT to Apache 2.0 on Oct 2, 2022 to be consistent with the libraries used in this project.
-
-[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)
-=======
-=======
 
 # text-dedup
 
@@ -102,7 +55,6 @@ INFO     Saving                        : 2.52s
 INFO     Before                        : 180332342 bytes (88803)
 INFO     After                         : 97646271 bytes (40404)
 INFO     Output                        : output/suffix_array/oscar_gl_dedup
->>>>>>> ab93c81 (update readme)
 ```
 
 ### MinHash Near Deduplication
@@ -139,9 +91,6 @@ INFO     Index                         : output/minhash/lsh.pkl
 INFO     Graph                         : output/minhash/graph.networkit
 INFO     Output                        : output/minhash/oscar_gl_dedup
 ```
-<<<<<<< HEAD
->>>>>>> e1e34dc (update argparse)
-=======
 
 ### SimHash Near Deduplication
 ```bash
@@ -249,4 +198,3 @@ Because the google repo is licensed under Apache 2.0, I have to update from MIT.
 ## License
 
 [Apache 2.0](https://duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.apache.org%2Flicenses%2FLICENSE%2D2.0.html&rut=617d395c7a807de85e5707aca1f765e5b69a1627ed84c0aefa950e54e00a3094)
->>>>>>> ab93c81 (update readme)
