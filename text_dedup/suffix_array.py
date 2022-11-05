@@ -187,6 +187,38 @@ def restore_and_merge(
     k: int,
     merge_strategy: Literal["longest", "overlapping"] = "longest",
 ) -> Tuple[List[List[slice]], int]:
+    """
+    Restore the duplicate slices from seg_file to their original document boundaries and merge them.
+
+    Parameters
+    ----------
+    boundaries : List[slice]
+        List of slices document boundary offsets.
+    segments: Union[str, List[slice]]
+        Path to the segmented file with duplicate offsets or a list of duplicate slices.
+    k : int
+        The minimum duplicate substring byte length.
+    merge_strategy : Literal["longest", "overlapping"], optional
+        The merge strategy to use, by default "longest"
+
+    Returns
+    -------
+    Tuple[List[List[slice]], int]
+        List of merged slices for each document and the duplicate size.
+
+    Examples
+    --------
+    >>> restore_and_merge(
+    ... [slice(0, 10, None), slice(10, 20, None)],
+    ... [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
+    ... 5, 'longest')
+    ([[slice(0, 5, None), slice(5, 10, None)], [slice(2, 9, None)]], 17)
+    >>> restore_and_merge(
+    ... [slice(0, 10, None), slice(10, 20, None)],
+    ... [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
+    ... 5, 'overlapping')
+    ([[slice(0, 10, None)], [slice(2, 9, None)]], 17)
+    """
     duplicate_size = 0
     results: List[List[slice]] = [[] for _ in boundaries]
     for idx, s in restore(boundaries, segments):
@@ -248,108 +280,110 @@ if __name__ == "__main__":
     parser = add_sa_args(parser)
 
     args = parser.parse_args()
-    if args.path:
-        OUTPUT_DIR = Path(args.output_dir)
-        OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
-        (Path(args.google_repo_path) / "output").mkdir(exist_ok=True, parents=True)
-        (Path(args.google_repo_path) / "tmp").mkdir(exist_ok=True, parents=True)
-        temp_text = "output/temp_text.txt"
-        temp_output = "output/temp_output.txt"
-        output = OUTPUT_DIR / args.dedup_name
 
-        elapsed_time = {}
-        elapsed_time["All"] = time.time()
-        # region: loading
-        elapsed_time["Loading"] = time.time()
-        ds = load_dataset(
-            path=args.path,
-            name=args.name,
-            data_dir=args.data_dir,
-            data_files=args.data_files,
-            split=args.split,
-            cache_dir=args.cache_dir,
-            use_auth_token=args.use_auth_token,
-        )
-        elapsed_time["Loading"] = time.time() - elapsed_time["Loading"]
-        # endregion
+    assert args.path is not None, "Please specify `path` for `load_dataset`."
 
-        # region: preprocessing
-        elapsed_time["Preprocessing"] = time.time()
-        offsets: List[slice] = []
-        start = 0
-        with open(temp_text, "wb") as f:
-            for doc in ds:
-                doc_bytes = doc[args.column].encode("utf-8")
-                end = start + len(doc_bytes)
-                offsets.append(slice(start, end))
-                start = end
-                f.write(doc_bytes)
-        elapsed_time["Preprocessing"] = time.time() - elapsed_time["Preprocessing"]
-        # endregion
+    OUTPUT_DIR = Path(args.output_dir)
+    OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+    (Path(args.google_repo_path) / "output").mkdir(exist_ok=True, parents=True)
+    (Path(args.google_repo_path) / "tmp").mkdir(exist_ok=True, parents=True)
+    temp_text = "output/temp_text.txt"
+    temp_output = "output/temp_output.txt"
+    output = OUTPUT_DIR / args.dedup_name
 
-        # region: suffix array
-        elapsed_time["Suffix Array"] = time.time()
-        __run_command(
-            f"python scripts/make_suffix_array.py {temp_text}",
-            args.google_repo_path,
-        )
-        elapsed_time["Suffix Array"] = time.time() - elapsed_time["Suffix Array"]
-        # endregion
+    elapsed_time = {}
+    elapsed_time["All"] = time.time()
+    # region: loading
+    elapsed_time["Loading"] = time.time()
+    ds = load_dataset(
+        path=args.path,
+        name=args.name,
+        data_dir=args.data_dir,
+        data_files=args.data_files,
+        split=args.split,
+        cache_dir=args.cache_dir,
+        use_auth_token=args.use_auth_token,
+    )
+    elapsed_time["Loading"] = time.time() - elapsed_time["Loading"]
+    # endregion
 
-        # region: collect
-        elapsed_time["Collect"] = time.time()
-        __run_command(
-            f"cargo run self-similar --data-file {temp_text}"
-            f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {os.cpu_count()}",
-            args.google_repo_path,
-        )
-        __run_command(
-            f"cargo run collect --data-file {temp_text}"
-            f" --length-threshold {args.k} --cache-dir {args.cache_dir} >"
-            f" {temp_output}",
-            args.google_repo_path,
-        )
-        elapsed_time["Collect"] = time.time() - elapsed_time["Collect"]
-        # endregion
+    # region: preprocessing
+    elapsed_time["Preprocessing"] = time.time()
+    offsets: List[slice] = []
+    start = 0
+    with open(temp_text, "wb") as f:
+        for doc in ds:
+            doc_bytes = doc[args.column].encode("utf-8")
+            end = start + len(doc_bytes)
+            offsets.append(slice(start, end))
+            start = end
+            f.write(doc_bytes)
+    elapsed_time["Preprocessing"] = time.time() - elapsed_time["Preprocessing"]
+    # endregion
 
-        # region: restore
-        elapsed_time["Restore"] = time.time()
-        duplicate_slices, duplicate_size = restore_and_merge(
-            offsets,
-            Path(args.google_repo_path) / temp_output,
-            args.k,
-            args.strategy,
-        )
-        elapsed_time["Restore"] = time.time() - elapsed_time["Restore"]
-        # endregion
+    # region: suffix array
+    elapsed_time["Suffix Array"] = time.time()
+    __run_command(
+        f"python scripts/make_suffix_array.py {temp_text}",
+        args.google_repo_path,
+    )
+    elapsed_time["Suffix Array"] = time.time() - elapsed_time["Suffix Array"]
+    # endregion
 
-        # region: output
-        elapsed_time["Deduplicate"] = time.time()
-        ds = ds.map(
-            lambda content, idx: {
-                args.column: clean_up(content, duplicate_slices[idx]),
-            },
-            with_indices=True,
-            input_columns=[args.column],
-            desc="Deduplicating",
-        ).filter(
-            lambda content: len(content) > 0,
-            input_columns=[args.column],
-            desc="Filtering empty documents",
-        )
-        elapsed_time["Deduplicate"] = time.time() - elapsed_time["Deduplicate"]
-        # endregion
+    # region: collect
+    elapsed_time["Collect"] = time.time()
+    __run_command(
+        f"cargo run self-similar --data-file {temp_text}"
+        f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {os.cpu_count()}",
+        args.google_repo_path,
+    )
+    __run_command(
+        f"cargo run collect --data-file {temp_text}"
+        f" --length-threshold {args.k} --cache-dir {args.cache_dir} >"
+        f" {temp_output}",
+        args.google_repo_path,
+    )
+    elapsed_time["Collect"] = time.time() - elapsed_time["Collect"]
+    # endregion
 
-        # region: save
-        elapsed_time["Saving"] = time.time()
-        ds.save_to_disk(output)
-        elapsed_time["Saving"] = time.time() - elapsed_time["Saving"]
-        # endregion
+    # region: restore
+    elapsed_time["Restore"] = time.time()
+    duplicate_slices, duplicate_size = restore_and_merge(
+        offsets,
+        Path(args.google_repo_path) / temp_output,
+        args.k,
+        args.strategy,
+    )
+    elapsed_time["Restore"] = time.time() - elapsed_time["Restore"]
+    # endregion
 
-        elapsed_time["All"] = time.time() - elapsed_time["All"]
-        for k, v in elapsed_time.items():
-            logger.info(f"{k:<30}: {v:.2f}s")
+    # region: output
+    elapsed_time["Deduplicate"] = time.time()
+    ds = ds.map(
+        lambda content, idx: {
+            args.column: clean_up(content, duplicate_slices[idx]),
+        },
+        with_indices=True,
+        input_columns=[args.column],
+        desc="Deduplicating",
+    ).filter(
+        lambda content: len(content) > 0,
+        input_columns=[args.column],
+        desc="Filtering empty documents",
+    )
+    elapsed_time["Deduplicate"] = time.time() - elapsed_time["Deduplicate"]
+    # endregion
 
-        logger.info(f"{'Before':<30}: {start} bytes ({len(offsets)})")
-        logger.info(f"{'After':<30}: {start - duplicate_size} bytes ({len(ds)})")
-        logger.info(f"{'Output':<30}: {output}")
+    # region: save
+    elapsed_time["Saving"] = time.time()
+    ds.save_to_disk(output)
+    elapsed_time["Saving"] = time.time() - elapsed_time["Saving"]
+    # endregion
+
+    elapsed_time["All"] = time.time() - elapsed_time["All"]
+    for k, v in elapsed_time.items():
+        logger.info(f"{k:<30}: {v:.2f}s")
+
+    logger.info(f"{'Before':<30}: {start} bytes ({len(offsets)})")
+    logger.info(f"{'After':<30}: {start - duplicate_size} bytes ({len(ds)})")
+    logger.info(f"{'Output':<30}: {output}")
