@@ -64,11 +64,11 @@ A collection of data deduplication scripts.
 
 ## Acknowledgements
 
- - [Datasketch](https://github.com/ekzhu/datasketch)
- - [simhash-py](https://github.com/seomoz/simhash-py/tree/master/simhash) and [simhash-cpp](https://github.com/seomoz/simhash-cpp)
- - [Deduplicating Training Data Makes Language Models Better](https://github.com/google-research/deduplicate-text-datasets)
- - [BigScience](https://github.com/bigscience-workshop)
- - [BigCode](https://github.com/bigcode-project)
+ - [Datasketch](https://github.com/ekzhu/datasketch) (MIT)
+ - [simhash-py](https://github.com/seomoz/simhash-py/tree/master/simhash) and [simhash-cpp](https://github.com/seomoz/simhash-cpp) (MIT)
+ - [Deduplicating Training Data Makes Language Models Better](https://github.com/google-research/deduplicate-text-datasets) (Apache 2.0)
+ - [BigScience](https://github.com/bigscience-workshop) (Apache 2.0)
+ - [BigCode](https://github.com/bigcode-project) (Apache 2.0)
 
 
 ## Quick Examples
