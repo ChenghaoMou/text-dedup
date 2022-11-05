@@ -6,39 +6,27 @@ from __future__ import annotations
 
 import argparse
 import gc
-import logging
 import multiprocessing
 import os
-from pathlib import Path
 import random
 import time
-from typing import Any, Dict, Iterable, Set
 import warnings
+from pathlib import Path
+from typing import Any, Dict, Iterable, Set
 
 import datasets
-from datasets import Dataset
-from datasets import load_dataset
-from datasketch import LeanMinHash
-from datasketch import MinHash
-from datasketch import MinHashLSH
 import dill as pickle
 import networkit as nk
 import numpy as np
-from rich.logging import RichHandler
+from datasets import Dataset, load_dataset
+from datasketch import LeanMinHash, MinHash, MinHashLSH
 from tqdm import tqdm
 
-from text_dedup.utils import add_io_args
-from text_dedup.utils import add_meta_args
-from text_dedup.utils import add_minhash_args
+from text_dedup import logger
+from text_dedup.utils import add_io_args, add_meta_args, add_minhash_args
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 multiprocessing.set_start_method("fork", force=True)
-
-random.seed(42)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(RichHandler(rich_tracebacks=True))
-logger.propagate = False
 datasets.logging.set_verbosity_error()
 nk.setLogLevel("ERROR")
 
@@ -114,6 +102,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="text_dedup.minhash",
         description="Deduplicate text using minhash",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser = add_io_args(parser)
     parser = add_meta_args(parser)

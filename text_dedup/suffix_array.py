@@ -5,23 +5,20 @@
 from __future__ import annotations
 
 import argparse
-from collections import deque
 import logging
 import os
-from pathlib import Path
-from pathlib import PosixPath
 import random
 import subprocess
 import time
+from collections import deque
+from pathlib import Path, PosixPath
 from typing import Deque, Generator, List, Literal, Sequence, Tuple
 
 import datasets
 from datasets import load_dataset
 from rich.logging import RichHandler
 
-from text_dedup.utils import add_io_args
-from text_dedup.utils import add_meta_args
-from text_dedup.utils import add_sa_args
+from text_dedup.utils import add_io_args, add_meta_args, add_sa_args
 
 random.seed(42)
 logger = logging.getLogger(__name__)
@@ -231,7 +228,7 @@ def clean_up(text: str, slices: List[slice]) -> str:
     Examples
     --------
     >>> clean_up("This is a test.", [slice(0, 4, None), slice(5, 7, None)])
-    'This a test.'
+    '  a test.'
     """
     chars = list(text)
     for s in slices:
@@ -244,6 +241,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="text-dedup.suffixarray",
         description="Deduplicate text using Suffix Array Deduplication",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser = add_io_args(parser)
     parser = add_meta_args(parser)

@@ -5,32 +5,29 @@
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
 import gc
-from itertools import permutations
 import logging
 import math
 import multiprocessing
 import os
-from pathlib import Path
 import random
 import time
-from typing import Any, Dict, Generator, Iterable, List, Set, Tuple
 import warnings
+from collections import defaultdict
+from itertools import permutations
+from pathlib import Path
+from typing import Any, Dict, Generator, Iterable, List, Set, Tuple
 
 import datasets
-from datasets import Dataset
-from datasets import load_dataset
 import dill as pickle
 import networkit as nk
 import numpy as np
+import xxhash
+from datasets import Dataset, load_dataset
 from rich.logging import RichHandler
 from tqdm import tqdm
-import xxhash
 
-from text_dedup.utils import add_io_args
-from text_dedup.utils import add_meta_args
-from text_dedup.utils import add_simhash_args
+from text_dedup.utils import add_io_args, add_meta_args, add_simhash_args
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 multiprocessing.set_start_method("fork", force=True)
@@ -373,6 +370,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="text_dedup.minhash",
         description="Deduplicate text using minhash",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser = add_io_args(parser)
     parser = add_meta_args(parser)

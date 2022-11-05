@@ -3,34 +3,26 @@
 # @Date    : 2022-11-05 09:44:48
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
-from hashlib import md5
-import logging
 import os
 import time
+from hashlib import md5
 
 from datasets import load_dataset
 from pybloom_live import ScalableBloomFilter
-from rich.logging import RichHandler
 
-from text_dedup.utils import add_bloom_filter_args
-from text_dedup.utils import add_io_args
-from text_dedup.utils import add_meta_args
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(RichHandler(rich_tracebacks=True))
-logger.propagate = False
+from text_dedup import logger
+from text_dedup.utils import add_bloom_filter_args, add_io_args, add_meta_args
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         prog="text_dedup.bloomfilter",
         description="Deduplicate text using Bloom Filter",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser = add_io_args(parser)
     parser = add_meta_args(parser)
     parser = add_bloom_filter_args(parser)
-
     args = parser.parse_args()
 
     if args.path is not None:
@@ -52,7 +44,11 @@ if __name__ == "__main__":
         hash_func = {
             "md5": md5,
         }[args.hash_func]
-        bf = ScalableBloomFilter(mode=ScalableBloomFilter.SMALL_SET_GROWTH, error_rate=args.error_rate)
+        bf = ScalableBloomFilter(
+            initial_capacity=args.initial_capacity,
+            mode=ScalableBloomFilter.SMALL_SET_GROWTH,
+            error_rate=args.error_rate,
+        )
         flags = []
 
         # region: processing
