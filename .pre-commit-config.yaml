@@ -21,4 +21,4 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
-        args: ["--profile google"]
+        args: ["--profile", "black"]

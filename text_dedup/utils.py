@@ -4,6 +4,12 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
 import argparse
+import os
+from typing import List, Set
+
+import datasets
+import networkit as nk
+from tqdm import tqdm
 
 
 def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -90,7 +96,7 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default=3,
         help="""
 Ngram size to use in MinHash. The tokenization is space-based,
-you can modify it by modifying the `embed_func` function in the script
+you can modify it by modifying the `ngrams` function in `utils.py`
     """,
     ),
     parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash"),
@@ -121,7 +127,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default=3,
         help="""
 Ngram size to use in SimHash. The tokenization is space-based,
-you can modify it by modifying the `embed_func` function in the script.
+you can modify it by modifying the `ngrams` function in `utils.py`
     """,
     )
     parser.add_argument("--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"),
@@ -197,3 +203,86 @@ def add_exact_hash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     """
     parser.add_argument("--hash_func", type=str, default="md5", help="Hash function to use in ExactHash"),
     return parser
+
+
+def ngrams(content: str, ngram: int = 1) -> List[str]:
+    """
+    Generate ngrams from a string.
+
+    Parameters
+    ----------
+    content : str
+        The text to generate ngrams from.
+    ngram : int
+        The size of the ngrams.
+
+    Returns
+    -------
+    ngrams : List[str]
+        List of ngrams.
+
+    Examples
+    --------
+    >>> ngrams("hello world!", ngram=2)
+    ['hello world!']
+    >>> ngrams("hello world!", ngram=1)
+    ['hello', 'world!']
+    >>> ngrams("This is a test message", ngram=3)
+    ['This is a', 'test message']
+    >>> ngrams("This is a test message", ngram=2)
+    ['This is', 'a test', 'message']
+    """
+    tokens = [t for t in content.split(" ") if t]
+    ngrams = [" ".join(tokens[i : i + ngram]) for i in range(0, len(tokens), ngram)]
+    return ngrams
+
+
+def find_duplicate_components(
+    records: datasets,
+    input_graph: str | None = None,
+    output_graph: str | None = None,
+) -> Set[int]:
+    """
+    Find the duplicate components in a graph.
+
+    Parameters
+    ----------
+    records : Iterable | Dataset
+        The dataset that contains the neighbors.
+    input_graph : str | None, optional
+        The path to the input graph, by default None
+    output_graph : str | None, optional
+        The path to the output graph, by default None
+
+    Returns
+    -------
+    Set[int]
+        The set of duplicate components.
+
+    Examples
+    --------
+    >>> records = [{"__id__": 0, "__neighbors__": [1]}, {"__id__": 1, "__neighbors__": [0]}]
+    >>> find_duplicate_components(records)
+    {1}
+    """
+    if input_graph is not None:
+        g = nk.readGraph(str(input_graph), nk.Format.NetworkitBinary)
+    else:
+        g = nk.graph.Graph()
+        for record in tqdm(records, desc="Constructing graph..."):
+            for y in record["__neighbors__"]:
+                g.addEdge(record["__id__"], y, addMissing=True)
+
+        if output_graph is not None:
+            if os.path.exists(output_graph):
+                os.remove(output_graph)
+            nk.writeGraph(g, str(output_graph), nk.Format.NetworkitBinary)
+
+    to_remove: Set[int] = set()
+    cc = nk.components.ConnectedComponents(g)
+    cc.run()
+    for component in tqdm(cc.getComponents(), desc="Iterating over components..."):
+        component = sorted(component)
+        to_remove.update(component[1:])
+
+    return to_remove
