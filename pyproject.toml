@@ -32,3 +32,6 @@ sphinx-copybutton = "^0.5.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+max-line-length = 120

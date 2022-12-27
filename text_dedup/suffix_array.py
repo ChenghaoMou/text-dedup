@@ -5,26 +5,21 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import random
 import subprocess
-import time
 from collections import deque
 from pathlib import Path, PosixPath
 from typing import Deque, Generator, List, Literal, Sequence, Tuple
 
 import datasets
 from datasets import load_dataset
-from rich.logging import RichHandler
 
+from text_dedup import logger
 from text_dedup.utils import add_io_args, add_meta_args, add_sa_args
+from text_dedup.utils.timer import Timer
 
 random.seed(42)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(RichHandler(rich_tracebacks=True))
-logger.propagate = False
 datasets.logging.set_verbosity_error()
 
 
@@ -283,107 +278,83 @@ if __name__ == "__main__":
 
     assert args.path is not None, "Please specify `path` for `load_dataset`."
 
-    OUTPUT_DIR = Path(args.output_dir)
-    OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
     (Path(args.google_repo_path) / "output").mkdir(exist_ok=True, parents=True)
     (Path(args.google_repo_path) / "tmp").mkdir(exist_ok=True, parents=True)
     temp_text = "output/temp_text.txt"
     temp_output = "output/temp_output.txt"
-    output = OUTPUT_DIR / args.dedup_name
+    timer = Timer()
 
-    elapsed_time = {}
-    elapsed_time["All"] = time.time()
-    # region: loading
-    elapsed_time["Loading"] = time.time()
-    ds = load_dataset(
-        path=args.path,
-        name=args.name,
-        data_dir=args.data_dir,
-        data_files=args.data_files,
-        split=args.split,
-        cache_dir=args.cache_dir,
-        use_auth_token=args.use_auth_token,
-    )
-    elapsed_time["Loading"] = time.time() - elapsed_time["Loading"]
-    # endregion
+    with timer("Total"):
+        with timer("Loading"):
+            ds = load_dataset(
+                path=args.path,
+                name=args.name,
+                data_dir=args.data_dir,
+                data_files=args.data_files,
+                split=args.split,
+                revision=args.revision,
+                cache_dir=args.cache_dir,
+                use_auth_token=args.use_auth_token,
+            )
 
-    # region: preprocessing
-    elapsed_time["Preprocessing"] = time.time()
-    offsets: List[slice] = []
-    start = 0
-    with open(temp_text, "wb") as f:
-        for doc in ds:
-            doc_bytes = doc[args.column].encode("utf-8")
-            end = start + len(doc_bytes)
-            offsets.append(slice(start, end))
-            start = end
-            f.write(doc_bytes)
-    elapsed_time["Preprocessing"] = time.time() - elapsed_time["Preprocessing"]
-    # endregion
+        with timer("Preprocessing"):
+            offsets: List[slice] = []
+            start = 0
+            with open(Path(args.google_repo_path) / temp_text, "wb") as f:
+                for doc in ds:
+                    doc_bytes = doc[args.column].encode("utf-8")
+                    end = start + len(doc_bytes)
+                    offsets.append(slice(start, end))
+                    start = end
+                    f.write(doc_bytes)
 
-    # region: suffix array
-    elapsed_time["Suffix Array"] = time.time()
-    __run_command(
-        f"python scripts/make_suffix_array.py {temp_text}",
-        args.google_repo_path,
-    )
-    elapsed_time["Suffix Array"] = time.time() - elapsed_time["Suffix Array"]
-    # endregion
+        with timer("SuffixArray"):
+            __run_command(
+                f"python scripts/make_suffix_array.py {temp_text}",
+                args.google_repo_path,
+            )
 
-    # region: collect
-    elapsed_time["Collect"] = time.time()
-    __run_command(
-        f"cargo run self-similar --data-file {temp_text}"
-        f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {os.cpu_count()}",
-        args.google_repo_path,
-    )
-    __run_command(
-        f"cargo run collect --data-file {temp_text}"
-        f" --length-threshold {args.k} --cache-dir {args.cache_dir} >"
-        f" {temp_output}",
-        args.google_repo_path,
-    )
-    elapsed_time["Collect"] = time.time() - elapsed_time["Collect"]
-    # endregion
+        with timer("SelfSimilar"):
+            __run_command(
+                f"cargo run self-similar --data-file {temp_text}"
+                f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {os.cpu_count()}",
+                args.google_repo_path,
+            )
+            __run_command(
+                f"cargo run collect --data-file {temp_text}"
+                f" --length-threshold {args.k} --cache-dir {args.cache_dir} >"
+                f" {temp_output}",
+                args.google_repo_path,
+            )
 
-    # region: restore
-    elapsed_time["Restore"] = time.time()
-    duplicate_slices, duplicate_size = restore_and_merge(
-        offsets,
-        Path(args.google_repo_path) / temp_output,
-        args.k,
-        args.strategy,
-    )
-    elapsed_time["Restore"] = time.time() - elapsed_time["Restore"]
-    # endregion
+        with timer("Restore"):
+            duplicate_slices, duplicate_size = restore_and_merge(
+                offsets,
+                Path(args.google_repo_path) / temp_output,
+                args.k,
+                args.strategy,
+            )
 
-    # region: output
-    elapsed_time["Deduplicate"] = time.time()
-    ds = ds.map(
-        lambda content, idx: {
-            args.column: clean_up(content, duplicate_slices[idx]),
-        },
-        with_indices=True,
-        input_columns=[args.column],
-        desc="Deduplicating",
-    ).filter(
-        lambda content: len(content) > 0,
-        input_columns=[args.column],
-        desc="Filtering empty documents",
-    )
-    elapsed_time["Deduplicate"] = time.time() - elapsed_time["Deduplicate"]
-    # endregion
+        with timer("Deduplicate"):
+            ds = ds.map(
+                lambda content, idx: {
+                    args.column: clean_up(content, duplicate_slices[idx]),
+                },
+                with_indices=True,
+                input_columns=[args.column],
+                desc="Deduplicating",
+            ).filter(
+                lambda content: len(content) > 0,
+                input_columns=[args.column],
+                desc="Filtering empty documents",
+            )
 
-    # region: save
-    elapsed_time["Saving"] = time.time()
-    ds.save_to_disk(output)
-    elapsed_time["Saving"] = time.time() - elapsed_time["Saving"]
-    # endregion
+        with timer("Saving"):
+            ds.save_to_disk(args.output)
 
-    elapsed_time["All"] = time.time() - elapsed_time["All"]
-    for k, v in elapsed_time.items():
-        logger.info(f"{k:<30}: {v:.2f}s")
+    PAD = 30
+    for k, v in timer.elapsed_times.items():
+        logger.info(f"{k:<{PAD}}: {v:.2f} seconds")
 
-    logger.info(f"{'Before':<30}: {start} bytes ({len(offsets)})")
-    logger.info(f"{'After':<30}: {start - duplicate_size} bytes ({len(ds)})")
-    logger.info(f"{'Output':<30}: {output}")
+    logger.info(f"{'Before':<{PAD}}: {start} bytes ({len(offsets)})")
+    logger.info(f"{'After':<{PAD}}: {start - duplicate_size} bytes ({len(ds)})")

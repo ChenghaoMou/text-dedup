@@ -1,137 +1,157 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Date    : 2022-11-05 11:03:18
-# @Author  : Chenghao Mou (mouchenghao@gmail.com)
+# author      : Chenghao Mou (mouchenghao@gmail.com)
+# created     : 10/4/22
 from __future__ import annotations
 
 import argparse
 import gc
-import multiprocessing
+import hashlib
+import multiprocessing as mp
 import os
 import random
-import time
+import re
+import struct
 import warnings
-from pathlib import Path
-from typing import Any, Dict, Set
-
-import datasets
-import dill as pickle
-import networkit as nk
-import numpy as np
-from datasets import load_dataset
-from datasketch import LeanMinHash, MinHash, MinHashLSH
-from tqdm import tqdm
+from collections import defaultdict
+from typing import Any, Dict, List, Set, Tuple
 
 from text_dedup import logger
-from text_dedup.utils import (
-    add_io_args,
-    add_meta_args,
-    add_minhash_args,
-    find_duplicate_components,
-    ngrams,
-)
+from text_dedup.utils import UnionFind, ngrams
+from text_dedup.utils.add_args import add_io_args, add_meta_args, add_minhash_args
+from text_dedup.utils.timer import Timer
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-multiprocessing.set_start_method("fork", force=True)
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    import datasets
+    import numpy as np
+    from datasets import load_dataset
+    from scipy.integrate import quad as integrate
+    from tqdm import tqdm
+
+
+SEED = 42
+NON_ALPHA = re.compile("[^A-Za-z_0-9]")
+RNG = np.random.RandomState(SEED)
+MAX_HASH = np.uint64((1 << 32) - 1)
+MERSENNE_PRIME = np.uint64((1 << 61) - 1)
 datasets.logging.set_verbosity_error()
-nk.setLogLevel("ERROR")
-
-# With multiprocessing and copy-on-write fork (Linux and macOS),
-# we can use global variables to share objects across processes.
-# This might not be the case on some systems where objects are
-# pickled and sent to the child processes. It might also not be reflected
-# when you use top command to check the memory usage. One way to check is to
-# print the id of the object in the child processes and see if they are the same.
-# References:
-# 1. https://stackoverflow.com/questions/38084401/leveraging-copy-on-write-to-copy-data-to-multiprocessing-pool-worker-process
-# 2. https://stackoverflow.com/questions/53841599/python-multiprocessing-copy-on-write-behaving-differently-between-osx-and-ubuntu
-# 3. https://stackoverflow.com/questions/40221868/multiprocessing-global-variable-memory-copying
-# 4. https://docs.python.org/3/library/gc.html#gc.freeze
-
-lsh: MinHashLSH | None = None
-dup_ids: Set[int] | None = None
 
 
-def embed_func(content: str, idx: int, *, num_perm: int, seed: int, ngram: int) -> Dict[str, Any]:
+def sha1_hash32(data):
     """
-    Calculate the minhash signature of a text.
+    Directly taken from datasketch package to avoid dependency.
+
+    Parameters
+    ----------
+    data : bytes
+
+    Returns
+    -------
+    int
+    """
+    return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
+
+
+def embed_func(
+    content: str,
+    idx: int,
+    *,
+    num_perm: int,
+    ngram_size: int,
+    hashranges: List[Tuple[int, int]],
+    permutations: np.ndarray,
+) -> Dict[str, Any]:
+    """
+    Combined with some datasketch code to avoid dependency.
 
     Parameters
     ----------
     content : str
-        The text to be hashed.
+        The content to be embedded.
     idx : int
-        The index of the text.
+        The index of the content.
     num_perm : int
         The number of permutations.
-    seed : int
-        The seed for the minhash.
-    ngram : int
-        The ngram size.
+    ngram_size : int
+        The size of n-grams.
+    hashranges : List[Tuple[int, int]]
+        The ranges of hash values.
+    permutations : np.ndarray
+        The permutations for the minhash.
 
     Returns
     -------
     Dict[str, Any]
-        The minhash signature and the index of the text as a dictionary.
-
-    Examples
-    --------
-    >>> res = embed_func("hello world", 0, num_perm=128, seed=0, ngram=3)
-    >>> res["__id__"]
-    0
-    >>> res["__signature__"].shape
-    (128,)
-    >>> res["__signature__"].dtype
-    dtype('uint64')
+        The hash values in each range and the index.
     """
-    m = MinHash(num_perm=num_perm, seed=seed)
-    tokens = ngrams(content, ngram)
-    m.update_batch([token.encode("utf-8") for token in tokens])
-    return {"__signature__": m.hashvalues, "__id__": idx}
+    hashvalues = np.ones(num_perm, dtype=np.uint64) * MAX_HASH
+    tokens = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size)}
+    hv = np.array([sha1_hash32(token.encode("utf-8")) for token in tokens], dtype=np.uint64)  # noqa: E501
+    a, b = permutations
+    phv = np.bitwise_and(((hv * np.tile(a, (len(hv), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH)  # noqa: E501
+    hashvalues = np.vstack([phv, hashvalues]).min(axis=0)
+    Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    return {"__signatures__": Hs, "__id__": idx}
 
 
-def query_func(idx: int, signature: np.ndarray, *, index: MinHashLSH, seed: int) -> Dict[str, Any]:
+def optimal_param(
+    threshold: float,
+    num_perm: int,
+    false_positive_weight: float = 0.5,
+    false_negative_weight: float = 0.5,
+):
     """
-    Query the minhash index.
+    Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
+    of probabilities of false positive and false negative, taken from datasketch.
 
     Parameters
     ----------
-    idx : int
-        The index of the text.
-    signature : np.ndarray
-        The minhash signature of the text.
-    index : MinHashLSH
-        The minhash index.
-    seed : int
-        The seed for the minhash.
+    threshold : float
+        The threshold for similarity.
+    num_perm : int
+        The number of permutations.
+    false_positive_weight : float
+        The weight of false positive.
+    false_negative_weight : float
+        The weight of false negative.
 
     Returns
     -------
-    Dict[str, Any]
-        The neighbors of the text as a dictionary.
-
-    Examples
-    --------
-    >>> lsh = MinHashLSH(threshold=0.5, num_perm=128)
-    >>> h = embed_func("hello world", 1, num_perm=128, ngram=3, seed=0)["__signature__"]
-    >>> lsh.insert(0, LeanMinHash(hashvalues=h, seed=0))
-    >>> lsh.insert(1, LeanMinHash(hashvalues=h, seed=0))
-    >>> res = query_func(0, h, index=lsh, seed=0)
-    >>> res["__id__"]
-    0
-    >>> res["__neighbors__"]
-    [1]
+    Tuple[int, int]
+        The optimal `b` and `r` parameters.
     """
-    return {
-        "__neighbors__": [
-            dup_idx
-            for dup_idx in index.query(
-                LeanMinHash(seed=seed, hashvalues=signature),
-            )
-            if dup_idx != idx  # exclude itself
-        ],
-        "__id__": idx,
-    }
+
+    def false_positive_probability(threshold: float, b: int, r: int):
+        """Source: `datasketch.lsh`"""
+
+        def proba(s):
+            return 1 - (1 - s ** float(r)) ** float(b)
+
+        a, _ = integrate(proba, 0.0, threshold)
+        return a
+
+    def false_negative_probability(threshold: float, b: int, r: int):
+        """Source: `datasketch.lsh`"""
+
+        def proba(s):
+            return 1 - (1 - (1 - s ** float(r)) ** float(b))
+
+        a, _ = integrate(proba, threshold, 1.0)
+        return a
+
+    min_error = float("inf")
+    opt = (0, 0)
+    for b in range(1, num_perm + 1):
+        max_r = int(num_perm / b)
+        for r in range(1, max_r + 1):
+            fp = false_positive_probability(threshold, b, r)
+            fn = false_negative_probability(threshold, b, r)
+            error = fp * false_positive_weight + fn * false_negative_weight
+            if error < min_error:
+                min_error = error
+                opt = (b, r)
+    return opt
 
 
 if __name__ == "__main__":
@@ -144,134 +164,107 @@ if __name__ == "__main__":
     parser = add_io_args(parser)
     parser = add_meta_args(parser)
     parser = add_minhash_args(parser)
-
     args = parser.parse_args()
+    mp.set_start_method("fork", force=True)
+    uf = UnionFind()
+    timer = Timer()
 
-    lsh = MinHashLSH(
-        threshold=args.threshold,
-        num_perm=args.num_perm,
-    )
+    B, R = optimal_param(args.threshold, args.num_perm)
+    HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
+    HASH_TABLES: List[Dict[int, Set]] = [defaultdict(set) for _ in range(B)]
 
-    assert args.path is not None, "Please specify `path` for `load_dataset`."
-    assert args.graph_name is not None, "Please specify `graph_name`."
-    assert args.index_name is not None, "Please specify `output_graph`."
+    with timer("Total"):
+        with timer("Loading"):
+            ds = load_dataset(
+                path=args.path,
+                name=args.name,
+                data_dir=args.data_dir,
+                data_files=args.data_files,
+                split=args.split,
+                revision=args.revision,
+                cache_dir=args.cache_dir,
+                use_auth_token=args.use_auth_token,
+            )
 
-    OUTPUT_DIR = Path(args.output_dir)
-    OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
-
-    output_graph = OUTPUT_DIR / args.graph_name
-    output_index = OUTPUT_DIR / args.index_name
-    output = OUTPUT_DIR / args.dedup_name
-
-    elapsed_time = {"All": time.time()}
-
-    # region: loading
-    elapsed_time["Loading"] = time.time()
-    ds = load_dataset(
-        path=args.path,
-        name=args.name,
-        data_dir=args.data_dir,
-        data_files=args.data_files,
-        split=args.split,
-        cache_dir=args.cache_dir,
-        use_auth_token=args.use_auth_token,
-    )
-    elapsed_time["Loading"] = time.time() - elapsed_time["Loading"]
-    # endregion
-
-    DATA_SIZE = len(ds)
-
-    # region: minhash
-    elapsed_time["Minhash"] = time.time()
-    embedded = ds.map(
-        function=embed_func,
-        fn_kwargs={"num_perm": args.num_perm, "seed": args.seed, "ngram": args.ngram},
-        input_columns=[args.column],
-        remove_columns=[args.column],
-        num_proc=os.cpu_count(),
-        with_indices=True,
-        desc=f"MinHashing...",
-    )
-    elapsed_time["Minhash"] = time.time() - elapsed_time["Minhash"]
-    # endregion
-
-    # region: index
-    if os.path.exists(output_index) and args.reuse_index:
-        elapsed_time["Load Index"] = time.time()
-        with open(output_index, "rb") as f:
-            lsh = pickle.load(f)
-        elapsed_time["Load Index"] = time.time() - elapsed_time["Load Index"]
-    else:
-        elapsed_time["Index"] = time.time()
-        with lsh.insertion_session() as session:
-            for data in tqdm(embedded, desc="Indexing signatures..."):
-                if data["__id__"] in lsh:
-                    continue
-                session.insert(
-                    data["__id__"],
-                    LeanMinHash(seed=args.seed, hashvalues=data["__signature__"]),
-                    check_duplication=False,
+        DATA_SIZE = len(ds)
+        PERMUTATIONS = np.array(
+            [
+                (
+                    RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
+                    RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
                 )
-        elapsed_time["Index"] = time.time() - elapsed_time["Index"]
-        elapsed_time["Save Index"] = time.time()
-        pickle.dump(lsh, open(output_index, "wb"), protocol=pickle.HIGHEST_PROTOCOL)
-        elapsed_time["Save Index"] = time.time() - elapsed_time["Save Index"]
-    # endregion
+                for _ in range(args.num_perm)
+            ],
+            dtype=np.uint64,
+        ).T
 
-    gc.disable()
-    gc.freeze()
+        with timer("MinHashing"):
+            embedded = ds.map(
+                function=embed_func,
+                fn_kwargs={
+                    "num_perm": args.num_perm,
+                    "hashranges": HASH_RANGES,
+                    "ngram_size": args.ngram,
+                    "permutations": PERMUTATIONS,
+                },
+                input_columns=[args.column],
+                remove_columns=ds.column_names,
+                num_proc=os.cpu_count(),
+                with_indices=True,
+                desc="Fingerprinting...",
+            )
 
-    # region: query
-    elapsed_time["Query"] = time.time()
-    queried = embedded.map(
-        lambda x, y: query_func(x, y, index=lsh, seed=args.seed),
-        num_proc=os.cpu_count(),
-        new_fingerprint=str(random.getrandbits(64)),
-        input_columns=["__id__", "__signature__"],
-        remove_columns=["__signature__"],
-        desc=f"Querying...",
-    )
-    elapsed_time["Query"] = time.time() - elapsed_time["Query"]
-    # endregion
+        with timer("Clustering"):
+            for i in tqdm(
+                range(0, len(embedded), args.batch_size),
+                dynamic_ncols=True,
+                desc="Iterating MinHashes...",  # noqa: E501
+            ):
+                batch = embedded[i : i + args.batch_size]
+                for key, Hs in zip(batch["__id__"], batch["__signatures__"]):
+                    for H, hashtable in zip(Hs, HASH_TABLES):
+                        hashtable[H].add(key)
+            for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
+                for cluster in table.values():
+                    if len(cluster) <= 1:
+                        continue
+                    idx = min(cluster)
+                    for x in cluster:
+                        uf.union(x, idx)
 
-    gc.enable()
-    gc.unfreeze()
-    gc.collect()
+        with timer("Filtering"):
+            gc.freeze()
+            gc.disable()
+            ds = ds.map(
+                function=lambda _, idx: {"__cluster__": uf.find(idx)},
+                with_indices=True,
+                num_proc=os.cpu_count(),
+                new_fingerprint=str(random.getrandbits(128)),
+                desc="Finding clusters...",
+            )
+            gc.enable()
+            gc.collect()
+            # This is where the deduplication happens
+            # Since there is no easy groupby in datasets
+            # I will use this simple filter for now
+            final_data = ds.filter(
+                function=lambda record, idx: record["__cluster__"] == idx,
+                with_indices=True,
+                num_proc=os.cpu_count(),
+                desc="Filtering clusters...",
+            )
 
-    # region: clustering
-    elapsed_time["Clustering"] = time.time()
-    queried = queried.filter(
-        lambda x: len(x["__neighbors__"]) > 0, num_proc=os.cpu_count(), desc="Finding duplicates..."
-    )
-    dup_ids = find_duplicate_components(
-        records=queried,
-        input_graph=output_graph if args.reuse_graph else None,
-        output_graph=output_graph,
-    )
-    elapsed_time["Clustering"] = time.time() - elapsed_time["Clustering"]
-    # endregion
+        with timer("Saving"):
+            final_data = final_data.remove_columns(["__cluster__"])
+            final_data.save_to_disk(args.output)
 
-    # region: deduplicate
-    elapsed_time["Deduplicate"] = time.time()
-    final_data = ds.filter(
-        lambda _, idx: idx not in dup_ids,
-        num_proc=os.cpu_count(),
-        with_indices=True,
-        desc="Filtering duplicates...",
-    )
-    elapsed_time["Deduplicate"] = time.time() - elapsed_time["Deduplicate"]
+    FINAL_DATA_SIZE = len(final_data)
+    DUP_SIZE = DATA_SIZE - FINAL_DATA_SIZE
+    PAD = 32
 
-    elapsed_time["Save"] = time.time()
-    final_data.save_to_disk(output)
-    elapsed_time["Save"] = time.time() - elapsed_time["Save"]
-    # endregion
-
-    elapsed_time["All"] = time.time() - elapsed_time["All"]
-    for k, v in elapsed_time.items():
-        logger.info(f"{k:<30}: {v:.2f}s")
-
-    logger.info(f"{'Before':<30}: {DATA_SIZE}")
-    logger.info(f"{'After':<30}: {len(final_data)}")
-    logger.info(f"{'Index':<30}: {output_index}")
-    logger.info(f"{'Graph':<30}: {output_graph}")
-    logger.info(f"{'Output':<30}: {output}")
+    for key, value in timer.elapsed_times.items():
+        logger.info(f"{key:<{PAD}}: {value:.2f} seconds")
+    logger.info(f"{'Data Number (before)':<{PAD}}: {DATA_SIZE}")
+    logger.info(f"{'Data Number (after)':<{PAD}}: {FINAL_DATA_SIZE} ({FINAL_DATA_SIZE / DATA_SIZE:.2%})")  # noqa: E501
+    logger.info(f"{'Duplicate Number':<{PAD}}: {DUP_SIZE} ({DUP_SIZE / DATA_SIZE:.2%})")  # noqa: E501
+    logger.info("🤗 Happy Deduplicating 🤗")

@@ -2,14 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2022-11-05 09:16:34
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-
 import argparse
-import os
-from typing import List, Set
-
-import datasets
-import networkit as nk
-from tqdm import tqdm
 
 
 def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -31,22 +24,12 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--data_dir", type=str, help="`data_dir` in load_dataset"),
     parser.add_argument("--data_files", type=str, help="`data_files` in load_dataset"),
     parser.add_argument("--split", type=str, help="`split` in load_dataset"),
-    parser.add_argument("--cache_dir", type=str, help="`cache_dir` in load_dataset"),
+    parser.add_argument("--cache_dir", type=str, help="`cache_dir` in load_dataset", default=".cache"),
+    parser.add_argument("--revision", type=str, help="`revision` in load_dataset"),
     parser.add_argument(
         "--use_auth_token", action=argparse.BooleanOptionalAction, help="`use_auth_token` in load_dataset"
     ),
-    parser.add_argument("--output_dir", type=str, help="Path to save all results", required=True),
-    parser.add_argument("--index_name", type=str, help="Name of the index file, will be saved in `output_dir`"),
-    parser.add_argument(
-        "--reuse_index", action=argparse.BooleanOptionalAction, help="Reuse the index if already exists"
-    ),
-    parser.add_argument("--graph_name", type=str, help="Name of the cluster file, will be saved in `output_dir`"),
-    parser.add_argument(
-        "--reuse_graph", action=argparse.BooleanOptionalAction, help="Reuse the cluster if already exists"
-    ),
-    parser.add_argument(
-        "--dedup_name", type=str, help="Name of the deduplicated dataset, will be saved in `output_dir`", required=True
-    ),
+    parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
     return parser
 
 
@@ -67,11 +50,14 @@ def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--column",
         type=str,
-        help="""
-Text column to use for deduplication. If multiple columns are desired,
-please concatenate them into one column before using this script
-    """,
+        help="""Text column to use for deduplication. Concatenate desired columns beforehand if needed.""",
         required=True,
+    ),
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        help="""Batch size to use for dataset iteration. Mainly for memory efficiency.""",
+        default=10000,
     ),
     return parser
 
@@ -93,16 +79,13 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     parser.add_argument(
         "--ngram",
         type=int,
-        default=3,
-        help="""
-Ngram size to use in MinHash. The tokenization is space-based,
-you can modify it by modifying the `ngrams` function in `utils.py`
-    """,
+        default=5,
+        help="""Ngram size to use in MinHash.""",
     ),
     parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash"),
     parser.add_argument("--num_perm", type=int, default=128, help="Number of permutations to use in MinHash"),
     parser.add_argument(
-        "--threshold", type=float, default=0.8, help="Jaccard similarity threshold to use in MinHashLSH"
+        "--threshold", type=float, default=0.7, help="Jaccard similarity threshold to use in MinHashLSH"
     ),
     return parser
 
@@ -125,10 +108,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         "--ngram",
         type=int,
         default=3,
-        help="""
-Ngram size to use in SimHash. The tokenization is space-based,
-you can modify it by modifying the `ngrams` function in `utils.py`
-    """,
+        help="""Ngram size to use in SimHash.""",
     )
     parser.add_argument("--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"),
     parser.add_argument(
@@ -203,86 +183,3 @@ def add_exact_hash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     """
     parser.add_argument("--hash_func", type=str, default="md5", help="Hash function to use in ExactHash"),
     return parser
-
-
-def ngrams(content: str, ngram: int = 1) -> List[str]:
-    """
-    Generate ngrams from a string.
-
-    Parameters
-    ----------
-    content : str
-        The text to generate ngrams from.
-    ngram : int
-        The size of the ngrams.
-
-    Returns
-    -------
-    ngrams : List[str]
-        List of ngrams.
-
-    Examples
-    --------
-    >>> ngrams("hello world!", ngram=2)
-    ['hello world!']
-    >>> ngrams("hello world!", ngram=1)
-    ['hello', 'world!']
-    >>> ngrams("This is a test message", ngram=3)
-    ['This is a', 'test message']
-    >>> ngrams("This is a test message", ngram=2)
-    ['This is', 'a test', 'message']
-    """
-    tokens = [t for t in content.split(" ") if t]
-    ngrams = [" ".join(tokens[i : i + ngram]) for i in range(0, len(tokens), ngram)]
-    return ngrams
-
-
-def find_duplicate_components(
-    records: datasets,
-    input_graph: str | None = None,
-    output_graph: str | None = None,
-) -> Set[int]:
-    """
-    Find the duplicate components in a graph.
-
-    Parameters
-    ----------
-    records : Iterable | Dataset
-        The dataset that contains the neighbors.
-    input_graph : str | None, optional
-        The path to the input graph, by default None
-    output_graph : str | None, optional
-        The path to the output graph, by default None
-
-    Returns
-    -------
-    Set[int]
-        The set of duplicate components.
-
-    Examples
-    --------
-    >>> records = [{"__id__": 0, "__neighbors__": [1]}, {"__id__": 1, "__neighbors__": [0]}]
-    >>> find_duplicate_components(records)
-    {1}
-    """
-    if input_graph is not None:
-        g = nk.readGraph(str(input_graph), nk.Format.NetworkitBinary)
-    else:
-        g = nk.graph.Graph()
-        for record in tqdm(records, desc="Constructing graph..."):
-            for y in record["__neighbors__"]:
-                g.addEdge(record["__id__"], y, addMissing=True)
-
-        if output_graph is not None:
-            if os.path.exists(output_graph):
-                os.remove(output_graph)
-            nk.writeGraph(g, str(output_graph), nk.Format.NetworkitBinary)
-
-    to_remove: Set[int] = set()
-    cc = nk.components.ConnectedComponents(g)
-    cc.run()
-    for component in tqdm(cc.getComponents(), desc="Iterating over components..."):
-        component = sorted(component)
-        to_remove.update(component[1:])
-
-    return to_remove

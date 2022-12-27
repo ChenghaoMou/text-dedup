@@ -10,15 +10,12 @@ import math
 import multiprocessing
 import os
 import random
-import time
 import warnings
 from collections import defaultdict
 from itertools import permutations
-from pathlib import Path
 from typing import Any, Dict, Generator, List, Set, Tuple
 
 import datasets
-import dill as pickle
 import networkit as nk
 import numpy as np
 import xxhash
@@ -27,12 +24,13 @@ from tqdm import tqdm
 
 from text_dedup import logger
 from text_dedup.utils import (
+    UnionFind,
     add_io_args,
     add_meta_args,
     add_simhash_args,
-    find_duplicate_components,
     ngrams,
 )
+from text_dedup.utils.timer import Timer
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 multiprocessing.set_start_method("fork", force=True)
@@ -360,8 +358,8 @@ def embed_func(content: str, idx: int, *, ngram: int) -> Dict[str, Any]:
     >>> res["__signature__"].dtype
     dtype('uint64')
     """
-    tokens = ngrams(content, ngram=ngram)
-    sig = compute([_unsigned_hash(t.encode("utf-8")) for t in tokens])
+    tokens = ngrams(content.split(" "), n=ngram)
+    sig = compute([_unsigned_hash(" ".join(t).encode("utf-8")) for t in tokens])
     return {"__signature__": np.uint64(sig), "__id__": idx}
 
 
@@ -421,121 +419,85 @@ if __name__ == "__main__":
         k=args.bit_diff,
         b=args.num_bucket,
     )
+    timer = Timer()
+    uf = UnionFind()
 
-    assert args.path is not None, "Please specify `path` for `load_dataset`."
-    assert args.graph_name is not None, "Please specify `graph_name`."
-    assert args.index_name is not None, "Please specify `output_graph`."
+    with timer("Total"):
+        with timer("Loading"):
+            ds = load_dataset(
+                path=args.path,
+                name=args.name,
+                data_dir=args.data_dir,
+                data_files=args.data_files,
+                split=args.split,
+                revision=args.revision,
+                cache_dir=args.cache_dir,
+                use_auth_token=args.use_auth_token,
+            )
 
-    OUTPUT_DIR = Path(args.output_dir)
-    OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+        DATA_SIZE = len(ds)
 
-    output_graph = OUTPUT_DIR / args.graph_name
-    output_index = OUTPUT_DIR / args.index_name
-    output = OUTPUT_DIR / args.dedup_name
+        with timer("SimHashing"):
+            embedded = ds.map(
+                function=embed_func,
+                fn_kwargs={"ngram": args.ngram},
+                input_columns=[args.column],
+                remove_columns=[args.column],
+                num_proc=os.cpu_count(),
+                with_indices=True,
+                desc=f"SimHashing...",
+            )
 
-    elapsed_time = {"All": time.time()}
+        with timer("Indexing"):
+            for i in tqdm(
+                range(0, len(embedded), args.batch_size),
+                dynamic_ncols=True,
+                desc="Iterating MinHashes...",  # noqa: E501
+            ):
+                batch = embedded[i : i + args.batch_size]
+                for idx, sig in tqdm(
+                    zip(batch["__id__"], batch["__signature__"]),
+                    desc="Indexing signatures...",
+                    leave=False,
+                    total=len(batch["__id__"]),
+                ):
+                    for neighbor in simhash_index.query(sig):
+                        uf.union(idx, neighbor)
+                    simhash_index.add(idx, sig)
 
-    # region: loading
-    elapsed_time["Loading"] = time.time()
-    ds = load_dataset(
-        path=args.path,
-        name=args.name,
-        data_dir=args.data_dir,
-        data_files=args.data_files,
-        split=args.split,
-        cache_dir=args.cache_dir,
-        use_auth_token=args.use_auth_token,
-    )
-    elapsed_time["Loading"] = time.time() - elapsed_time["Loading"]
-    # endregion
+        with timer("Filtering"):
+            gc.freeze()
+            gc.disable()
+            ds = ds.map(
+                function=lambda _, idx: {"__cluster__": uf.find(idx)},
+                with_indices=True,
+                num_proc=os.cpu_count(),
+                new_fingerprint=str(random.getrandbits(128)),
+                desc="Finding clusters...",
+            )
+            gc.enable()
+            gc.collect()
+            # This is where the deduplication happens
+            # Since there is no easy groupby in datasets
+            # I will use this simple filter for now
+            final_data = ds.filter(
+                function=lambda record, idx: record["__cluster__"] == idx,
+                with_indices=True,
+                num_proc=os.cpu_count(),
+                desc="Filtering clusters...",
+            )
 
-    DATA_SIZE = len(ds)
+        with timer("Saving"):
+            final_data = final_data.remove_columns(["__cluster__"])
+            final_data.save_to_disk(args.output)
 
-    # region: simhash
-    elapsed_time["Simhash"] = time.time()
-    embedded = ds.map(
-        function=embed_func,
-        fn_kwargs={"ngram": args.ngram},
-        input_columns=[args.column],
-        remove_columns=[args.column],
-        num_proc=os.cpu_count(),
-        with_indices=True,
-        desc=f"SimHashing...",
-    )
-    elapsed_time["Simhash"] = time.time() - elapsed_time["Simhash"]
-    # endregion
+    FINAL_DATA_SIZE = len(final_data)
+    DUP_SIZE = DATA_SIZE - FINAL_DATA_SIZE
+    PAD = 32
 
-    # region: index
-    if os.path.exists(output_index) and args.reuse_index:
-        elapsed_time["Load Index"] = time.time()
-        with open(output_index, "rb") as f:
-            simhash_index = pickle.load(f)
-        elapsed_time["Load Index"] = time.time() - elapsed_time["Load Index"]
-    else:
-        elapsed_time["Index"] = time.time()
-        for data in tqdm(embedded, desc="Indexing signatures..."):
-            simhash_index.add(data["__id__"], data["__signature__"])
-        elapsed_time["Index"] = time.time() - elapsed_time["Index"]
-        elapsed_time["Save Index"] = time.time()
-        pickle.dump(simhash_index, open(output_index, "wb"), protocol=pickle.HIGHEST_PROTOCOL)
-        elapsed_time["Save Index"] = time.time() - elapsed_time["Save Index"]
-    # endregion
-
-    gc.disable()
-    gc.freeze()
-
-    # region: query
-    elapsed_time["Query"] = time.time()
-    assert simhash_index is not None, "Index is not created/loaded"
-    queried = embedded.map(
-        lambda x, y: query_func(x, y, index=simhash_index),
-        num_proc=os.cpu_count(),
-        new_fingerprint=str(random.getrandbits(64)),
-        input_columns=["__id__", "__signature__"],
-        remove_columns=["__signature__"],
-        desc=f"Querying...",
-    )
-    elapsed_time["Query"] = time.time() - elapsed_time["Query"]
-    # endregion
-
-    gc.enable()
-    gc.unfreeze()
-    gc.collect()
-
-    # region: clustering
-    elapsed_time["Clustering"] = time.time()
-    queried = queried.filter(
-        lambda x: len(x["__neighbors__"]) > 0, num_proc=os.cpu_count(), desc="Finding duplicates..."
-    )
-    dup_ids = find_duplicate_components(
-        records=queried,
-        input_graph=output_graph if args.reuse_graph else None,
-        output_graph=output_graph,
-    )
-    elapsed_time["Clustering"] = time.time() - elapsed_time["Clustering"]
-    # endregion
-
-    # region: deduplicate
-    elapsed_time["Deduplicate"] = time.time()
-    final_data = ds.filter(
-        lambda _, idx: idx not in dup_ids,
-        num_proc=os.cpu_count(),
-        with_indices=True,
-        desc="Filtering duplicates...",
-    )
-    elapsed_time["Deduplicate"] = time.time() - elapsed_time["Deduplicate"]
-
-    elapsed_time["Save"] = time.time()
-    final_data.save_to_disk(output)
-    elapsed_time["Save"] = time.time() - elapsed_time["Save"]
-    # endregion
-
-    elapsed_time["All"] = time.time() - elapsed_time["All"]
-    for k, v in elapsed_time.items():
-        logger.info(f"{k:<30}: {v:.2f}s")
-
-    logger.info(f"{'Before':<30}: {DATA_SIZE}")
-    logger.info(f"{'After':<30}: {len(final_data)}")
-    logger.info(f"{'Index':<30}: {output_index}")
-    logger.info(f"{'Graph':<30}: {output_graph}")
-    logger.info(f"{'Output':<30}: {output}")
+    for key, value in timer.elapsed_times.items():
+        logger.info(f"{key:<{PAD}}: {value:.2f} seconds")
+    logger.info(f"{'Data Number (before)':<{PAD}}: {DATA_SIZE}")
+    logger.info(f"{'Data Number (after)':<{PAD}}: {FINAL_DATA_SIZE} ({FINAL_DATA_SIZE / DATA_SIZE:.2%})")  # noqa: E501
+    logger.info(f"{'Duplicate Number':<{PAD}}: {DUP_SIZE} ({DUP_SIZE / DATA_SIZE:.2%})")  # noqa: E501
+    logger.info("🤗 Happy Deduplicating 🤗")
