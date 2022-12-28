@@ -50,10 +50,6 @@ datasets.logging.set_verbosity_error()
 # 3. https://stackoverflow.com/questions/40221868/multiprocessing-global-variable-memory-copying
 # 4. https://docs.python.org/3/library/gc.html#gc.freeze
 
-
-simhash_index: SimHashIndex | None = None
-dup_ids: Set[int] | None = None
-
 BIT_MASK: np.ndarray = 2 ** np.arange(64, dtype=np.uint64).reshape([1, 64])
 
 
@@ -492,13 +488,9 @@ if __name__ == "__main__":
             final_data = final_data.remove_columns(["__cluster__"])
             final_data.save_to_disk(args.output)
 
-    FINAL_DATA_SIZE = len(final_data)
-    DUP_SIZE = DATA_SIZE - FINAL_DATA_SIZE
     PAD = 32
+    for k, v in timer.elapsed_times.items():
+        logger.info(f"{k:<{PAD}}: {v:.2f}s")
 
-    for key, value in timer.elapsed_times.items():
-        logger.info(f"{key:<{PAD}}: {value:.2f} seconds")
-    logger.info(f"{'Data Number (before)':<{PAD}}: {DATA_SIZE}")
-    logger.info(f"{'Data Number (after)':<{PAD}}: {FINAL_DATA_SIZE} ({FINAL_DATA_SIZE / DATA_SIZE:.2%})")  # noqa: E501
-    logger.info(f"{'Duplicate Number':<{PAD}}: {DUP_SIZE} ({DUP_SIZE / DATA_SIZE:.2%})")  # noqa: E501
-    logger.info("🤗 Happy Deduplicating 🤗")
+    logger.info(f"{'Before':<{PAD}}: {len(ds)}")
+    logger.info(f"{'After':<{PAD}}: {len(final_data)}")

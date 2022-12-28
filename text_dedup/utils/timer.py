@@ -15,13 +15,9 @@ class TimerContext:
         self.start_time = time.time()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-
-        # check the exception
-        if exc_type is not None:
-            print(f"Exception: {exc_type} {exc_val} {exc_tb}")
-
+        if any([exc_type, exc_val, exc_tb]):
+            return True
         self.timer.elapsed_times[self.name] = time.time() - self.start_time
-        return self
 
 
 class Timer:

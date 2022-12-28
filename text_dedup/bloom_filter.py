@@ -70,8 +70,9 @@ if __name__ == "__main__":
         with timer("Saving"):
             ds.save_to_disk(args.output)
 
+    PAD = 32
     for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<30}: {v:.2f}s")
+        logger.info(f"{k:<{PAD}}: {v:.2f}s")
 
-    logger.info(f"{'Before':<30}: {len(flags)}")
-    logger.info(f"{'After':<30}: {len(ds)}")
+    logger.info(f"{'Before':<{PAD}}: {len(flags)}")
+    logger.info(f"{'After':<{PAD}}: {len(ds)}")
