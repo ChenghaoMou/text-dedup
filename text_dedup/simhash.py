@@ -13,7 +13,12 @@ import random
 import warnings
 from collections import defaultdict
 from itertools import permutations
-from typing import Any, Dict, Generator, List, Set, Tuple
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Set
+from typing import Tuple
 
 import datasets
 import numpy as np
@@ -22,13 +27,11 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
-from text_dedup.utils import (
-    UnionFind,
-    add_io_args,
-    add_meta_args,
-    add_simhash_args,
-    ngrams,
-)
+from text_dedup.utils import UnionFind
+from text_dedup.utils import add_io_args
+from text_dedup.utils import add_meta_args
+from text_dedup.utils import add_simhash_args
+from text_dedup.utils import ngrams
 from text_dedup.utils.timer import Timer
 
 warnings.filterwarnings("ignore", category=FutureWarning)

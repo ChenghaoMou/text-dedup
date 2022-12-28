@@ -14,11 +14,18 @@ import re
 import struct
 import warnings
 from collections import defaultdict
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Set
+from typing import Tuple
 
 from text_dedup import logger
-from text_dedup.utils import UnionFind, ngrams
-from text_dedup.utils.add_args import add_io_args, add_meta_args, add_minhash_args
+from text_dedup.utils import UnionFind
+from text_dedup.utils import ngrams
+from text_dedup.utils.add_args import add_io_args
+from text_dedup.utils.add_args import add_meta_args
+from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.timer import Timer
 
 with warnings.catch_warnings():
