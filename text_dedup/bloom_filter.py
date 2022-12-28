@@ -11,7 +11,9 @@ from pybloom_live import ScalableBloomFilter
 from tqdm import tqdm
 
 from text_dedup import logger
-from text_dedup.utils import add_bloom_filter_args, add_io_args, add_meta_args
+from text_dedup.utils import add_bloom_filter_args
+from text_dedup.utils import add_io_args
+from text_dedup.utils import add_meta_args
 from text_dedup.utils.timer import Timer
 
 if __name__ == "__main__":
