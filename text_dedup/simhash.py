@@ -16,7 +16,6 @@ from itertools import permutations
 from typing import Any, Dict, Generator, List, Set, Tuple
 
 import datasets
-import networkit as nk
 import numpy as np
 import xxhash
 from datasets import load_dataset
@@ -35,7 +34,6 @@ from text_dedup.utils.timer import Timer
 warnings.filterwarnings("ignore", category=FutureWarning)
 multiprocessing.set_start_method("fork", force=True)
 datasets.logging.set_verbosity_error()
-nk.setLogLevel("ERROR")
 
 # With multiprocessing and copy-on-write fork (Linux and macOS),
 # we can use global variables to share objects across processes.
