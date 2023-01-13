@@ -16,7 +16,7 @@ class TimerContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if any([exc_type, exc_val, exc_tb]):
-            return True
+            raise exc_val
         self.timer.elapsed_times[self.name] = time.time() - self.start_time
 
 

@@ -9,16 +9,23 @@ import gc
 import hashlib
 import multiprocessing as mp
 import os
+import pickle
 import random
 import re
 import struct
-import warnings
 from collections import defaultdict
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Set
 from typing import Tuple
+
+import datasets
+import numpy as np
+from datasets import load_dataset
+from datasets import load_from_disk
+from scipy.integrate import quad as integrate
+from tqdm import tqdm
 
 from text_dedup import logger
 from text_dedup.utils import UnionFind
@@ -27,15 +34,6 @@ from text_dedup.utils.add_args import add_io_args
 from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.timer import Timer
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    import datasets
-    import numpy as np
-    from datasets import load_dataset
-    from scipy.integrate import quad as integrate
-    from tqdm import tqdm
-
 
 SEED = 42
 NON_ALPHA = re.compile("[^A-Za-z_0-9]")
@@ -172,26 +170,34 @@ if __name__ == "__main__":
     parser = add_meta_args(parser)
     parser = add_minhash_args(parser)
     args = parser.parse_args()
+
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
     timer = Timer()
 
-    B, R = optimal_param(args.threshold, args.num_perm)
+    if args.b is not None and args.r is not None:
+        B, R = args.b, args.r
+    else:
+        B, R = optimal_param(args.threshold, args.num_perm)
+
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
     HASH_TABLES: List[Dict[int, Set]] = [defaultdict(set) for _ in range(B)]
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_dataset(
-                path=args.path,
-                name=args.name,
-                data_dir=args.data_dir,
-                data_files=args.data_files,
-                split=args.split,
-                revision=args.revision,
-                cache_dir=args.cache_dir,
-                use_auth_token=args.use_auth_token,
-            )
+            if args.local:
+                ds = load_from_disk(args.path)
+            else:
+                ds = load_dataset(
+                    path=args.path,
+                    name=args.name,
+                    data_dir=args.data_dir,
+                    data_files=args.data_files,
+                    split=args.split,
+                    revision=args.revision,
+                    cache_dir=args.cache_dir,
+                    use_auth_token=args.use_auth_token,
+                )
 
         DATA_SIZE = len(ds)
         PERMUTATIONS = np.array(
@@ -264,6 +270,9 @@ if __name__ == "__main__":
         with timer("Saving"):
             final_data = final_data.remove_columns(["__cluster__"])
             final_data.save_to_disk(args.output)
+            if args.debug:
+                with open(os.path.join(args.output, "uf.pkl"), "wb") as f:
+                    pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     PAD = 32
     for k, v in timer.elapsed_times.items():

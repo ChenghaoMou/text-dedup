@@ -19,6 +19,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser : argparse.ArgumentParser
         Parser with added arguments.
     """
+    parser.add_argument("--local", action=argparse.BooleanOptionalAction, help="Use local dataset"),
     parser.add_argument("--path", type=str, help="`path` in load_dataset", required=True),
     parser.add_argument("--name", type=str, help="`name` in load_dataset"),
     parser.add_argument("--data_dir", type=str, help="`data_dir` in load_dataset"),
@@ -30,6 +31,9 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--use_auth_token", action=argparse.BooleanOptionalAction, help="`use_auth_token` in load_dataset"
     ),
     parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
+    parser.add_argument(
+        "--debug", action=argparse.BooleanOptionalAction, help="Whether to run in debug mode", default=False
+    )
     return parser
 
 
@@ -81,12 +85,25 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         type=int,
         default=5,
         help="""Ngram size to use in MinHash.""",
-    ),
-    parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash"),
-    parser.add_argument("--num_perm", type=int, default=128, help="Number of permutations to use in MinHash"),
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash")
+    parser.add_argument("--num_perm", type=int, default=128, help="Number of permutations to use in MinHash")
     parser.add_argument(
         "--threshold", type=float, default=0.7, help="Jaccard similarity threshold to use in MinHashLSH"
-    ),
+    )
+    parser.add_argument(
+        "--b",
+        type=int,
+        default=None,
+        help="Number of bands",
+    )
+    parser.add_argument(
+        "--r",
+        type=int,
+        default=None,
+        help="Number of rows per band",
+    )
+
     return parser
 
 
@@ -110,6 +127,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default=3,
         help="""Ngram size to use in SimHash.""",
     )
+    parser.add_argument("--f", type=int, default=64, help="Simhash bit size"),
     parser.add_argument("--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"),
     parser.add_argument(
         "--num_bucket", type=int, default=4, help="Number of buckets to use in SimHash, must be larger than bit_diff"

@@ -10,13 +10,13 @@ packages = [{include = "text_dedup"}]
 [tool.poetry.dependencies]
 python = "^3.9,<3.12"
 numpy = "^1.23.2"
-datasketch = "^1.5.8"
 tqdm = "^4.64.1"
 datasets = "^2.4.0"
 rich = "^12.5.1"
 scipy = "1.9.1"
 xxhash = "^3.0.0"
 pybloom-live = "^4.0.0"
+bitarray = "^2.6.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.3"

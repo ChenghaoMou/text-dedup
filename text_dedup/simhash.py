@@ -7,22 +7,22 @@ from __future__ import annotations
 import argparse
 import gc
 import math
-import multiprocessing
+import multiprocessing as mp
 import os
+import pickle
 import random
-import warnings
 from collections import defaultdict
 from itertools import permutations
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import List
-from typing import Set
 from typing import Tuple
 
 import datasets
 import numpy as np
 import xxhash
+from bitarray import bitarray
+from bitarray import frozenbitarray
 from datasets import load_dataset
 from tqdm import tqdm
 
@@ -34,53 +34,38 @@ from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
 from text_dedup.utils.timer import Timer
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-multiprocessing.set_start_method("fork", force=True)
 datasets.logging.set_verbosity_error()
-
-# With multiprocessing and copy-on-write fork (Linux and macOS),
-# we can use global variables to share objects across processes.
-# This might not be the case on some systems where objects are
-# pickled and sent to the child processes. It might also not be reflected
-# when you use top command to check the memory usage. One way to check is to
-# print the id of the object in the child processes and see if they are the same.
-# References:
-# 1. https://stackoverflow.com/questions/38084401/leveraging-copy-on-write-to-copy-data-to-multiprocessing-pool-worker-process
-# 2. https://stackoverflow.com/questions/53841599/python-multiprocessing-copy-on-write-behaving-differently-between-osx-and-ubuntu
-# 3. https://stackoverflow.com/questions/40221868/multiprocessing-global-variable-memory-copying
-# 4. https://docs.python.org/3/library/gc.html#gc.freeze
-
 BIT_MASK: np.ndarray = 2 ** np.arange(64, dtype=np.uint64).reshape([1, 64])
 
 
-def _hamming_distance(a: int, b: int) -> int:
+def _hamming_distance(a: bitarray, b: bitarray) -> int:
     """
-    Compute the Hamming distance between two integers.
+    Compute the Hamming distance between two bitarrays.
 
     Parameters
     ----------
-    a : int
-        The first integer.
-    b : int
-        The second integer.
+    a : bitarray
+        The first bitarray.
+    b : bitarray
+        The second bitarray.
 
     Returns
     -------
     int
-        The Hamming distance between the two integers.
+        The Hamming distance between the two bitarrays.
 
     Examples
     --------
-    >>> _hamming_distance(0b1010, 0b0101)
-    4
-    >>> _hamming_distance(0b1010, 0b1010)
+    >>> _hamming_distance(bitarray('1010'), bitarray('1010'))
     0
+    >>> _hamming_distance(bitarray('1010'), bitarray('0010'))
+    1
     """
-    return (a ^ b).bit_count()
+    return (a ^ b).count(1)
 
 
 class Permutation:
-    def __init__(self, f: int, k: int, b: int, masks: List[Tuple[int, int, int, int]]) -> None:
+    def __init__(self, f: int, k: int, b: int, masks: List[Tuple[bitarray, int, int, int]]) -> None:
         """
         A permutation object for bit manipulation.
 
@@ -108,8 +93,8 @@ class Permutation:
         self.masks: List[int] = []  # block masks
         for mask, mask_size, start, _ in masks:
             self.widths.append(mask_size)
+            offset = start - width
             width += mask_size
-            offset = f - width - start
             self.offsets.append(offset)
             if offset > 0:
                 self.reverse_masks.append(mask << offset)
@@ -118,28 +103,30 @@ class Permutation:
 
             self.masks.append(mask)
 
-        prefix_width = sum(self.widths[: b - k])
-        self.search_mask: int = 0
-        for i in range(f):
-            if i < prefix_width:
-                self.search_mask += 1
-            self.search_mask <<= 1
+        assert sum(self.widths) == f, "The sum of block widths must be equal to the fingerprint size"
 
-    def permute(self, x: int) -> int:
+        prefix_width = sum(self.widths[: b - k])
+        self.search_mask: bitarray = bitarray(f)
+        self.search_mask.setall(0)
+        self.search_mask[:prefix_width] = 1
+        self.search_mask = frozenbitarray(self.search_mask)
+
+    def permute(self, x: bitarray) -> bitarray:
         """
         Permute the fingerprint.
 
         Parameters
         ----------
-        x: int
+        x: bitarray
             The fingerprint to be permuted
 
         Returns
         -------
-        int
+        bitarray
             The permuted fingerprint
         """
-        result = 0
+        result = bitarray(self.f)
+        result.setall(0)
 
         for mask, offset in zip(self.masks, self.offsets):
             if offset > 0:
@@ -149,21 +136,23 @@ class Permutation:
 
         return result
 
-    def reverse(self, x: int) -> int:
+    def reverse(self, x: bitarray) -> bitarray:
         """
         Reverse the permutation.
 
         Parameters
         ----------
-        x: int
+        x: bitarray
            The fingerprint to be reversed
 
         Returns
         -------
-        int
+        bitarray
             The reversed fingerprint
         """
-        result = 0
+        result = bitarray(self.f)
+        result.setall(0)
+
         for mask, offset in zip(self.reverse_masks, self.offsets):
             if offset > 0:
                 result |= (x & mask) >> offset
@@ -174,29 +163,40 @@ class Permutation:
 
 def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     """
-    Create permutations for f bit, b blocks, and k bit difference allowed.
+    Create permutations for f bits and b blocks with k-bit difference allowed.
 
     Parameters
     ----------
     f: int
-        The fingerprint to be permuted
+        Fingerprint size
     k: int
-        The bit difference allowed
+        Bit difference allowed
     b: int
-        The number of blocks
+        Number of blocks
 
     Returns
     -------
     List[Permutation]
         The permutations
+
+    Examples
+    --------
+    >>> from bitarray.util import urandom
+    >>> perms = _create_permutations(128, 3, 4)
+    >>> len(perms)
+    4
+    >>> data = urandom(128)
+    >>> for perm in perms:
+    ...     assert perm.reverse(perm.permute(data)) == data
     """
     block_size: int = math.ceil(f / b)
-    masks: List[Tuple[int, int, int, int]] = []
+    masks: List[Tuple[bitarray, int, int, int]] = []
+
     for i in range(b):
-        mask: int = 0
         start, end = i * block_size, min((i + 1) * block_size, f)
-        for j in range(start, end):
-            mask |= 1 << j
+        mask: bitarray = bitarray(f)
+        mask.setall(0)
+        mask[start:end] = 1
         masks.append(
             (
                 mask,
@@ -207,50 +207,14 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
         )
 
     results: List[Permutation] = []
-    for leading_blocks in permutations(masks, b - k):
-        blocks = list(leading_blocks)
-        for record in masks:
-            if record not in blocks:
-                blocks.append(record)
+    # b - k many blocks must be the same
+    indices = set(range(len(masks)))
+    for leading_idx in permutations(range(len(masks)), b - k):
+        remaining_idx = sorted(indices - set(leading_idx))
+        blocks = [masks[i] for i in leading_idx] + [masks[i] for i in remaining_idx]
         results.append(Permutation(f, k, b, blocks))
 
     return results
-
-
-class SimHashIndex(object):
-    def __init__(
-        self,
-        f: int = 64,
-        k: int = 3,
-        b: int = 4,
-    ):
-        assert b > k, "b must be greater than k"
-
-        self.k = k
-        self.b = b
-        self.f = f
-
-        self.bucket: Dict[Any, List] = defaultdict(list)
-        self.permutations = _create_permutations(f, k, b)
-
-    def query(self, fingerprint: int) -> List[Any]:
-        fingerprint = int(fingerprint)
-        ans = set()
-        for key in self.get_keys(fingerprint):
-            for idx, other_fingerprint in self.bucket[key]:
-                if _hamming_distance(fingerprint, other_fingerprint) <= self.k:
-                    ans.add(idx)
-        return list(ans)
-
-    def add(self, idx: int, fingerprint: int):
-        fingerprint = int(fingerprint)
-        for key in self.get_keys(fingerprint):
-            self.bucket[key].append((idx, fingerprint))
-
-    def get_keys(self, fingerprint: int) -> Generator[Tuple[int, int], None, None]:
-        fingerprint = int(fingerprint)
-        for permutation in self.permutations:
-            yield permutation.search_mask, permutation.permute(fingerprint) & permutation.search_mask
 
 
 def unpackbits(x: np.ndarray, num_bits: int = 64) -> np.ndarray:
@@ -279,9 +243,9 @@ def unpackbits(x: np.ndarray, num_bits: int = 64) -> np.ndarray:
     return (x & BIT_MASK).astype(bool).astype(int).reshape(xshape + [num_bits])
 
 
-def _unsigned_hash(obj: bytes) -> int:
+def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
     """
-    Compute a 64-bit hash of an object.
+    Compute a hash of an object.
 
     It doesn't really matter what hash function to use, as long as it is consistent.
 
@@ -289,21 +253,33 @@ def _unsigned_hash(obj: bytes) -> int:
     ----------
     obj: bytes
         The object to hash.
+    f: int
+        The fingerprint size
 
     Returns
     -------
-    int
+    bitarray
         The hash of the object.
 
     Examples
     --------
-    >>> _unsigned_hash(b'hello world')
-    5020219685658847592
+    >>> len(_unsigned_hash(b'hello world', f=64))
+    64
+    >>> len(_unsigned_hash(b'hello world', f=128))
+    128
     """
-    return xxhash.xxh64(obj).intdigest()
+    result = bitarray(0)
+    match f:
+        case 64:
+            result.frombytes(xxhash.xxh64(obj).digest())
+        case 128:
+            result.frombytes(xxhash.xxh128(obj).digest())
+        case _:
+            raise ValueError(f"Unsupported fingerprint size: {f}")
+    return result
 
 
-def compute(hashes: List[int]) -> int:
+def compute(hashes: List[bitarray]) -> bitarray:
     """
     Compute the Simhash of a list of hashes.
 
@@ -316,20 +292,24 @@ def compute(hashes: List[int]) -> int:
 
     Returns
     -------
-    int
+    bitarray
         The Simhash of the list of hashes.
 
     Examples
     --------
-    >>> compute([13352372148217134600, 5020219685658847592])
+    >>> from bitarray.util import int2ba, ba2int
+    >>> res = compute([int2ba(13352372148217134600, length=64), int2ba(5020219685658847592, length=64)])
+    >>> ba2int(res)
     74633958390507528
     """
-    bits = 2 * unpackbits(np.asarray(hashes, dtype=np.uint64), 64) - 1
-    res = (np.where(np.sum(bits, axis=0) > 0, 1, 0)[::-1]).astype(np.uint64)
-    return np.packbits(res).view(np.uint64).byteswap().item()
+    sigs = np.asarray([h.tolist() for h in hashes], dtype=int)
+    sig = np.where(np.sum(2 * sigs - 1, axis=0) > 0, 1, 0).astype(bool)
+    res = bitarray()
+    res.pack(sig.tobytes())
+    return res
 
 
-def embed_func(content: str, idx: int, *, ngram: int) -> Dict[str, Any]:
+def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List[Permutation] = None) -> Dict[str, Any]:
     """
     Calculate the simhash signature of a text.
 
@@ -337,6 +317,8 @@ def embed_func(content: str, idx: int, *, ngram: int) -> Dict[str, Any]:
     ----------
     content : str
         The text to be hashed.
+    f : int
+        The fingerprint size.
     idx : int
         The index of the text.
     ngram : int
@@ -352,52 +334,19 @@ def embed_func(content: str, idx: int, *, ngram: int) -> Dict[str, Any]:
     >>> res = embed_func("hello world", 0, ngram=3)
     >>> res["__id__"]
     0
-    >>> res["__signature__"].dtype
-    dtype('uint64')
     """
     tokens = ngrams(content.split(" "), n=ngram)
-    sig = compute([_unsigned_hash(" ".join(t).encode("utf-8")) for t in tokens])
-    return {"__signature__": np.uint64(sig), "__id__": idx}
-
-
-def query_func(idx: int, signature: np.uint64, *, index: SimHashIndex) -> Dict[str, Any]:
-    """
-    Query the simhash index.
-
-    Parameters
-    ----------
-    idx : int
-        The index of the text.
-    signature : np.ndarray
-        The simhash signature of the text.
-    index : MinHashLSH
-        The simhash index.
-    seed : int
-        The seed for the simhash.
-
-    Returns
-    -------
-    Dict[str, Any]
-        The neighbors of the text as a dictionary.
-
-    Examples
-    --------
-    >>> index = SimHashIndex(f=64, k=3, b=4)
-    >>> h = embed_func("hello world", 0, ngram=3)["__signature__"]
-    >>> h.dtype
-    dtype('uint64')
-    >>> index.add(0, h)
-    >>> index.add(1, h)
-    >>> res = query_func(0, h, index=index)
-    >>> res["__id__"]
-    0
-    >>> res["__neighbors__"]
-    [1]
-    """
-    return {
-        "__neighbors__": [dup_idx for dup_idx in index.query(signature) if dup_idx != idx],
-        "__id__": idx,
-    }
+    sig = compute([_unsigned_hash(" ".join(t).encode("utf-8"), f=f) for t in tokens])
+    keys = []
+    if permutations:
+        for permutation in permutations:
+            keys.append(
+                (
+                    permutation.search_mask.tobytes(),
+                    frozenbitarray(permutation.permute(sig) & permutation.search_mask).tobytes(),
+                )
+            )
+    return {"__signature__": sig.tobytes(), "__id__": idx, "__keys__": keys}
 
 
 if __name__ == "__main__":
@@ -410,14 +359,13 @@ if __name__ == "__main__":
     parser = add_io_args(parser)
     parser = add_meta_args(parser)
     parser = add_simhash_args(parser)
-
     args = parser.parse_args()
-    simhash_index = SimHashIndex(
-        k=args.bit_diff,
-        b=args.num_bucket,
-    )
-    timer = Timer()
+
+    mp.set_start_method("fork", force=True)
     uf = UnionFind()
+    timer = Timer()
+    PERMUTATIONS = _create_permutations(args.f, k=args.bit_diff, b=args.num_bucket)
+    BUCKETS: Dict[Any, List] = defaultdict(list)
 
     with timer("Total"):
         with timer("Loading"):
@@ -437,7 +385,7 @@ if __name__ == "__main__":
         with timer("SimHashing"):
             embedded = ds.map(
                 function=embed_func,
-                fn_kwargs={"ngram": args.ngram},
+                fn_kwargs={"ngram": args.ngram, "permutations": PERMUTATIONS, "f": args.f},
                 input_columns=[args.column],
                 remove_columns=[args.column],
                 num_proc=os.cpu_count(),
@@ -445,22 +393,34 @@ if __name__ == "__main__":
                 desc=f"SimHashing...",
             )
 
-        with timer("Indexing"):
+        with timer("Clustering"):
             for i in tqdm(
                 range(0, len(embedded), args.batch_size),
                 dynamic_ncols=True,
-                desc="Iterating MinHashes...",  # noqa: E501
+                desc="Iterating MinHashes...",
             ):
                 batch = embedded[i : i + args.batch_size]
-                for idx, sig in tqdm(
-                    zip(batch["__id__"], batch["__signature__"]),
-                    desc="Indexing signatures...",
+                for idx, keys, sig in tqdm(
+                    zip(batch["__id__"], batch["__keys__"], batch["__signature__"]),
+                    desc="Indexing...",
                     leave=False,
                     total=len(batch["__id__"]),
                 ):
-                    for neighbor in simhash_index.query(sig):
-                        uf.union(idx, neighbor)
-                    simhash_index.add(idx, sig)
+                    temp = bitarray()
+                    temp.frombytes(sig)
+                    sig = frozenbitarray(temp)
+                    neighbors = set()
+                    for key in keys:
+                        key = tuple(key)
+                        for idy, other_fingerprint in BUCKETS[key]:
+                            if idy in neighbors:
+                                continue
+                            if _hamming_distance(sig, other_fingerprint) <= args.bit_diff:
+                                neighbors.add(idy)
+                        BUCKETS[key].append((idx, sig))
+
+                    for idy in neighbors:
+                        uf.union(idx, idy)
 
         with timer("Filtering"):
             gc.freeze()
@@ -487,6 +447,9 @@ if __name__ == "__main__":
         with timer("Saving"):
             final_data = final_data.remove_columns(["__cluster__"])
             final_data.save_to_disk(args.output)
+            if args.debug:
+                with open(os.path.join(args.output, "uf.pkl"), "wb") as f:
+                    pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     PAD = 32
     for k, v in timer.elapsed_times.items():

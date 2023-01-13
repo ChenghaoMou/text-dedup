@@ -8,7 +8,7 @@ A collection of data deduplication scripts.
 
 - Ready to use and modify single script for each method:
   - MinHash + MinHashLSH
-  - SimHash
+  - SimHash (64, 128)
   - SuffixArray Substring
   - Bloom Filter
   - Exact Hash
@@ -20,6 +20,7 @@ A collection of data deduplication scripts.
 - [Deduplicating Training Data Makes Language Models Better](https://github.com/google-research/deduplicate-text-datasets) (Apache 2.0)
 - [BigScience](https://github.com/bigscience-workshop) (Apache 2.0)
 - [BigCode](https://github.com/bigcode-project) (Apache 2.0)
+- [Gaoya](https://github.com/serega/gaoya) (MIT)
 
 ## Quick Examples
 
@@ -149,6 +150,10 @@ INFO     Total                         : 10.54s
 INFO     Before                        : 88803
 INFO     After                         : 47045
 ```
+## Benchmarks
+
+A benchmark of different methods here can be found in `benchmarks/comparison.ipynb`. A notebook in evaluating MinHash on `pinecone/core-2020-05-10-deduplication` can be found in `benchmarks/datasets.ipynb`.
+
 
 ## Documentation
 
@@ -157,11 +162,9 @@ INFO     After                         : 47045
 ## Roadmap
 
 - [ ] Memory benchmark for streaming processing
-- [ ] Speed benchmark for in-memory processing
 - [ ] Inter-dataset deduplication
 - [ ] Rewrite suffix array in Python
-- [ ] A collections of deduplication methods used in papers/datasets/projects
-- [ ] SuperMinHash, ProbMinHash, TreeMinHash, BagMinHash, [Optimal Densification for Fast and Accurate Minwise Hashing](https://arxiv.org/abs/1703.04664), [Fast Similarity Sketching](https://arxiv.org/abs/1704.04370)
+- [ ] A collections of deduplication methods used in papers/datasets/projects: SuperMinHash, ProbMinHash, TreeMinHash, BagMinHash, [Optimal Densification for Fast and Accurate Minwise Hashing](https://arxiv.org/abs/1703.04664), [Fast Similarity Sketching](https://arxiv.org/abs/1704.04370)
 
 ## FAQ
 
