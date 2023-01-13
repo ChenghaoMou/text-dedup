@@ -35,7 +35,6 @@ from text_dedup.utils import ngrams
 from text_dedup.utils.timer import Timer
 
 datasets.logging.set_verbosity_error()
-BIT_MASK: np.ndarray = 2 ** np.arange(64, dtype=np.uint64).reshape([1, 64])
 
 
 def _hamming_distance(a: bitarray, b: bitarray) -> int:
@@ -136,30 +135,6 @@ class Permutation:
 
         return result
 
-    def reverse(self, x: bitarray) -> bitarray:
-        """
-        Reverse the permutation.
-
-        Parameters
-        ----------
-        x: bitarray
-           The fingerprint to be reversed
-
-        Returns
-        -------
-        bitarray
-            The reversed fingerprint
-        """
-        result = bitarray(self.f)
-        result.setall(0)
-
-        for mask, offset in zip(self.reverse_masks, self.offsets):
-            if offset > 0:
-                result |= (x & mask) >> offset
-            else:
-                result |= (x & mask) << -offset
-        return result
-
 
 def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     """
@@ -215,32 +190,6 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
         results.append(Permutation(f, k, b, blocks))
 
     return results
-
-
-def unpackbits(x: np.ndarray, num_bits: int = 64) -> np.ndarray:
-    """
-    Unpack a numpy integer array into a numpy bit array.
-
-    Parameters
-    ----------
-    x: np.ndarray
-        The numpy integer array, unsigned
-    num_bits: int
-        The number of bits to unpack
-
-    Returns
-    -------
-    np.ndarray
-        The numpy bit array
-
-    Examples
-    --------
-    >>> unpackbits(np.array([0, 1], dtype=np.uint64)).shape
-    (2, 64)
-    """
-    xshape = list(x.shape)
-    x = x.reshape([-1, 1])
-    return (x & BIT_MASK).astype(bool).astype(int).reshape(xshape + [num_bits])
 
 
 def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
@@ -343,7 +292,7 @@ def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List
             keys.append(
                 (
                     permutation.search_mask.tobytes(),
-                    frozenbitarray(permutation.permute(sig) & permutation.search_mask).tobytes(),
+                    (permutation.permute(sig) & permutation.search_mask).tobytes(),
                 )
             )
     return {"__signature__": sig.tobytes(), "__id__": idx, "__keys__": keys}
@@ -393,6 +342,7 @@ if __name__ == "__main__":
                 desc=f"SimHashing...",
             )
 
+        # TODO Create multiple BUCKETS for parallelization
         with timer("Clustering"):
             for i in tqdm(
                 range(0, len(embedded), args.batch_size),

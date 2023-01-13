@@ -3,7 +3,8 @@
 # @Date    : 2022-12-26 15:59:42
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from itertools import tee
-from typing import List, Text
+from typing import List
+from typing import Text
 
 
 def ngrams(sequence: List[Text], n: int):

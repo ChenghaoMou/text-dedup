@@ -19,7 +19,6 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser : argparse.ArgumentParser
         Parser with added arguments.
     """
-    parser.add_argument("--local", action=argparse.BooleanOptionalAction, help="Use local dataset"),
     parser.add_argument("--path", type=str, help="`path` in load_dataset", required=True),
     parser.add_argument("--name", type=str, help="`name` in load_dataset"),
     parser.add_argument("--data_dir", type=str, help="`data_dir` in load_dataset"),
@@ -30,6 +29,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--use_auth_token", action=argparse.BooleanOptionalAction, help="`use_auth_token` in load_dataset"
     ),
+    parser.add_argument("--local", action=argparse.BooleanOptionalAction, help="Use local dataset", default=False),
     parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
     parser.add_argument(
         "--debug", action=argparse.BooleanOptionalAction, help="Whether to run in debug mode", default=False
@@ -84,10 +84,10 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         "--ngram",
         type=int,
         default=5,
-        help="""Ngram size to use in MinHash.""",
+        help="Ngram size to use in MinHash.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash")
-    parser.add_argument("--num_perm", type=int, default=128, help="Number of permutations to use in MinHash")
+    parser.add_argument("--num_perm", type=int, default=256, help="Number of permutations to use in MinHash")
     parser.add_argument(
         "--threshold", type=float, default=0.7, help="Jaccard similarity threshold to use in MinHashLSH"
     )

@@ -9,14 +9,22 @@ import os
 import random
 import subprocess
 from collections import deque
-from pathlib import Path, PosixPath
-from typing import Deque, Generator, List, Literal, Sequence, Tuple
+from pathlib import Path
+from pathlib import PosixPath
+from typing import Deque
+from typing import Generator
+from typing import List
+from typing import Literal
+from typing import Sequence
+from typing import Tuple
 
 import datasets
 from datasets import load_dataset
 
 from text_dedup import logger
-from text_dedup.utils import add_io_args, add_meta_args, add_sa_args
+from text_dedup.utils import add_io_args
+from text_dedup.utils import add_meta_args
+from text_dedup.utils import add_sa_args
 from text_dedup.utils.timer import Timer
 
 random.seed(42)
