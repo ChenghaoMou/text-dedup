@@ -12,7 +12,6 @@ import os
 import pickle
 import random
 import re
-import struct
 from collections import defaultdict
 from typing import Any
 from typing import Dict
@@ -36,26 +35,37 @@ from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.timer import Timer
 
 SEED = 42
-NON_ALPHA = re.compile("[^A-Za-z_0-9]")
 RNG = np.random.RandomState(SEED)
+NON_ALPHA = re.compile("[^A-Za-z_0-9]")
 MAX_HASH = np.uint64((1 << 32) - 1)
 MERSENNE_PRIME = np.uint64((1 << 61) - 1)
 datasets.logging.set_verbosity_error()
 
 
-def sha1_hash32(data):
+def sha1_hash(data: bytes, d: int = 32) -> int:
     """
-    Directly taken from datasketch package to avoid dependency.
+    Generate a d-bit hash value from the given data.
 
     Parameters
     ----------
     data : bytes
+        The data to be hashed.
+    d : int
+        The number of bits of the hash value.
 
     Returns
     -------
     int
+        The hash value.
+
+    Examples
+    --------
+    >>> sha1_hash(b"hello world", 32)
+    896314922
+    >>> sha1_hash(b"hello world", 64)
+    13028719972609469994
     """
-    return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
+    return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
 
 
 def embed_func(
@@ -68,7 +78,7 @@ def embed_func(
     permutations: np.ndarray,
 ) -> Dict[str, Any]:
     """
-    Combined with some datasketch code to avoid dependency.
+    Calculate hash values for the content.
 
     Parameters
     ----------
@@ -90,12 +100,14 @@ def embed_func(
     Dict[str, Any]
         The hash values in each range and the index.
     """
-    hashvalues = np.ones(num_perm, dtype=np.uint64) * MAX_HASH
-    tokens = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size)}
-    hv = np.array([sha1_hash32(token.encode("utf-8")) for token in tokens], dtype=np.uint64)  # noqa: E501
     a, b = permutations
-    phv = np.bitwise_and(((hv * np.tile(a, (len(hv), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH)  # noqa: E501
-    hashvalues = np.vstack([phv, hashvalues]).min(axis=0)
+    masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
+    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size)}
+    hashvalues: np.ndarray = np.array([sha1_hash(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
+    permuted_hashvalues = np.bitwise_and(
+        ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
+    )
+    hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
@@ -124,7 +136,14 @@ def optimal_param(
     Returns
     -------
     Tuple[int, int]
-        The optimal `b` and `r` parameters.
+        The optimal `b` (bands) and `r` (rows) parameters.
+
+    Examples
+    --------
+    >>> optimal_param(0.75, 256)
+    (21, 12)
+    >>> optimal_param(0.75, 256, 0.1, 0.9)
+    (28, 9)
     """
 
     def false_positive_probability(threshold: float, b: int, r: int):
@@ -235,8 +254,9 @@ if __name__ == "__main__":
             ):
                 batch = embedded[i : i + args.batch_size]
                 for key, Hs in zip(batch["__id__"], batch["__signatures__"]):
-                    for H, hashtable in zip(Hs, HASH_TABLES):
-                        hashtable[H].add(key)
+                    for i, H in enumerate(Hs):
+                        HASH_TABLES[i][H].add(key)
+
             for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
                 for cluster in table.values():
                     if len(cluster) <= 1:
@@ -244,6 +264,19 @@ if __name__ == "__main__":
                     idx = min(cluster)
                     for x in cluster:
                         uf.union(x, idx)
+
+            # import dask.bag as db
+            # bags = db.from_sequence(zip(embedded["__signatures__"], embedded["__id__"]))\
+            #     .map(lambda x: [(i, sig, x[1]) for i, sig in enumerate(x[0])])\
+            #     .flatten()\
+            #     .groupby(lambda x: (x[0], x[1]))\
+            #     .map(lambda x: (min(i for *_, i in x[1]), {i for *_, i in x[1]}))\
+            #     .filter(lambda x: len(x[1]) > 1)\
+            #     .map(lambda x: [(x[0], i) for i in x[1]])\
+            #     .flatten()\
+            #     .compute()
+            # for x, y in tqdm(bags, dynamic_ncols=True, desc="Clustering..."):
+            #     uf.union(y, x)
 
         with timer("Filtering"):
             gc.freeze()

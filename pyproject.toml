@@ -17,6 +17,7 @@ scipy = "1.9.1"
 xxhash = "^3.0.0"
 pybloom-live = "^4.0.0"
 bitarray = "^2.6.2"
+dask = {extras = ["bag"], version = "^2023.1.0"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.3"

@@ -24,6 +24,7 @@ import xxhash
 from bitarray import bitarray
 from bitarray import frozenbitarray
 from datasets import load_dataset
+from datasets import load_from_disk
 from tqdm import tqdm
 
 from text_dedup import logger
@@ -89,7 +90,7 @@ class Permutation:
         self.widths: List[int] = []  # block widths
         self.offsets: List[int] = []  # block offsets
         self.reverse_masks: List[int] = []  # block reverse masks
-        self.masks: List[int] = []  # block masks
+        self.masks: List[bitarray] = []  # block masks
         for mask, mask_size, start, _ in masks:
             self.widths.append(mask_size)
             offset = start - width
@@ -128,6 +129,7 @@ class Permutation:
         result.setall(0)
 
         for mask, offset in zip(self.masks, self.offsets):
+            assert len(mask) == len(x) == self.f, f"{len(mask)}, {len(x)}, {self.f}"
             if offset > 0:
                 result |= (x & mask) << offset
             else:
@@ -280,13 +282,15 @@ def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List
 
     Examples
     --------
-    >>> res = embed_func("hello world", 0, ngram=3)
+    >>> res = embed_func("hello world", 0, f=64, ngram=3)
     >>> res["__id__"]
     0
+    >>> len(res["__signature__"])
+    8
     """
-    tokens = ngrams(content.split(" "), n=ngram)
-    sig = compute([_unsigned_hash(" ".join(t).encode("utf-8"), f=f) for t in tokens])
-    keys = []
+    tokens = {"".join(ng) for ng in ngrams(list(content), n=ngram)}
+    sig = compute([_unsigned_hash(t.encode("utf-8"), f=f) for t in tokens])
+    keys: List[Tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:
             keys.append(
@@ -318,16 +322,19 @@ if __name__ == "__main__":
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_dataset(
-                path=args.path,
-                name=args.name,
-                data_dir=args.data_dir,
-                data_files=args.data_files,
-                split=args.split,
-                revision=args.revision,
-                cache_dir=args.cache_dir,
-                use_auth_token=args.use_auth_token,
-            )
+            if args.local:
+                ds = load_from_disk(args.path)
+            else:
+                ds = load_dataset(
+                    path=args.path,
+                    name=args.name,
+                    data_dir=args.data_dir,
+                    data_files=args.data_files,
+                    split=args.split,
+                    revision=args.revision,
+                    cache_dir=args.cache_dir,
+                    use_auth_token=args.use_auth_token,
+                )
 
         DATA_SIZE = len(ds)
 
@@ -347,7 +354,7 @@ if __name__ == "__main__":
             for i in tqdm(
                 range(0, len(embedded), args.batch_size),
                 dynamic_ncols=True,
-                desc="Iterating MinHashes...",
+                desc="Iterating SimHashes...",
             ):
                 batch = embedded[i : i + args.batch_size]
                 for idx, keys, sig in tqdm(
@@ -356,9 +363,7 @@ if __name__ == "__main__":
                     leave=False,
                     total=len(batch["__id__"]),
                 ):
-                    temp = bitarray()
-                    temp.frombytes(sig)
-                    sig = frozenbitarray(temp)
+                    sig = frozenbitarray(buffer=sig)
                     neighbors = set()
                     for key in keys:
                         key = tuple(key)

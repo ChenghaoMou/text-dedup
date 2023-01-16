@@ -29,7 +29,11 @@ def ngrams(sequence: List[Text], n: int):
     --------
     >>> list(ngrams(["a", "b", "c", "d"], 2))
     [('a', 'b'), ('b', 'c'), ('c', 'd')]
+    >>> list(ngrams(["a", "b"], 3))
+    [['a', 'b']]
     """
+    if len(sequence) < n:
+        return iter([sequence])
     iterables = tee(iter(sequence), n)
     for i, sub_iterable in enumerate(iterables):
         for _ in range(i):
