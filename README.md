@@ -4,9 +4,12 @@ A collection of data deduplication scripts.
 
 ![GitHub](https://img.shields.io/github/license/ChenghaoMou/text-dedup) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage)
 
+Intended for deduplicating moderate datasets (<100 M docs) with one multi-core machine. Designed to be modified for specific use cases.
+Please reach out if you are interested in collaboration for large scale deduplication in distributed environment.
+
 ## Features
 
-- Ready to use and modify single script for each method:
+- Ready to use or modify scripts for each deduplication method:
   - MinHash + MinHashLSH
   - SimHash (64, 128)
   - SuffixArray Substring
@@ -150,10 +153,22 @@ INFO     Total                         : 10.54s
 INFO     Before                        : 88803
 INFO     After                         : 47045
 ```
+
 ## Benchmarks
 
-A benchmark of different methods here can be found in `benchmarks/comparison.ipynb`. A notebook in evaluating MinHash on `pinecone/core-2020-05-10-deduplication` can be found in `benchmarks/datasets.ipynb`.
+A benchmark of different methods here can be found in `benchmarks/wiki40.ipynb`. A notebook in evaluating MinHash on `pinecone/core-2020-05-10-deduplication` can be found in `benchmarks/pinecone.ipynb`.
 
+For quick reference, here are the results:
+
+| Method                                                                              | Precision  | Recall     | F1         | Time |
+| ----------------------------------------------------------------------------------- | ---------- | ---------- | ---------- | ---- |
+| MinHash                                                                             | **0.9464** | **0.9446** | **0.9455** | 24s  |
+| SimHash\*                                                                           | 0.9011     | 0.6959     | 0.7853     | 210s |
+| SimHash [(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)     | 0.697      | 0.247      | 0.3647     | -    |
+| Exact Title (my implementation)                                                     | 0.8302     | 0.5521     | 0.6632     | -    |
+| Exact Title [(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830      | 0.50       | 0.624      | -    |
+
+\*Best SimHash result from `benchmarks/hyperparameter.ipynb`.
 
 ## Documentation
 
