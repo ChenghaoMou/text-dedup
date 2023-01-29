@@ -4,17 +4,14 @@ A collection of data deduplication scripts.
 
 ![GitHub](https://img.shields.io/github/license/ChenghaoMou/text-dedup) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage)
 
-Intended for deduplicating moderate datasets (<100 M docs) with one multi-core machine. Designed to be modified for specific use cases.
-Please reach out if you are interested in collaboration for large scale deduplication in distributed environment.
-
 ## Features
 
-- Ready to use or modify scripts for each deduplication method:
-  - MinHash + MinHashLSH
-  - SimHash (64, 128)
-  - SuffixArray Substring
-  - Bloom Filter
-  - Exact Hash
+Ready to use or modify scripts for each deduplication method:
+- MinHash + MinHashLSH, including a spark implementation suitable for large scale (>100M) datasets
+- SimHash (64, 128)
+- SuffixArray Substring
+- Bloom Filter
+- Exact Hash
 
 ## Acknowledgements
 
@@ -27,7 +24,37 @@ Please reach out if you are interested in collaboration for large scale deduplic
 
 ## Quick Examples
 
-In this section, we are going to deduplicate one dataset: `gl` subset of `oscar-corpus/OSCAR-2201`.
+### PySpark with DataProc
+
+*MODIFY `spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!*
+
+```bash
+export CLUSTER_NAME=chenghao-temp
+export PROJECT_ID=xx
+
+gcloud dataproc clusters create $CLUSTER_NAME \
+    --enable-component-gateway \
+    --region us-central1 \
+    --zone us-central1-a \
+    --master-machine-type c2d-standard-16 \
+    --master-boot-disk-size 500 \
+    --num-workers 10 \
+    --worker-machine-type c2d-standard-16 \
+    --worker-boot-disk-size 500 \
+    --image-version 2.0-debian10 \
+    --project $PROJECT_ID
+
+gcloud dataproc jobs submit pyspark --cluster ${CLUSTER_NAME} \
+    --region us-central1 \
+    --jars gs://spark-lib/bigquery/spark-bigquery-latest_2.12.jar \
+    --driver-log-levels root=WARN \
+    --properties="spark.executor.memory"="50g","spark.driver.memory"="8g","spark.executor.cores"="14" \
+    spark.py
+```
+
+For reference, the script finished deduplicating 42 million rows in less than 40 minutes with above settings (160 cores, 640GB memory in total), while the python version would take around 10 hours with a 80-core machine with 1.8TB memory.
+
+In the following part, we are going to deduplicate one dataset: `gl` subset of `oscar-corpus/OSCAR-2201`.
 
 ### Suffix Array Substring Exact Deduplication
 
