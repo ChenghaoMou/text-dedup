@@ -265,10 +265,15 @@ def clean_up(text: str, slices: List[slice]) -> str:
     >>> clean_up("This is a test.", [slice(0, 4, None), slice(5, 7, None)])
     '  a test.'
     """
-    chars = list(text)
+    byte_array = bytearray(text, "utf-8")
+    result = bytearray()
+    start = 0
     for s in slices:
-        chars[s] = [""] * (s.stop - s.start)
-    return "".join(chars)
+        result.extend(byte_array[start : s.start])
+        start = s.stop
+    result.extend(byte_array[start:])
+
+    return result.decode("utf-8", errors="ignore")
 
 
 if __name__ == "__main__":
