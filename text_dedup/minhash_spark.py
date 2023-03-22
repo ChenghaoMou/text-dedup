@@ -12,8 +12,6 @@ import numpy as np
 from pyspark import SparkConf
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-
-# from pyspark.sql import types
 from scipy.integrate import quad as integrate
 
 SEED = 42
@@ -21,6 +19,7 @@ NON_ALPHA = re.compile("[^A-Za-z_0-9]")
 RNG = np.random.RandomState(SEED)
 MAX_HASH = np.uint64((1 << 32) - 1)
 MERSENNE_PRIME = np.uint64((1 << 61) - 1)
+
 
 # Connected Components in MapReduce and Beyond
 def large_star_map(edge):
@@ -64,6 +63,13 @@ def ngrams(sequence: List[str], n: int) -> Iterable:
     -------
     Iterable
         The n-grams generated from the sequence.
+
+    Examples
+    --------
+    >>> list(ngrams(['a', 'b', 'c', 'd'], 2))
+    [('a', 'b'), ('b', 'c'), ('c', 'd')]
+    >>> list(ngrams(['a', 'b', 'c', 'd'], 3))
+    [('a', 'b', 'c'), ('b', 'c', 'd')]
     """
     iterables = tee(sequence, n)
     for i, sub_iterable in enumerate(iterables):
@@ -83,6 +89,16 @@ def sha1_hash32(data):
     Returns
     -------
     int
+        The first 4 bytes (32 bits) of the SHA1 hash of the input data.
+
+    Examples
+    --------
+    >>> sha1_hash32(b"hello")
+    499578026
+    >>> bin(sha1_hash32(b"hello"))
+    '0b11101110001101111010010101010'
+    >>> sha1_hash32(b"hello world").bit_length()
+    30
     """
     return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
 
@@ -94,15 +110,38 @@ def generate_hash_values(
     ngram_size: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
-):
+) -> List[Tuple[int, bytes, int]]:
+    """
+    Generate the MinHashLSH values for a given document.
+
+    Parameters
+    ----------
+    content : str
+        The content of the document.
+    idx : int
+        The index of the document.
+    num_perm : int
+        The number of permutations.
+    ngram_size : int
+        The size of the n-grams.
+    hashranges : list
+        The ranges of offsets for each hash value.
+    permutations : np.ndarray
+        The permutations for the hash values.
+
+    Returns
+    -------
+    List[Tuple[int, bytes, int]]
+        The list of (band_idx, hash value, idx) for the document.
+    """
     hashvalues = np.ones(num_perm, dtype=np.uint64) * MAX_HASH
     tokens = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size)}
-    hv = np.array([sha1_hash32(token.encode("utf-8")) for token in tokens], dtype=np.uint64)  # noqa: E501
+    hv = np.array([sha1_hash32(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
     a, b = permutations
-    phv = np.bitwise_and(((hv * np.tile(a, (len(hv), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH)  # noqa: E501
+    phv = np.bitwise_and(((hv * np.tile(a, (len(hv), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH)
     hashvalues = np.vstack([phv, hashvalues]).min(axis=0)
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
-    return [(table_idx, H, idx) for table_idx, H in enumerate(Hs)]
+    return [(band_idx, H, idx) for band_idx, H in enumerate(Hs)]
 
 
 def optimal_param(
@@ -170,8 +209,21 @@ def optimal_param(
     return opt
 
 
-def generate_edges(nodes):
+def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
+    """
+    Generate edges from a cluster. Instead of generating N^2 edges, we only need all nodes align to a single node, since
+    we will be running connected components on the edges later.
 
+    Parameters
+    ----------
+    nodes : List[int]
+        The list of nodes in the cluster.
+
+    Returns
+    -------
+    List[Tuple[int, int]]
+        The list of edges.
+    """
     if len(nodes) <= 1:
         return []
 
@@ -181,16 +233,31 @@ def generate_edges(nodes):
 
 if __name__ == "__main__":
 
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Near-deduplicating BigQuery Table with PySpark")
+    parser.add_argument("--table", type=str, required=True, help="BigQuery table to deduplicate")
+    parser.add_argument("--threshold", type=float, default=0.7, help="Similarity threshold")
+    parser.add_argument("--ngram_size", type=int, default=5, help="N-gram size")
+    parser.add_argument("--num_perm", type=int, default=256, help="Number of permutations")
+    parser.add_argument("--b", type=int, default=None, help="Number of bands")
+    parser.add_argument("--r", type=int, default=None, help="Number of rows per band")
+    parser.add_argument("--column", "-c", type=str, default="content", help="Column to deduplicate")
+    parser.add_argument("--output", "-o", type=str, required=True, help="Output directory")
+    args = parser.parse_args()
+
     conf = SparkConf()
     conf.set("spark.app.name", "MinHashLSH")
     conf.set("spark.debug.maxToStringFields", "100")
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
     log: Logger = spark.sparkContext._jvm.org.apache.log4j.LogManager.getLogger(__name__)  # type: ignore
 
-    threshold = 0.7
-    ngram_size = 5
-    num_perm = 256
-    B, R = optimal_param(threshold, num_perm)
+    if args.b is None or args.r is None:
+        B, R = optimal_param(args.threshold, args.num_perm)
+        log.info(f"Using optimal parameters: {B=}, {R=}")
+    else:
+        B, R = args.b, args.r
+
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
     PERMUTATIONS = np.array(
         [
@@ -198,25 +265,23 @@ if __name__ == "__main__":
                 RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
                 RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
             )
-            for _ in range(num_perm)
+            for _ in range(args.num_perm)
         ],
         dtype=np.uint64,
-    ).T  # [2, num_perm]
+    ).T
 
-    table = "huggingface-science-codeparrot.the_stack_java.java"
-
-    df = spark.read.format("bigquery").option("table", table).load()
+    df = spark.read.format("bigquery").option("table", args.table).load()
     df = df.withColumn("__id__", F.monotonically_increasing_id()).cache()
-    records = df.select("__id__", "content").rdd
-    records = records.repartition(num_perm * 2).cache()
+    records = df.select("__id__", args.column).rdd
+    records = records.repartition(args.num_perm * 2).cache()
 
     edges = (
         records.flatMap(
             lambda x: generate_hash_values(
                 content=x[1],
                 idx=x[0],
-                num_perm=num_perm,
-                ngram_size=ngram_size,
+                num_perm=args.num_perm,
+                ngram_size=args.ngram_size,
                 hashranges=HASH_RANGES,
                 permutations=PERMUTATIONS,
             )
@@ -226,29 +291,6 @@ if __name__ == "__main__":
         .distinct()
         .cache()
     )
-
-    # Debug Code for Jaccard Similarity Investigation
-    # def real_jaccard_similarity(a, b):
-    #     tokens_a = set(NON_ALPHA.split(a))
-    #     tokens_b = set(NON_ALPHA.split(b))
-    #     return len(tokens_a.intersection(tokens_b)) / max(1, len(tokens_a.union(tokens_b)))
-    #
-    # debug_pairs = spark.createDataFrame(edges, schema=["__id__", "__id2__"])
-    # debug_pairs = debug_pairs.join(df, on="__id__", how="inner").select(
-    #     F.col("__id__").alias("__id1__"),
-    #     F.col("content").alias("content1"),
-    #     F.col("__id2__").alias("__id__"),
-    # )
-    # debug_pairs = debug_pairs.join(df, on="__id__", how="inner").select(
-    #     F.col("__id1__"),
-    #     F.col("content1"),
-    #     F.col("__id__").alias("__id2__"),
-    #     F.col("content").alias("content2"),
-    # )
-    # debug_pairs = debug_pairs.withColumn("jaccard", F.udf(
-    #   real_jaccard_similarity, types.FloatType()
-    # )(F.col("content1"), F.col("content2")))
-    # debug_pairs.select("__id1__", "__id2__", "jaccard").show()
 
     a = edges
     while True:
@@ -261,11 +303,12 @@ if __name__ == "__main__":
     results = a.collect()
     if len(results) == 0:
         log.info("No components found.")
+        df = df.drop("__id__").cache()
+        df.write.json(args.output, mode="overwrite")
         sys.exit(0)
 
     components = spark.createDataFrame(results, schema=["__id__", "component"]).sort(["component", "__id__"])
     components.show()
-
     df = df.join(components, on="__id__", how="left")
     df = df.filter(F.col("component").isNull()).drop("__id__", "component").cache()
-    df.write.json("gs://chenghao-data/dataproc_output/deduplicated", mode="overwrite")
+    df.write.json(args.output, mode="overwrite")

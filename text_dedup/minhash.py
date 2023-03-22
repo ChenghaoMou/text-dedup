@@ -99,6 +99,33 @@ def embed_func(
     -------
     Dict[str, Any]
         The hash values in each range and the index.
+
+    Examples
+    --------
+    >>> doc = "I wish spider dog is a thing."
+    >>> tokens = [" ".join(t) for t in ngrams(NON_ALPHA.split(doc), 3)]
+    >>> hashvalues = np.array([sha1_hash(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
+    >>> RNG = np.random.RandomState(42)
+    >>> a, b = np.array(
+    ...     [
+    ...         (
+    ...             RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
+    ...             RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
+    ...         )
+    ...         for _ in range(5)
+    ...     ],
+    ...     dtype=np.uint64,
+    ... ).T
+    >>> permuted_hashvalues = np.bitwise_and(
+    ...    ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
+    ... )
+    >>> permuted_hashvalues = permuted_hashvalues[:-1]
+    >>> masks = np.full(shape=5, dtype=np.uint64, fill_value=MAX_HASH)
+    >>> hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
+    >>> hashvalues
+    >>> hashranges = [(i * 10, (i + 1) * 10) for i in range(25)]
+    >>> hashranges
+    >>> [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     """
     a, b = permutations
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
@@ -107,6 +134,7 @@ def embed_func(
     permuted_hashvalues = np.bitwise_and(
         ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
     )
+    print(permuted_hashvalues)
     hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}

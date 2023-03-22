@@ -1,32 +1,43 @@
-# text-dedup
-
-A collection of data deduplication scripts.
+<center><img src="./banner.png"/ style="background-color:white;"></center>
 
 ![GitHub](https://img.shields.io/github/license/ChenghaoMou/text-dedup) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage)
 
 ## Features
 
-Ready to use or modify scripts for each deduplication method:
-- MinHash + MinHashLSH, including a spark implementation suitable for large scale (>100M) datasets
-- SimHash (64, 128)
+This repository contains a collection of text deduplication scripts that are ready to use, or modify based on your needs:
+
+- MinHash + MinHashLSH, including a spark implementation suitable for large (TB) datasets
+- 64 or 128 bit SimHash
 - SuffixArray Substring
 - Bloom Filter
 - Exact Hash
 
+I also have big plans for the future:
+
+- [ ] Memory benchmark for streaming processing
+- [ ] Inter-dataset deduplication
+- [ ] Rewrite suffix array in Python
+- [ ] A collections of other deduplication methods: SuperMinHash, ProbMinHash, TreeMinHash, BagMinHash, [Optimal Densification for Fast and Accurate Minwise Hashing](https://arxiv.org/abs/1703.04664), [Fast Similarity Sketching](https://arxiv.org/abs/1704.04370)
+- [ ] A collections of other deduplication methods used in other places: [CCNet](https://github.com/facebookresearch/cc_net/blob/main/cc_net/dedup.py).
+
+However, I do not intent to build a general purpose deduplication library, which was the goal of this repo early on. I will gradually retire the pypi package as well. The reason behind it is that each use-case can be wildly different and requires careful design and consideration. I sincerely encourage you to read the script first (they are relatively short) so you can understand what are at stake here when using it. You can use it to bootstrap your own script, or just use it as a reference.
+
 ## Acknowledgements
+
+This repository is inspired by the following projects, and is heavily influenced by lessons learned from my own participation in [BigScience (Apache 2.0)](https://github.com/bigscience-workshop) and [BigCode (Apache 2.0)](https://github.com/bigcode-project). There is a [blog post](https://publish.obsidian.md/chenghao/posts/20230220150602) about the journey. Feedbacks are welcome!
 
 - [Datasketch](https://github.com/ekzhu/datasketch) (MIT)
 - [simhash-py](https://github.com/seomoz/simhash-py/tree/master/simhash) and [simhash-cpp](https://github.com/seomoz/simhash-cpp) (MIT)
 - [Deduplicating Training Data Makes Language Models Better](https://github.com/google-research/deduplicate-text-datasets) (Apache 2.0)
-- [BigScience](https://github.com/bigscience-workshop) (Apache 2.0)
-- [BigCode](https://github.com/bigcode-project) (Apache 2.0)
 - [Gaoya](https://github.com/serega/gaoya) (MIT)
 
 ## Quick Examples
 
 ### PySpark with DataProc
 
-*MODIFY `spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!*
+Not a lot of people have access to enough compute resources or the need to deduplicate TB-scale datasets, but if you do, this is a good example of how to use it with GCP DataProc.
+
+*MODIFY `text_dedup/minhash_spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!*
 
 ```bash
 export CLUSTER_NAME=chenghao-temp
@@ -49,7 +60,9 @@ gcloud dataproc jobs submit pyspark --cluster ${CLUSTER_NAME} \
     --jars gs://spark-lib/bigquery/spark-bigquery-latest_2.12.jar \
     --driver-log-levels root=WARN \
     --properties="spark.executor.memory"="50g","spark.driver.memory"="8g","spark.executor.cores"="14" \
-    spark.py
+    minhash_spark.py -- \
+    --table "huggingface-science-codeparrot.the_stack_java.java" \
+    --output "gs://chenghao-data/dataproc_output/deduplicated"
 ```
 
 For reference, the script finished deduplicating 42 million rows in less than 40 minutes with above settings (160 cores, 640GB memory in total), while the python version would take around 10 hours with a 80-core machine with 1.8TB memory.
@@ -187,36 +200,25 @@ A benchmark of different methods here can be found in `benchmarks/wiki40.ipynb`.
 
 For quick reference, here are the results:
 
-| Method                                                                              | Precision  | Recall     | F1         | Time |
-| ----------------------------------------------------------------------------------- | ---------- | ---------- | ---------- | ---- |
-| MinHash                                                                             | **0.9464** | **0.9446** | **0.9455** | 24s  |
-| SimHash\*                                                                           | 0.9011     | 0.6959     | 0.7853     | 210s |
-| SimHash [(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)     | 0.697      | 0.247      | 0.3647     | -    |
-| Exact Title (my implementation)                                                     | 0.8302     | 0.5521     | 0.6632     | -    |
-| Exact Title [(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830      | 0.50       | 0.624      | -    |
+| Method                                                                          | Precision        | Recall           | F1               | Time |
+| ------------------------------------------------------------------------------- | ---------------- | ---------------- | ---------------- | ---- |
+| MinHash                                                                         | **0.9464** | **0.9446** | **0.9455** | 24s  |
+| SimHash\*                                                                       | 0.9011           | 0.6959           | 0.7853           | 210s |
+| SimHash[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)     | 0.697            | 0.247            | 0.3647           | -    |
+| Exact Title (my implementation)                                                 | 0.8302           | 0.5521           | 0.6632           | -    |
+| Exact Title[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830            | 0.50             | 0.624            | -    |
 
 \*Best SimHash result from `benchmarks/hyperparameter.ipynb`.
 
-## Documentation
-
-- [ ] TODO
-
-## Roadmap
-
-- [ ] Memory benchmark for streaming processing
-- [ ] Inter-dataset deduplication
-- [ ] Rewrite suffix array in Python
-- [ ] A collections of deduplication methods used in papers/datasets/projects: SuperMinHash, ProbMinHash, TreeMinHash, BagMinHash, [Optimal Densification for Fast and Accurate Minwise Hashing](https://arxiv.org/abs/1703.04664), [Fast Similarity Sketching](https://arxiv.org/abs/1704.04370)
-
-## FAQ
+<!-- ## FAQ
 
 ### Why use scripts instead of OOD classes and functions?
 
-Early versions of the code uses object-oriented design for hashing and indexing, which was very difficult because different methods share little to no abstraction. In order to complie something that is useful, a lot of the wrapper code was used, and that actually increased the overhead of using this library. Additionally, deduplicating is often a one-time thing in data preprocessing pipeline, there isn't really a need for inline access.
+Early versions of the code uses object-oriented design for hashing and indexing, which was very difficult because different methods share little to no abstraction. In order to complie something that is useful, a lot of the wrapper code was used, and that actually increased the overhead of using this library. Additionally, deduplicating is often a one-time thing in data preprocessing pipeline, there isn't really a need for inline access. -->
 
-### Why license change?
+<!-- ### Why license change?
 
-Because the google repo is licensed under Apache 2.0, I have to update from MIT. Util that part of code is completely re-implemented, Apache 2.0. will be the license I use.
+Because the google repo is licensed under Apache 2.0, I have to update from MIT. Util that part of code is completely re-implemented, Apache 2.0. will be the license I use. -->
 
 ## License
 
