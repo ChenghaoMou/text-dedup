@@ -2,53 +2,44 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2023-01-02 15:18:55
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-import pickle
-from collections import defaultdict
-
-import datasets
-import numpy as np
-from tqdm import tqdm
+from typing import List
 
 from text_dedup.utils.tokenization import ngrams
-from text_dedup.utils.union_find import UnionFind
 
 
-def jaccard_similarity(doc1, doc2):
+def jaccard_similarity(
+    doc1: str | List[str],
+    doc2: str | List[str],
+    ngram_size: int = 8,
+    min_length: int = 0,
+) -> float:
+    """Compute the Jaccard similarity between two documents.
 
-    words1 = set(" ".join(ng) for ng in ngrams(doc1, 8))
-    words2 = set(" ".join(ng) for ng in ngrams(doc2, 8))
+    Parameters
+    ----------
+    doc1 : str or List[str]
+        The first document.
+    doc2 : str or List[str]
+        The second document.
+    ngram_size : int, optional
+        The size of n-grams, by default 8
+    min_length : int, optional
+        The minimum length of each n-gram, by default 0
+
+    Returns
+    -------
+    float
+        The Jaccard similarity.
+
+    Examples
+    --------
+    >>> jaccard_similarity("hello world", "hello world")
+    1.0
+    >>> jaccard_similarity("hello world", "hello world!")
+    0.8
+    >>> jaccard_similarity("hello world".split(), "hello world!".split(), ngram_size=1)
+    0.3333333333333333
+    """
+    words1 = set(" ".join(ng) for ng in ngrams(list(doc1), ngram_size, min_length=min_length))
+    words2 = set(" ".join(ng) for ng in ngrams(list(doc2), ngram_size, min_length=min_length))
     return len(words1 & words2) / max(1, len(words1 | words2))
-
-
-def false_positives(
-    ds: datasets.Dataset,
-    uf: UnionFind,
-    threshold: float,
-):
-
-    groups = defaultdict(set)
-    for x, y in uf.parent.items():
-        groups[y].add(x)
-
-    clusters = [c for c in groups.values() if len(c) > 1]
-    false_positive_total = 0
-    total = 0
-    for cluster in tqdm(clusters):
-        total += len(cluster)
-        similarities = np.zeros((len(cluster), len(cluster)))
-        for i, x in enumerate(cluster):
-            for j in range(i + 1, len(cluster)):
-                y = cluster[j]
-                similarities[i, j] = similarities[j, i] = jaccard_similarity(ds[x]["text"], ds[y]["text"])
-
-        false_positive_cnt = (np.max(similarities, axis=1) < threshold).sum()
-        false_positive_total += false_positive_cnt
-
-    return false_positive_total / total
-
-
-if __name__ == "__main__":
-    ds = datasets.load_dataset("wiki40b", "en", split="train")
-    with open("output/simhash/dedup/uf.pkl", "rb") as f:
-        uf = pickle.load(f)
-    print(false_positives(ds, uf, 0.7))

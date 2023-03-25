@@ -137,6 +137,27 @@ class Permutation:
 
         return result
 
+    def reverse(self, x: int) -> int:
+        """
+        Reverse the permutation.
+        Parameters
+        ----------
+        x: int
+           The fingerprint to be reversed
+        Returns
+        -------
+        int
+            The reversed fingerprint
+        """
+        result = bitarray(self.f)
+        result.setall(0)
+        for mask, offset in zip(self.reverse_masks, self.offsets):
+            if offset > 0:
+                result |= (x & mask) >> offset
+            else:
+                result |= (x & mask) << -offset
+        return result
+
 
 def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     """
@@ -164,7 +185,7 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     4
     >>> data = urandom(128)
     >>> for perm in perms:
-    ...     assert perm.reverse(perm.permute(data)) == data
+    ...     assert perm.reverse(perm.permute(data)) == data, f"{perm.reverse(perm.permute(data))} != {data}"
     """
     block_size: int = math.ceil(f / b)
     masks: List[Tuple[bitarray, int, int, int]] = []

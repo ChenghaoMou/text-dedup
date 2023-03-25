@@ -23,6 +23,13 @@ class TimerContext:
 class Timer:
     """
     A simple timer that tracks the elapsed time of each context.
+
+    Examples
+    --------
+    >>> t = Timer()
+    >>> with t("test"):
+    ...     time.sleep(1)
+    >>> assert int(t.elapsed_times.get("test", 0)) >= 1, "The elapsed time should be 1 second."
     """
 
     def __init__(self):

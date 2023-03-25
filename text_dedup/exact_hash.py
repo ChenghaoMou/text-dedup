@@ -15,7 +15,7 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils.timer import Timer
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
 
     parser = argparse.ArgumentParser(
         prog="text_dedup.exacthash",

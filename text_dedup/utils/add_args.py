@@ -5,7 +5,7 @@
 import argparse
 
 
-def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add input/output arguments to parser.
 
@@ -37,7 +37,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add meta arguments to parser.
 
@@ -66,7 +66,7 @@ def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add MinHash arguments to parser.
 
@@ -85,6 +85,12 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         type=int,
         default=5,
         help="Ngram size to use in MinHash.",
+    )
+    parser.add_argument(
+        "--min_length",
+        type=int,
+        default=5,
+        help="Minimum number of tokens to use in MinHash. Shorter documents will be filtered out.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash")
     parser.add_argument("--num_perm", type=int, default=256, help="Number of permutations to use in MinHash")
@@ -107,7 +113,7 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     return parser
 
 
-def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add SimHash arguments to parser.
 
@@ -135,7 +141,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     return parser
 
 
-def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add Suffix Array arguments to parser.
 
@@ -165,7 +171,7 @@ def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def add_bloom_filter_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_bloom_filter_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add Bloom Filter arguments to parser.
 
@@ -185,7 +191,7 @@ def add_bloom_filter_args(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     return parser
 
 
-def add_exact_hash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+def add_exact_hash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
     Add Exact Hash arguments to parser.
 

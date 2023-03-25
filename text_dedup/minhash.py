@@ -64,6 +64,8 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
     896314922
     >>> sha1_hash(b"hello world", 64)
     13028719972609469994
+    >>> sha1_hash(b"hello world", 128)
+    310522945683037930239412421226792791594
     """
     return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
 
@@ -74,6 +76,7 @@ def embed_func(
     *,
     num_perm: int,
     ngram_size: int,
+    min_length: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
 ) -> Dict[str, Any]:
@@ -90,6 +93,8 @@ def embed_func(
         The number of permutations.
     ngram_size : int
         The size of n-grams.
+    min_length : int
+        The minimum length of the document in terms of tokens.
     hashranges : List[Tuple[int, int]]
         The ranges of hash values.
     permutations : np.ndarray
@@ -102,39 +107,34 @@ def embed_func(
 
     Examples
     --------
-    >>> doc = "I wish spider dog is a thing."
-    >>> tokens = [" ".join(t) for t in ngrams(NON_ALPHA.split(doc), 3)]
-    >>> hashvalues = np.array([sha1_hash(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
-    >>> RNG = np.random.RandomState(42)
-    >>> a, b = np.array(
+    >>> content = "hello world"
+    >>> idx = 0
+    >>> num_perm = 250
+    >>> ngram_size = 1
+    >>> hashranges = [(i, i + 25) for i in range(0, 250, 25)]
+    >>> PERMUTATIONS = np.array(
     ...     [
     ...         (
     ...             RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
     ...             RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
     ...         )
-    ...         for _ in range(5)
+    ...         for _ in range(num_perm)
     ...     ],
     ...     dtype=np.uint64,
     ... ).T
-    >>> permuted_hashvalues = np.bitwise_and(
-    ...    ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
-    ... )
-    >>> permuted_hashvalues = permuted_hashvalues[:-1]
-    >>> masks = np.full(shape=5, dtype=np.uint64, fill_value=MAX_HASH)
-    >>> hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
-    >>> hashvalues
-    >>> hashranges = [(i * 10, (i + 1) * 10) for i in range(25)]
-    >>> hashranges
-    >>> [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, permutations=PERMUTATIONS)
+    >>> len(res["__signatures__"])
+    10
+    >>> res["__id__"]
+    0
     """
     a, b = permutations
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
-    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size)}
+    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
     hashvalues: np.ndarray = np.array([sha1_hash(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
     permuted_hashvalues = np.bitwise_and(
         ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
     )
-    print(permuted_hashvalues)
     hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
@@ -149,6 +149,8 @@ def optimal_param(
     """
     Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
     of probabilities of false positive and false negative, taken from datasketch.
+
+    You can also refer to the interactive demo at https://huggingface.co/spaces/bigcode/near-deduplication.
 
     Parameters
     ----------
@@ -174,7 +176,7 @@ def optimal_param(
     (28, 9)
     """
 
-    def false_positive_probability(threshold: float, b: int, r: int):
+    def false_positive_area(threshold: float, b: int, r: int):
         """Source: `datasketch.lsh`"""
 
         def proba(s):
@@ -183,7 +185,7 @@ def optimal_param(
         a, _ = integrate(proba, 0.0, threshold)
         return a
 
-    def false_negative_probability(threshold: float, b: int, r: int):
+    def false_negative_area(threshold: float, b: int, r: int):
         """Source: `datasketch.lsh`"""
 
         def proba(s):
@@ -197,8 +199,8 @@ def optimal_param(
     for b in range(1, num_perm + 1):
         max_r = int(num_perm / b)
         for r in range(1, max_r + 1):
-            fp = false_positive_probability(threshold, b, r)
-            fn = false_negative_probability(threshold, b, r)
+            fp = false_positive_area(threshold, b, r)
+            fn = false_negative_area(threshold, b, r)
             error = fp * false_positive_weight + fn * false_negative_weight
             if error < min_error:
                 min_error = error
@@ -206,7 +208,7 @@ def optimal_param(
     return opt
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
 
     parser = argparse.ArgumentParser(
         prog="text_dedup.minhash",
@@ -265,6 +267,7 @@ if __name__ == "__main__":
                     "num_perm": args.num_perm,
                     "hashranges": HASH_RANGES,
                     "ngram_size": args.ngram,
+                    "min_length": args.min_length,
                     "permutations": PERMUTATIONS,
                 },
                 input_columns=[args.column],
@@ -292,19 +295,6 @@ if __name__ == "__main__":
                     idx = min(cluster)
                     for x in cluster:
                         uf.union(x, idx)
-
-            # import dask.bag as db
-            # bags = db.from_sequence(zip(embedded["__signatures__"], embedded["__id__"]))\
-            #     .map(lambda x: [(i, sig, x[1]) for i, sig in enumerate(x[0])])\
-            #     .flatten()\
-            #     .groupby(lambda x: (x[0], x[1]))\
-            #     .map(lambda x: (min(i for *_, i in x[1]), {i for *_, i in x[1]}))\
-            #     .filter(lambda x: len(x[1]) > 1)\
-            #     .map(lambda x: [(x[0], i) for i in x[1]])\
-            #     .flatten()\
-            #     .compute()
-            # for x, y in tqdm(bags, dynamic_ncols=True, desc="Clustering..."):
-            #     uf.union(y, x)
 
         with timer("Filtering"):
             gc.freeze()

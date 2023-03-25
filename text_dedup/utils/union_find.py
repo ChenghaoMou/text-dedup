@@ -7,6 +7,23 @@
 class UnionFind:
     """
     A data structure for maintaining disjoint sets. This helps build connected components for given duplicate pairs.
+
+    Examples
+    --------
+    >>> uf = UnionFind()
+    >>> uf.union(1, 2)
+    >>> uf.union(2, 3)
+    >>> uf.union(4, 5)
+    >>> uf.find(1)
+    1
+    >>> uf.find(2)
+    1
+    >>> uf.find(3)
+    1
+    >>> uf.find(4)
+    4
+    >>> uf.find(5)
+    4
     """
 
     def __init__(self):

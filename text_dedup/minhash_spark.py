@@ -2,9 +2,7 @@ import hashlib
 import re
 import struct
 import sys
-from itertools import tee
 from logging import Logger
-from typing import Iterable
 from typing import List
 from typing import Tuple
 
@@ -13,6 +11,8 @@ from pyspark import SparkConf
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from scipy.integrate import quad as integrate
+
+from text_dedup.utils.tokenization import ngrams
 
 SEED = 42
 NON_ALPHA = re.compile("[^A-Za-z_0-9]")
@@ -48,36 +48,6 @@ def small_star_reduce(group):
     return [(n, minimum) for n in nodes if n != minimum]
 
 
-def ngrams(sequence: List[str], n: int) -> Iterable:
-    """
-    Code taken from NLTK, without padding.
-
-    Parameters
-    ----------
-    sequence : list
-        The sequence of items to be converted into n-grams.
-    n : int
-        The order of the n-grams to be extracted.
-
-    Returns
-    -------
-    Iterable
-        The n-grams generated from the sequence.
-
-    Examples
-    --------
-    >>> list(ngrams(['a', 'b', 'c', 'd'], 2))
-    [('a', 'b'), ('b', 'c'), ('c', 'd')]
-    >>> list(ngrams(['a', 'b', 'c', 'd'], 3))
-    [('a', 'b', 'c'), ('b', 'c', 'd')]
-    """
-    iterables = tee(sequence, n)
-    for i, sub_iterable in enumerate(iterables):
-        for _ in range(i):
-            next(sub_iterable, None)
-    return zip(*iterables)
-
-
 def sha1_hash32(data):
     """
     Directly taken from datasketch package to avoid dependency.
@@ -108,6 +78,7 @@ def generate_hash_values(
     idx: int,
     num_perm: int,
     ngram_size: int,
+    min_length: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
 ) -> List[Tuple[int, bytes, int]]:
@@ -124,6 +95,8 @@ def generate_hash_values(
         The number of permutations.
     ngram_size : int
         The size of the n-grams.
+    min_length : int
+        The minimum number of tokens in a document.
     hashranges : list
         The ranges of offsets for each hash value.
     permutations : np.ndarray
@@ -133,9 +106,30 @@ def generate_hash_values(
     -------
     List[Tuple[int, bytes, int]]
         The list of (band_idx, hash value, idx) for the document.
+
+    Examples
+    --------
+    >>> content = "hello world"
+    >>> idx = 0
+    >>> num_perm = 250
+    >>> ngram_size = 1
+    >>> hashranges = [(i, i + 25) for i in range(0, 250, 25)]
+    >>> PERMUTATIONS = np.array(
+    ...     [
+    ...         (
+    ...             RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
+    ...             RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
+    ...         )
+    ...         for _ in range(num_perm)
+    ...     ],
+    ...     dtype=np.uint64,
+    ... ).T
+    >>> res = generate_hash_values(content, idx, num_perm, ngram_size, 0, hashranges, PERMUTATIONS)
+    >>> len(res)
+    10
     """
     hashvalues = np.ones(num_perm, dtype=np.uint64) * MAX_HASH
-    tokens = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size)}
+    tokens = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
     hv = np.array([sha1_hash32(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
     a, b = permutations
     phv = np.bitwise_and(((hv * np.tile(a, (len(hv), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH)
@@ -177,22 +171,22 @@ def optimal_param(
     (25, 10)
     """
 
-    def false_positive_probability(threshold: float, b: int, r: int):
+    def false_positive_area(threshold: float, b: int, r: int):
         """Source: `datasketch.lsh`"""
 
-        def proba(s):
+        def area(s):
             return 1 - (1 - s ** float(r)) ** float(b)
 
-        a, _ = integrate(proba, 0.0, threshold)
+        a, _ = integrate(area, 0.0, threshold)
         return a
 
-    def false_negative_probability(threshold: float, b: int, r: int):
+    def false_negative_area(threshold: float, b: int, r: int):
         """Source: `datasketch.lsh`"""
 
-        def proba(s):
+        def area(s):
             return 1 - (1 - (1 - s ** float(r)) ** float(b))
 
-        a, _ = integrate(proba, threshold, 1.0)
+        a, _ = integrate(area, threshold, 1.0)
         return a
 
     min_error = float("inf")
@@ -200,8 +194,8 @@ def optimal_param(
     for b in range(1, num_perm + 1):
         max_r = int(num_perm / b)
         for r in range(1, max_r + 1):
-            fp = false_positive_probability(threshold, b, r)
-            fn = false_negative_probability(threshold, b, r)
+            fp = false_positive_area(threshold, b, r)
+            fn = false_negative_area(threshold, b, r)
             error = fp * false_positive_weight + fn * false_negative_weight
             if error < min_error:
                 min_error = error
@@ -223,6 +217,11 @@ def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
     -------
     List[Tuple[int, int]]
         The list of edges.
+
+    Examples
+    --------
+    >>> generate_edges([1, 2, 3])
+    [(2, 1), (3, 1)]
     """
     if len(nodes) <= 1:
         return []
@@ -231,7 +230,7 @@ def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
     return [(n, min_node) for n in nodes if n != min_node]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
 
     import argparse
 
@@ -239,6 +238,7 @@ if __name__ == "__main__":
     parser.add_argument("--table", type=str, required=True, help="BigQuery table to deduplicate")
     parser.add_argument("--threshold", type=float, default=0.7, help="Similarity threshold")
     parser.add_argument("--ngram_size", type=int, default=5, help="N-gram size")
+    parser.add_argument("--min_length", type=int, default=5, help="Minimum length of document to be considered")
     parser.add_argument("--num_perm", type=int, default=256, help="Number of permutations")
     parser.add_argument("--b", type=int, default=None, help="Number of bands")
     parser.add_argument("--r", type=int, default=None, help="Number of rows per band")
@@ -282,6 +282,7 @@ if __name__ == "__main__":
                 idx=x[0],
                 num_perm=args.num_perm,
                 ngram_size=args.ngram_size,
+                min_length=args.min_length,
                 hashranges=HASH_RANGES,
                 permutations=PERMUTATIONS,
             )
