@@ -4,9 +4,9 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
 import os
-from hashlib import md5
+from hashlib import md5, sha256
 
-from datasets import load_dataset
+from datasets.load import load_dataset
 from pybloom_live import ScalableBloomFilter
 from tqdm import tqdm
 

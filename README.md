@@ -10,7 +10,7 @@ This repository contains a collection of text deduplication scripts that are rea
 - 64 or 128 bit SimHash
 - SuffixArray Substring
 - Bloom Filter
-- Exact Hash
+- Exact Hash (document-level, line-level/ccnet)
 
 I also have big plans for the future:
 
@@ -18,7 +18,6 @@ I also have big plans for the future:
 - [ ] Inter-dataset deduplication
 - [ ] Rewrite suffix array in Python
 - [ ] A collections of other deduplication methods: SuperMinHash, ProbMinHash, TreeMinHash, BagMinHash, [Optimal Densification for Fast and Accurate Minwise Hashing](https://arxiv.org/abs/1703.04664), [Fast Similarity Sketching](https://arxiv.org/abs/1704.04370)
-- [ ] A collections of other deduplication methods used in other places: [CCNet](https://github.com/facebookresearch/cc_net/blob/main/cc_net/dedup.py).
 
 However, I do not intent to build a general purpose deduplication library, which was the goal of this repo early on. I will gradually retire the pypi package as well. The reason behind it is that each use-case can be wildly different and requires careful design and consideration. I sincerely encourage you to read the script first (they are relatively short) so you can understand what are at stake here when using it. You can use it to bootstrap your own script, or just use it as a reference.
 
