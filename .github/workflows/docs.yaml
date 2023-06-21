@@ -1,22 +1,49 @@
-name: Deploy Sphinx documentation to Pages
+name: text-dedup
 
+# build the documentation whenever there are new commits on main
 on:
   push:
-    branches: [master] # branch to trigger deployment
+    branches:
+      - main
+    # Alternative: only build for tags.
+    # tags:
+    #   - '*'
+
+# security: restrict permissions for CI jobs.
+permissions:
+  contents: read
 
 jobs:
-  pages:
-    runs-on: ubuntu-20.04
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Build the documentation and upload the static HTML files as an artifact.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+      - run: pip install poetry
+      - run: poetry config virtualenvs.create false
+      - run: poetry env use system
+      - run: poetry install
+      - name: Running Sphinx
+        working-directory: ./docs
+        run: make html
+      - run: tar --directory docs/build/html -hcf artifact.tar .
+      - uses: actions/upload-artifact@v3
+        with:
+          name: github-pages
+          path: ./artifact.tar
+
+  # Deploy the artifact to GitHub pages.
+  # This is a separate job so that only actions/deploy-pages has the necessary permissions.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-    - id: deployment
-      uses: sphinx-notes/pages@v3
-      with:
-        documentation_path: ./docs
-        cache: true
-        requirements_path: "./pyproject.toml"
+      - id: deployment
+        uses: actions/deploy-pages@v1
