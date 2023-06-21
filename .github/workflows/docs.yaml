@@ -25,8 +25,8 @@ jobs:
       - run: poetry env use system
       - run: poetry install
       - name: Running Sphinx
-        working-directory: ./docs
-        run: make html
+        working-directory: .
+        run: sphinx-build -b html docs/source docs/build
       - run: tar --directory docs/build/html -hcf artifact.tar .
       - uses: actions/upload-artifact@v3
         with:
