@@ -27,7 +27,7 @@ jobs:
       - name: Running Sphinx
         working-directory: .
         run: sphinx-build -b html docs/source docs/build
-      - run: tar --directory docs/build/html -hcf artifact.tar .
+      - run: tar --directory docs/build -hcf artifact.tar .
       - uses: actions/upload-artifact@v3
         with:
           name: github-pages
