@@ -17,7 +17,6 @@ scipy = "1.9.1"
 xxhash = "^3.0.0"
 pybloom-live = "^4.0.0"
 bitarray = "^2.6.2"
-dask = {extras = ["bag"], version = "^2023.1.0"}
 pyspark = "^3.3.1"
 regex = "^2023.5.5"
 
@@ -29,9 +28,10 @@ furo = "^2022.6.21"
 pre-commit = "^2.20.0"
 isort = "^5.10.1"
 livereload = "^2.6.3"
-sphinx-copybutton = "^0.5.0"
 matplotlib = "^3.7.1"
 seaborn = "^0.12.2"
+ruff = "^0.0.265"
+insegel = "^1.3.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -39,3 +39,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 max-line-length = 120
+force-single-line = true

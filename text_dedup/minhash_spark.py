@@ -130,7 +130,7 @@ def generate_hash_values(
     """
     hashvalues = np.ones(num_perm, dtype=np.uint64) * MAX_HASH
     tokens = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
-    hv = np.array([sha1_hash32(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
+    hv = np.array([sha1_hash32(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
     a, b = permutations
     phv = np.bitwise_and(((hv * np.tile(a, (len(hv), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH)
     hashvalues = np.vstack([phv, hashvalues]).min(axis=0)

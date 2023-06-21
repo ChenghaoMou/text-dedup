@@ -140,10 +140,12 @@ class Permutation:
     def reverse(self, x: int) -> int:
         """
         Reverse the permutation.
+
         Parameters
         ----------
         x: int
            The fingerprint to be reversed
+        
         Returns
         -------
         int
@@ -310,7 +312,7 @@ def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List
     8
     """
     tokens = {"".join(ng) for ng in ngrams(list(content), n=ngram)}
-    sig = compute([_unsigned_hash(t.encode("utf-8"), f=f) for t in tokens])
+    sig = compute([_unsigned_hash(t.lower().encode("utf-8"), f=f) for t in tokens])
     keys: List[Tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:

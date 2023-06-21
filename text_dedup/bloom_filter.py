@@ -33,7 +33,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_dataset(
+            ds: Dataset = load_dataset(
                 path=args.path,
                 name=args.name,
                 data_dir=args.data_dir,
@@ -47,6 +47,7 @@ if __name__ == "__main__":  # pragma: no cover
 
         hash_func = {
             "md5": md5,
+            "sha256": sha256,
         }[args.hash_func]
 
         bf = ScalableBloomFilter(
