@@ -143,7 +143,13 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
 
 def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
-    Add Suffix Array arguments to parser.
+    Add Suffix Array arguments to parser. This adds the following arguments:
+
+    - k: Minimum byte length of a duplicate substring in Suffix Array Deduplication, default 100
+    - strategy: Strategy when there are overlapping duplicate substrings, default "overlapping"
+        overlapping: Merge all overlapping duplicate substrings
+        longest: Only keep the longest duplicate substring
+    - google_repo_path: Path to google-research-deduplication codebase, required
 
     Parameters
     ----------

@@ -14,6 +14,47 @@ Quick Start
 -----------
 .. code-block:: bash
 
+   python -m text_dedup.suffix_array --help
+
+   usage: text-dedup.suffixarray [-h] --path PATH [--name NAME] [--data_dir DATA_DIR] [--data_files DATA_FILES]
+                              [--split SPLIT] [--cache_dir CACHE_DIR] [--revision REVISION]
+                              [--use_auth_token | --no-use_auth_token] [--local | --no-local] --output OUTPUT
+                              [--debug | --no-debug] --column COLUMN [--batch_size BATCH_SIZE] [--k K]
+                              [--strategy {overlapping,longest}] --google_repo_path GOOGLE_REPO_PATH
+
+Deduplicate text using Suffix Array Deduplication
+
+options:
+  -h, --help            show this help message and exit
+  --path PATH           `path` in load_dataset (default: None)
+  --name NAME           `name` in load_dataset (default: None)
+  --data_dir DATA_DIR   `data_dir` in load_dataset (default: None)
+  --data_files DATA_FILES
+                        `data_files` in load_dataset (default: None)
+  --split SPLIT         `split` in load_dataset (default: None)
+  --cache_dir CACHE_DIR
+                        `cache_dir` in load_dataset (default: .cache)
+  --revision REVISION   `revision` in load_dataset (default: None)
+  --use_auth_token, --no-use_auth_token
+                        `use_auth_token` in load_dataset (default: None)
+  --local, --no-local   Use local dataset (default: False)
+  --output OUTPUT       Path to deduplicated dataset output (default: None)
+  --debug, --no-debug   Whether to run in debug mode (default: False)
+  --column COLUMN       Text column to use for deduplication. Concatenate desired columns beforehand if needed.
+                        (default: None)
+  --batch_size BATCH_SIZE
+                        Batch size to use for dataset iteration. Mainly for memory efficiency. (default: 10000)
+  --k K                 Minimum byte length of a duplicate substring in Suffix Array Deduplication (default:
+                        100)
+  --strategy {overlapping,longest}
+                        Strategy when there are overlapping duplicate substrings (default: overlapping)
+  --google_repo_path GOOGLE_REPO_PATH
+                        Path to google-research-deduplication codebase (default: None)
+
+Example
+-------
+.. code-block:: bash
+
    python -m text_dedup.suffix_array \
     --path "oscar-corpus/OSCAR-2201" \
     --name "gl" \
@@ -30,4 +71,3 @@ API Reference
    :members:
    :undoc-members:
    :noindex:
-
