@@ -15,7 +15,7 @@ from scipy.integrate import quad as integrate
 from text_dedup.utils.tokenization import ngrams
 
 SEED = 42
-NON_ALPHA = re.compile("[^A-Za-z_0-9]")
+NON_ALPHA = re.compile("\W", re.UNICODE)
 RNG = np.random.RandomState(SEED)
 MAX_HASH = np.uint64((1 << 32) - 1)
 MERSENNE_PRIME = np.uint64((1 << 61) - 1)
