@@ -20,10 +20,12 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.doctest',
     'sphinx.ext.mathjax',
+    'sphinxcontrib.bibtex',
 ]
 
 templates_path = ['_templates']
 exclude_patterns = []
+bibtex_bibfiles = ['refs.bib']
 
 
 
