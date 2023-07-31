@@ -41,5 +41,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-max-line-length = 120
+line-length = 120
+
+[tool.ruff.isort]
 force-single-line = true
