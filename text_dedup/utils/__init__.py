@@ -13,6 +13,7 @@ from text_dedup.utils.add_args import add_simhash_args
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.tokenization import ngrams
 from text_dedup.utils.union_find import UnionFind
+from text_dedup.utils.hashfunc import sha1_hash, xxh3_hash
 
 __all__ = [
     "add_bloom_filter_args",
@@ -25,4 +26,6 @@ __all__ = [
     "Timer",
     "ngrams",
     "UnionFind",
+    "sha1_hash",
+    "xxh3_hash",
 ]
