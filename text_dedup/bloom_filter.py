@@ -6,6 +6,7 @@ import argparse
 import os
 from hashlib import md5, sha256
 
+import datasets
 from datasets.load import load_dataset
 from pybloom_live import ScalableBloomFilter
 from tqdm import tqdm
@@ -17,7 +18,6 @@ from text_dedup.utils import add_meta_args
 from text_dedup.utils.timer import Timer
 
 if __name__ == "__main__":  # pragma: no cover
-
     parser = argparse.ArgumentParser(
         prog="text_dedup.bloomfilter",
         description="Deduplicate text using Bloom Filter",
@@ -33,7 +33,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_dataset(
+            ds: datasets.Dataset = load_dataset(
                 path=args.path,
                 name=args.name,
                 data_dir=args.data_dir,
@@ -65,7 +65,10 @@ if __name__ == "__main__":  # pragma: no cover
 
         with timer("Filtering"):
             ds = ds.filter(
-                lambda _, idx: not flags[idx], with_indices=True, num_proc=os.cpu_count(), desc="Filtering..."
+                lambda _, idx: not flags[idx],
+                with_indices=True,
+                num_proc=os.cpu_count(),
+                desc="Filtering...",
             )
 
         with timer("Saving"):
