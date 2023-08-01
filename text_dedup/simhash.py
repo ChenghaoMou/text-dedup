@@ -20,7 +20,7 @@ from typing import Tuple
 
 import datasets
 import numpy as np
-import xxhash
+
 from bitarray import bitarray
 from bitarray import frozenbitarray
 from datasets import load_dataset
@@ -34,6 +34,7 @@ from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
 from text_dedup.utils.timer import Timer
+from text_dedup.utils.hashfunc import xxh64_digest, xxh128_digest
 
 datasets.logging.set_verbosity_error()
 
@@ -65,7 +66,9 @@ def _hamming_distance(a: bitarray, b: bitarray) -> int:
 
 
 class Permutation:
-    def __init__(self, f: int, k: int, b: int, masks: List[Tuple[bitarray, int, int, int]]) -> None:
+    def __init__(
+        self, f: int, k: int, b: int, masks: List[Tuple[bitarray, int, int, int]]
+    ) -> None:
         """
         A permutation object for bit manipulation.
 
@@ -103,7 +106,9 @@ class Permutation:
 
             self.masks.append(mask)
 
-        assert sum(self.widths) == f, "The sum of block widths must be equal to the fingerprint size"
+        assert (
+            sum(self.widths) == f
+        ), "The sum of block widths must be equal to the fingerprint size"
 
         prefix_width = sum(self.widths[: b - k])
         self.search_mask: bitarray = bitarray(f)
@@ -145,7 +150,7 @@ class Permutation:
         ----------
         x: int
            The fingerprint to be reversed
-        
+
         Returns
         -------
         int
@@ -245,9 +250,9 @@ def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
     result = bitarray(0)
     match f:
         case 64:
-            result.frombytes(xxhash.xxh64(obj).digest())
+            result.frombytes(xxh64_digest(obj))
         case 128:
-            result.frombytes(xxhash.xxh128(obj).digest())
+            result.frombytes(xxh128_digest(obj))
         case _:
             raise ValueError(f"Unsupported fingerprint size: {f}")
     return result
@@ -283,7 +288,14 @@ def compute(hashes: List[bitarray]) -> bitarray:
     return res
 
 
-def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List[Permutation] = None) -> Dict[str, Any]:
+def embed_func(
+    content: str,
+    idx: int,
+    *,
+    f: int,
+    ngram: int,
+    permutations: List[Permutation] = None,
+) -> Dict[str, Any]:
     """
     Calculate the simhash signature of a text.
 
@@ -326,7 +338,6 @@ def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         prog="text_dedup.simhash",
         description="Deduplicate text using simhash",
@@ -364,7 +375,11 @@ if __name__ == "__main__":
         with timer("SimHashing"):
             embedded = ds.map(
                 function=embed_func,
-                fn_kwargs={"ngram": args.ngram, "permutations": PERMUTATIONS, "f": args.f},
+                fn_kwargs={
+                    "ngram": args.ngram,
+                    "permutations": PERMUTATIONS,
+                    "f": args.f,
+                },
                 input_columns=[args.column],
                 remove_columns=[args.column],
                 num_proc=os.cpu_count(),
@@ -393,7 +408,10 @@ if __name__ == "__main__":
                         for idy, other_fingerprint in BUCKETS[key]:
                             if idy in neighbors:
                                 continue
-                            if _hamming_distance(sig, other_fingerprint) <= args.bit_diff:
+                            if (
+                                _hamming_distance(sig, other_fingerprint)
+                                <= args.bit_diff
+                            ):
                                 neighbors.add(idy)
                         BUCKETS[key].append((idx, sig))
 
