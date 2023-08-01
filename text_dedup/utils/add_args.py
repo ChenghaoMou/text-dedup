@@ -137,6 +137,13 @@ def add_minhash_args(
         default=None,
         help="Number of rows per band",
     )
+    parser.add_argument(
+        "--hash_func",
+        type=str,
+        choices=["sha1", "xxh3"],
+        default="sha1",
+        help="Hashing algorithm. Defaults to sha1. xxh3 is faster",
+    )
 
     return parser
 

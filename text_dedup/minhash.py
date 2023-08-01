@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 import gc
-import hashlib
 import multiprocessing as mp
 import os
 import pickle
@@ -33,6 +32,7 @@ from text_dedup.utils.add_args import add_io_args
 from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.timer import Timer
+from text_dedup.utils.hashfunc import sha1_hash, xxh3_hash
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
@@ -40,34 +40,6 @@ NON_ALPHA = re.compile("\W", re.UNICODE)
 MAX_HASH = np.uint64((1 << 32) - 1)
 MERSENNE_PRIME = np.uint64((1 << 61) - 1)
 datasets.logging.set_verbosity_error()
-
-
-def sha1_hash(data: bytes, d: int = 32) -> int:
-    """
-    Generate a d-bit hash value from the given data.
-
-    Parameters
-    ----------
-    data : bytes
-        The data to be hashed.
-    d : int
-        The number of bits of the hash value.
-
-    Returns
-    -------
-    int
-        The hash value.
-
-    Examples
-    --------
-    >>> sha1_hash(b"hello world", 32)
-    896314922
-    >>> sha1_hash(b"hello world", 64)
-    13028719972609469994
-    >>> sha1_hash(b"hello world", 128)
-    310522945683037930239412421226792791594
-    """
-    return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
 
 
 def embed_func(
@@ -79,6 +51,7 @@ def embed_func(
     min_length: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
+    hash_func: callable,
 ) -> Dict[str, Any]:
     """
     Calculate hash values for the content.
@@ -130,10 +103,15 @@ def embed_func(
     """
     a, b = permutations
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
-    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
-    hashvalues: np.ndarray = np.array([sha1_hash(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
+    tokens: Set[str] = {
+        " ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
+    }
+    hashvalues: np.ndarray = np.array(
+        [hash_func(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64
+    )
     permuted_hashvalues = np.bitwise_and(
-        ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
+        ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME,
+        MAX_HASH,
     )
     hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
@@ -209,7 +187,6 @@ def optimal_param(
 
 
 if __name__ == "__main__":  # pragma: no cover
-
     parser = argparse.ArgumentParser(
         prog="text_dedup.minhash",
         description="Deduplicate text using minhash",
@@ -219,6 +196,11 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_meta_args(parser)
     parser = add_minhash_args(parser)
     args = parser.parse_args()
+
+    hash_func = {
+        "sha1": sha1_hash,
+        "xxh3": xxh3_hash,
+    }[args.hash_func]
 
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
@@ -269,6 +251,7 @@ if __name__ == "__main__":  # pragma: no cover
                     "ngram_size": args.ngram,
                     "min_length": args.min_length,
                     "permutations": PERMUTATIONS,
+                    "hash_func": hash_func,
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,
