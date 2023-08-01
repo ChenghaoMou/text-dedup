@@ -151,12 +151,12 @@ if __name__ == "__main__":  # pragma: no cover
                 range(0, len(hashed), args.batch_size), desc="Processing..."
             ):
                 batch = hashed[idx : idx + args.batch_size]
-                for h, id, idx in tqdm(
+                for h, id_, idx in tqdm(
                     zip(batch["__hash__"], batch["__id__"], batch["__idx__"]),
                     leave=False,
                 ):
                     if h in hashes:
-                        remove.add((id, idx))
+                        remove.add((id_, idx))
                         continue
                     hashes.add(h)
 
