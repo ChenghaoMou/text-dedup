@@ -1,11 +1,14 @@
 import hashlib
 import struct
+from hashlib import md5
+from hashlib import sha256
+
 import xxhash
-
-from hashlib import md5, sha256
 from blake3 import blake3
-
-from xxhash import xxh3_64, xxh3_128, xxh3_64_digest, xxh3_128_digest
+from xxhash import xxh3_64
+from xxhash import xxh3_64_digest
+from xxhash import xxh3_128
+from xxhash import xxh3_128_digest
 
 
 def sha1_hash(data: bytes, d: int = 32) -> int:

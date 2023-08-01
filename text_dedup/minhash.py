@@ -31,8 +31,9 @@ from text_dedup.utils import ngrams
 from text_dedup.utils.add_args import add_io_args
 from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
+from text_dedup.utils.hashfunc import sha1_hash
+from text_dedup.utils.hashfunc import xxh3_hash
 from text_dedup.utils.timer import Timer
-from text_dedup.utils.hashfunc import sha1_hash, xxh3_hash
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
@@ -103,12 +104,8 @@ def embed_func(
     """
     a, b = permutations
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
-    tokens: Set[str] = {
-        " ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
-    }
-    hashvalues: np.ndarray = np.array(
-        [hash_func(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64
-    )
+    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
+    hashvalues: np.ndarray = np.array([hash_func(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
     permuted_hashvalues = np.bitwise_and(
         ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME,
         MAX_HASH,

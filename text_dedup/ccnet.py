@@ -7,26 +7,30 @@
 
 import argparse
 import os
-from typing import Any, Callable, Dict, List
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
 
-from datasets import load_dataset
 import numpy as np
+from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.timer import Timer
+from text_dedup.utils.hashfunc import md5
+from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import xxh3_64_digest
+from text_dedup.utils.hashfunc import xxh3_128
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
-from text_dedup.utils.hashfunc import md5, sha256, xxh3_64_digest, xxh3_128
+from text_dedup.utils.timer import Timer
 
 HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
 
 
-def compute_hashes(
-    batch: Dict[str, Any], idx: List[int], column: str, hash_func: Callable
-) -> Dict[str, Any]:
+def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func: Callable) -> Dict[str, Any]:
     """
     Compute a hash for each line in the document.
 
@@ -49,17 +53,9 @@ def compute_hashes(
     lines = batch[column][0].split("\n")
     n = len(lines)
     if hash_func == xxh3_128 and HASH_SIZE == 8:
-        hashes = [
-            xxh3_64_digest(bytes(normalize_for_dedup(l), encoding="utf-8"))
-            for l in lines
-        ]
+        hashes = [xxh3_64_digest(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
     else:
-        hashes = [
-            hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[
-                :HASH_SIZE
-            ]
-            for l in lines
-        ]
+        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE] for l in lines]
     return {
         "__hash__": hashes,
         "__id__": [idx[0] for _ in range(n)],
@@ -67,9 +63,7 @@ def compute_hashes(
     }
 
 
-def dedup(
-    record: Dict[str, Any], idx: int, column: str, lookup: Dict
-) -> Dict[str, Any]:
+def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[str, Any]:
     """
     Remove duplicated lines from the document.
 
@@ -147,9 +141,7 @@ if __name__ == "__main__":  # pragma: no cover
                 remove_columns=ds.column_names,
             )
 
-            for idx in tqdm(
-                range(0, len(hashed), args.batch_size), desc="Processing..."
-            ):
+            for idx in tqdm(range(0, len(hashed), args.batch_size), desc="Processing..."):
                 batch = hashed[idx : idx + args.batch_size]
                 for h, id_, idx in tqdm(
                     zip(batch["__hash__"], batch["__id__"], batch["__idx__"]),

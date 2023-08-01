@@ -20,7 +20,6 @@ from typing import Tuple
 
 import datasets
 import numpy as np
-
 from bitarray import bitarray
 from bitarray import frozenbitarray
 from datasets import load_dataset
@@ -33,8 +32,9 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
+from text_dedup.utils.hashfunc import xxh3_64_digest
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
-from text_dedup.utils.hashfunc import xxh3_64_digest, xxh3_128_digest
 
 datasets.logging.set_verbosity_error()
 
@@ -66,9 +66,7 @@ def _hamming_distance(a: bitarray, b: bitarray) -> int:
 
 
 class Permutation:
-    def __init__(
-        self, f: int, k: int, b: int, masks: List[Tuple[bitarray, int, int, int]]
-    ) -> None:
+    def __init__(self, f: int, k: int, b: int, masks: List[Tuple[bitarray, int, int, int]]) -> None:
         """
         A permutation object for bit manipulation.
 
@@ -106,9 +104,7 @@ class Permutation:
 
             self.masks.append(mask)
 
-        assert (
-            sum(self.widths) == f
-        ), "The sum of block widths must be equal to the fingerprint size"
+        assert sum(self.widths) == f, "The sum of block widths must be equal to the fingerprint size"
 
         prefix_width = sum(self.widths[: b - k])
         self.search_mask: bitarray = bitarray(f)
@@ -408,10 +404,7 @@ if __name__ == "__main__":
                         for idy, other_fingerprint in BUCKETS[key]:
                             if idy in neighbors:
                                 continue
-                            if (
-                                _hamming_distance(sig, other_fingerprint)
-                                <= args.bit_diff
-                            ):
+                            if _hamming_distance(sig, other_fingerprint) <= args.bit_diff:
                                 neighbors.add(idy)
                         BUCKETS[key].append((idx, sig))
 

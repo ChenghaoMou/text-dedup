@@ -273,7 +273,6 @@ def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
 
 
 if __name__ == "__main__":  # pragma: no cover
-
     import argparse
 
     parser = argparse.ArgumentParser(description="Near-deduplicating BigQuery Table with PySpark")

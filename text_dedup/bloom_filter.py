@@ -5,7 +5,6 @@
 import argparse
 import os
 
-
 import datasets
 from datasets.load import load_dataset
 from pybloom_live import ScalableBloomFilter
@@ -15,8 +14,11 @@ from text_dedup import logger
 from text_dedup.utils import add_bloom_filter_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
+from text_dedup.utils.hashfunc import blake3
+from text_dedup.utils.hashfunc import md5
+from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import xxh3_128
 from text_dedup.utils.timer import Timer
-from text_dedup.utils.hashfunc import blake3, md5, sha256, xxh3_128
 
 if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(

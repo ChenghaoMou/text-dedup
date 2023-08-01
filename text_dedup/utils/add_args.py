@@ -21,29 +21,21 @@ def add_io_args(
     parser : argparse.ArgumentParser
         Parser with added arguments.
     """
-    parser.add_argument(
-        "--path", type=str, help="`path` in load_dataset", required=True
-    ),
+    parser.add_argument("--path", type=str, help="`path` in load_dataset", required=True),
     parser.add_argument("--name", type=str, help="`name` in load_dataset"),
     parser.add_argument("--data_dir", type=str, help="`data_dir` in load_dataset"),
     parser.add_argument("--data_files", type=str, help="`data_files` in load_dataset"),
     parser.add_argument("--split", type=str, help="`split` in load_dataset"),
-    parser.add_argument(
-        "--cache_dir", type=str, help="`cache_dir` in load_dataset", default=".cache"
-    ),
+    parser.add_argument("--cache_dir", type=str, help="`cache_dir` in load_dataset", default=".cache"),
     parser.add_argument("--revision", type=str, help="`revision` in load_dataset"),
-    parser.add_argument(
-        "--use_auth_token", type=str, help="`use_auth_token` in load_dataset"
-    ),
+    parser.add_argument("--use_auth_token", type=str, help="`use_auth_token` in load_dataset"),
     parser.add_argument(
         "--local",
         action=argparse.BooleanOptionalAction,
         help="Use local dataset",
         default=False,
     ),
-    parser.add_argument(
-        "--output", type=str, help="Path to deduplicated dataset output", required=True
-    ),
+    parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
     parser.add_argument(
         "--debug",
         action=argparse.BooleanOptionalAction,
@@ -171,9 +163,7 @@ def add_simhash_args(
         help="""Ngram size to use in SimHash.""",
     )
     parser.add_argument("--f", type=int, default=64, help="Simhash bit size"),
-    parser.add_argument(
-        "--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"
-    ),
+    parser.add_argument("--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"),
     parser.add_argument(
         "--num_bucket",
         type=int,
