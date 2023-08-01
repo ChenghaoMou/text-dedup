@@ -19,7 +19,7 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
-from text_dedup.utils.hashfunc import blake3, md5, sha256, xxh3_128
+from text_dedup.utils.hashfunc import md5, sha256, xxh3_128
 
 HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":  # pragma: no cover
             )
 
         hash_func = {
-            "blake3": blake3,
+            "blake3": xxh3_128,  # blake3 causes pickling error
             "md5": md5,
             "sha256": sha256,
             "xxh3": xxh3_128,
