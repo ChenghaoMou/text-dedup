@@ -34,7 +34,7 @@ from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
 from text_dedup.utils.timer import Timer
-from text_dedup.utils.hashfunc import xxh64_digest, xxh128_digest
+from text_dedup.utils.hashfunc import xxh3_64_digest, xxh3_128_digest
 
 datasets.logging.set_verbosity_error()
 
@@ -250,9 +250,9 @@ def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
     result = bitarray(0)
     match f:
         case 64:
-            result.frombytes(xxh64_digest(obj))
+            result.frombytes(xxh3_64_digest(obj))
         case 128:
-            result.frombytes(xxh128_digest(obj))
+            result.frombytes(xxh3_128_digest(obj))
         case _:
             raise ValueError(f"Unsupported fingerprint size: {f}")
     return result

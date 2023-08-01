@@ -1,7 +1,8 @@
 import hashlib
 import struct
 import xxhash
-from xxhash import xxh64_digest, xxh128_digest
+from xxhash import xxh3_64_digest, xxh3_128_digest
+from xxhash import xxh3_128
 
 
 def sha1_hash(data: bytes, d: int = 32) -> int:
