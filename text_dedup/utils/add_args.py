@@ -252,8 +252,9 @@ def add_bloom_filter_args(
     parser.add_argument(
         "--hash_func",
         type=str,
+        choices=["md5", "sha256", "blake3", "xxh3"],
         default="md5",
-        help="Hash function to use in BloomFilter",
+        help="Hash function to use in BloomFilter. defaults to md5",
     ),
     parser.add_argument(
         "--initial_capacity",
