@@ -7,7 +7,6 @@
 
 import argparse
 import os
-from hashlib import md5, sha256
 from typing import Any, Callable, Dict, List
 
 from datasets import load_dataset
@@ -20,10 +19,14 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
+from text_dedup.utils.hashfunc import blake3, md5, sha256, xxh3_128
 
-HASH_SIZE = np.uint64(0).nbytes # 8 bytes
+HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
 
-def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func: Callable) -> Dict[str, Any]:
+
+def compute_hashes(
+    batch: Dict[str, Any], idx: List[int], column: str, hash_func: Callable
+) -> Dict[str, Any]:
     """
     Compute a hash for each line in the document.
 
@@ -37,7 +40,7 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
         The column name of the text.
     hash_func : Callable
         The hash function to use.
-    
+
     Returns
     -------
     Dict[str, Any]
@@ -49,10 +52,16 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
         hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE]
         for l in lines
     ]
-    return {"__hash__": hashes, "__id__": [idx[0] for _ in range(n)], "__idx__": list(range(n))}
+    return {
+        "__hash__": hashes,
+        "__id__": [idx[0] for _ in range(n)],
+        "__idx__": list(range(n)),
+    }
 
 
-def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[str, Any]:
+def dedup(
+    record: Dict[str, Any], idx: int, column: str, lookup: Dict
+) -> Dict[str, Any]:
     """
     Remove duplicated lines from the document.
 
@@ -66,7 +75,7 @@ def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[s
         The column name of the text.
     lookup : Dict
         A dictionary containing duplicated (example index, line index) pairs.
-    
+
     Returns
     -------
     Dict[str, Any]
@@ -81,8 +90,8 @@ def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[s
     record[column] = "\n".join(new_content)
     return record
 
-if __name__ == "__main__":  # pragma: no cover
 
+if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(
         prog="text_dedup.ccnet",
         description="Deduplicate line-level text using exact hashing",
@@ -110,9 +119,12 @@ if __name__ == "__main__":  # pragma: no cover
             )
 
         hash_func = {
+            "blake3": blake3,
             "md5": md5,
             "sha256": sha256,
+            "xxh3": xxh3_128,
         }[args.hash_func]
+
         hashes = set()
         remove = set()
 
@@ -127,15 +139,19 @@ if __name__ == "__main__":  # pragma: no cover
                 remove_columns=ds.column_names,
             )
 
-            for idx in tqdm(range(0, len(hashed), args.batch_size), desc="Processing..."):
+            for idx in tqdm(
+                range(0, len(hashed), args.batch_size), desc="Processing..."
+            ):
                 batch = hashed[idx : idx + args.batch_size]
-                for h, id, idx in tqdm(zip(batch["__hash__"], batch["__id__"], batch["__idx__"]), leave=False):
+                for h, id, idx in tqdm(
+                    zip(batch["__hash__"], batch["__id__"], batch["__idx__"]),
+                    leave=False,
+                ):
                     if h in hashes:
                         remove.add((id, idx))
                         continue
                     hashes.add(h)
 
-    
         with timer("Filtering"):
             # TODO: remove might pose a memory bottleneck
             ds = ds.map(

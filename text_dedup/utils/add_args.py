@@ -282,6 +282,10 @@ def add_exact_hash_args(
         Parser with added arguments.
     """
     parser.add_argument(
-        "--hash_func", type=str, default="md5", help="Hash function to use in ExactHash"
+        "--hash_func",
+        type=str,
+        choices=["md5", "sha256", "blake3", "xxh3"],
+        default="md5",
+        help="Hash function to use in ExactHash. defaults to md5",
     ),
     return parser
