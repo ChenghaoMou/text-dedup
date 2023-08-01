@@ -19,7 +19,7 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
-from text_dedup.utils.hashfunc import md5, sha256, xxh3_128
+from text_dedup.utils.hashfunc import md5, sha256, xxh3_64_digest, xxh3_128
 
 HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
 
@@ -48,10 +48,18 @@ def compute_hashes(
     """
     lines = batch[column][0].split("\n")
     n = len(lines)
-    hashes = [
-        hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE]
-        for l in lines
-    ]
+    if hash_func == xxh3_128 and HASH_SIZE == 8:
+        hashes = [
+            xxh3_64_digest(bytes(normalize_for_dedup(l), encoding="utf-8"))
+            for l in lines
+        ]
+    else:
+        hashes = [
+            hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[
+                :HASH_SIZE
+            ]
+            for l in lines
+        ]
     return {
         "__hash__": hashes,
         "__id__": [idx[0] for _ in range(n)],

@@ -5,7 +5,7 @@ import xxhash
 from hashlib import md5, sha256
 from blake3 import blake3
 
-from xxhash import xxh3_128, xxh3_64_digest, xxh3_128_digest
+from xxhash import xxh3_64, xxh3_128, xxh3_64_digest, xxh3_128_digest
 
 
 def sha1_hash(data: bytes, d: int = 32) -> int:
