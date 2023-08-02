@@ -49,7 +49,6 @@ if __name__ == "__main__":  # pragma: no cover
             )
 
         hash_func = {
-            "blake3": blake3,
             "md5": md5,
             "sha256": sha256,
             "xxh3": xxh3_128,

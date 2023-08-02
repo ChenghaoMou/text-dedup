@@ -4,7 +4,6 @@ from hashlib import md5
 from hashlib import sha256
 
 import xxhash
-from blake3 import blake3
 from xxhash import xxh3_64
 from xxhash import xxh3_64_digest
 from xxhash import xxh3_128

@@ -121,7 +121,6 @@ if __name__ == "__main__":  # pragma: no cover
             )
 
         hash_func = {
-            "blake3": xxh3_128,  # blake3 causes pickling error
             "md5": md5,
             "sha256": sha256,
             "xxh3": xxh3_128,
