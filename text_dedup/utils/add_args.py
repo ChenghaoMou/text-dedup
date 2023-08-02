@@ -199,7 +199,13 @@ def add_bloom_filter_args(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         Parser with added arguments.
     """
     parser.add_argument("--error_rate", type=float, default=1e-6, help="Error rate to use in BloomFilter"),
-    parser.add_argument("--hash_func", type=str, default="md5", help="Hash function to use in BloomFilter"),
+    parser.add_argument(
+        "--hash_func",
+        type=str,
+        choices=["md5", "sha256", "xxh3"],
+        default="md5",
+        help="Hash function to use in BloomFilter",
+    ),
     parser.add_argument("--initial_capacity", type=int, default=100, help="Initial capacity of BloomFilter"),
     return parser
 
