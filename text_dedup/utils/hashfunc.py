@@ -47,6 +47,7 @@ def xxh3_hash(data: bytes, d: int = 32) -> int:
     """
     Generate a d-bit xxhash based hash value from the given data.
     As of python xxhash 3.3.0 (and since 0.3.0) outputs in big-endian.
+    This is useful as a general purpose xxhash that can take multiple `d` values
 
     Parameters
     ----------
@@ -81,3 +82,9 @@ def xxh3_hash(data: bytes, d: int = 32) -> int:
             return xxhash.xxh3_128_intdigest(data)
     # fall back
     return int.from_bytes(xxhash.xxh3_128_digest(data)[: d // 8], byteorder="big")
+
+
+__all__ = [
+    "sha1_hash",
+    "xxh3_hash",
+]
