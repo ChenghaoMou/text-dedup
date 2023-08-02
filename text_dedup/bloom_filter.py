@@ -14,7 +14,6 @@ from text_dedup import logger
 from text_dedup.utils import add_bloom_filter_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.hashfunc import blake3
 from text_dedup.utils.hashfunc import md5
 from text_dedup.utils.hashfunc import sha256
 from text_dedup.utils.hashfunc import xxh3_128
