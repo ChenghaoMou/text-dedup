@@ -169,11 +169,9 @@ if __name__ == "__main__":  # pragma: no cover
     if args.b is not None and args.r is not None:
         B, R = args.b, args.r
     else:
-        """
-        Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
-        of probabilities of false positive and false negative, taken from datasketch.
-        You can also refer to the interactive demo at https://huggingface.co/spaces/bigcode/near-deduplication.
-        """
+        # Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
+        # of probabilities of false positive and false negative, taken from datasketch.
+        # You can also refer to the interactive demo at https://huggingface.co/spaces/bigcode/near-deduplication.
         B, R = optimal_param(args.threshold, args.num_perm, false_positive_weight=0.5, false_negative_weight=0.5)
 
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
