@@ -133,7 +133,7 @@ def embed_func(
     tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
     hashvalues: np.ndarray = np.array([sha1_hash(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
     permuted_hashvalues = np.bitwise_and(
-        np.mod((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b, MERSENNE_PRIME),
+        np.mod(np.add((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T, b), MERSENNE_PRIME),
         MAX_HASH,
     )
     hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
@@ -210,7 +210,6 @@ def optimal_param(
 
 
 if __name__ == "__main__":  # pragma: no cover
-
     parser = argparse.ArgumentParser(
         prog="text_dedup.minhash",
         description="Deduplicate text using minhash",
