@@ -13,6 +13,7 @@ import random
 import re
 from collections import defaultdict
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
@@ -52,7 +53,7 @@ def embed_func(
     min_length: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
-    hash_func: callable,
+    hash_func: Callable,
 ) -> Dict[str, Any]:
     """
     Calculate hash values for the content.
