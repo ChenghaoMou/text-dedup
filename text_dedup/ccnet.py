@@ -122,7 +122,7 @@ if __name__ == "__main__":  # pragma: no cover
         match args.hash_func:
             case "md5":
                 hash_func = md5
-            case other:
+            case _:
                 hash_func = sha256
 
         hashes = set()
