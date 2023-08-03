@@ -277,7 +277,6 @@ def clean_up(text: str, slices: List[slice]) -> str:
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         prog="text-dedup.suffixarray",
         description="Deduplicate text using Suffix Array Deduplication",

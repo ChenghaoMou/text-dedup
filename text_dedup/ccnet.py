@@ -7,21 +7,27 @@
 
 import argparse
 import os
-from hashlib import md5, sha256
-from typing import Any, Callable, Dict, List
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
 
-from datasets import load_dataset
 import numpy as np
+from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.timer import Timer
+from text_dedup.utils.hashfunc import md5
+from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import xxh3_64_digest
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
+from text_dedup.utils.timer import Timer
 
-HASH_SIZE = np.uint64(0).nbytes # 8 bytes
+HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
+
 
 def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func: Callable) -> Dict[str, Any]:
     """
@@ -37,7 +43,7 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
         The column name of the text.
     hash_func : Callable
         The hash function to use.
-    
+
     Returns
     -------
     Dict[str, Any]
@@ -45,11 +51,15 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
     """
     lines = batch[column][0].split("\n")
     n = len(lines)
-    hashes = [
-        hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE]
-        for l in lines
-    ]
-    return {"__hash__": hashes, "__id__": [idx[0] for _ in range(n)], "__idx__": list(range(n))}
+    if hash_func == xxh3_64_digest:
+        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
+    else:
+        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE] for l in lines]
+    return {
+        "__hash__": hashes,
+        "__id__": [idx[0] for _ in range(n)],
+        "__idx__": list(range(n)),
+    }
 
 
 def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[str, Any]:
@@ -66,7 +76,7 @@ def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[s
         The column name of the text.
     lookup : Dict
         A dictionary containing duplicated (example index, line index) pairs.
-    
+
     Returns
     -------
     Dict[str, Any]
@@ -81,8 +91,8 @@ def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[s
     record[column] = "\n".join(new_content)
     return record
 
-if __name__ == "__main__":  # pragma: no cover
 
+if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(
         prog="text_dedup.ccnet",
         description="Deduplicate line-level text using exact hashing",
@@ -109,10 +119,12 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        hash_func = {
-            "md5": md5,
-            "sha256": sha256,
-        }[args.hash_func]
+        match args.hash_func:
+            case "md5":
+                hash_func = md5
+            case _:
+                hash_func = sha256
+
         hashes = set()
         remove = set()
 
@@ -129,13 +141,15 @@ if __name__ == "__main__":  # pragma: no cover
 
             for idx in tqdm(range(0, len(hashed), args.batch_size), desc="Processing..."):
                 batch = hashed[idx : idx + args.batch_size]
-                for h, id, idx in tqdm(zip(batch["__hash__"], batch["__id__"], batch["__idx__"]), leave=False):
+                for h, id_, idx in tqdm(
+                    zip(batch["__hash__"], batch["__id__"], batch["__idx__"]),
+                    leave=False,
+                ):
                     if h in hashes:
-                        remove.add((id, idx))
+                        remove.add((id_, idx))
                         continue
                     hashes.add(h)
 
-    
         with timer("Filtering"):
             # TODO: remove might pose a memory bottleneck
             ds = ds.map(

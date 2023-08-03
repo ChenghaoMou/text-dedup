@@ -4,7 +4,6 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
 import os
-from hashlib import md5
 
 from datasets import load_dataset
 from tqdm import tqdm
@@ -13,10 +12,12 @@ from text_dedup import logger
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
+from text_dedup.utils.hashfunc import md5
+from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import xxh3_128
 from text_dedup.utils.timer import Timer
 
 if __name__ == "__main__":  # pragma: no cover
-
     parser = argparse.ArgumentParser(
         prog="text_dedup.exacthash",
         description="Deduplicate text using exact hashing",
@@ -44,7 +45,10 @@ if __name__ == "__main__":  # pragma: no cover
 
         hash_func = {
             "md5": md5,
+            "sha256": sha256,
+            "xxh3": xxh3_128,
         }[args.hash_func]
+
         hashes = set()
         flags = []
 
@@ -60,7 +64,11 @@ if __name__ == "__main__":  # pragma: no cover
                         hashes.add(h)
 
         with timer("Filtering"):
-            ds = ds.filter(lambda _, idx: not flags[idx], with_indices=True, num_proc=os.cpu_count())
+            ds = ds.filter(
+                lambda _, idx: not flags[idx],
+                with_indices=True,
+                num_proc=os.cpu_count(),
+            )
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
