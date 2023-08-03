@@ -23,7 +23,6 @@ from text_dedup.utils import add_meta_args
 from text_dedup.utils.hashfunc import md5
 from text_dedup.utils.hashfunc import sha256
 from text_dedup.utils.hashfunc import xxh3_64_digest
-from text_dedup.utils.hashfunc import xxh3_128
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
 from text_dedup.utils.timer import Timer
 
@@ -52,8 +51,8 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
     """
     lines = batch[column][0].split("\n")
     n = len(lines)
-    if hash_func == xxh3_128 and HASH_SIZE == 8:
-        hashes = [xxh3_64_digest(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
+    if hash_func == xxh3_64_digest:
+        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
     else:
         hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE] for l in lines]
     return {
@@ -120,11 +119,11 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        hash_func = {
-            "md5": md5,
-            "sha256": sha256,
-            "xxh3": xxh3_128,
-        }[args.hash_func]
+        match args.hash_func:
+            case "md5":
+                hash_func = md5
+            case other:
+                hash_func = sha256
 
         hashes = set()
         remove = set()

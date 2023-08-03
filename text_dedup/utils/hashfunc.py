@@ -5,6 +5,7 @@ from hashlib import sha256
 
 import xxhash
 from xxhash import xxh3_64
+from xxhash import xxh3_64_digest
 from xxhash import xxh3_128
 
 
