@@ -74,6 +74,8 @@ def embed_func(
         The ranges of hash values.
     permutations : np.ndarray
         The permutations for the minhash.
+    hash_func : Callable
+        The hash function to use.
 
     Returns
     -------
@@ -97,7 +99,8 @@ def embed_func(
     ...     ],
     ...     dtype=np.uint64,
     ... ).T
-    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, permutations=PERMUTATIONS)
+    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, 
+    ... permutations=PERMUTATIONS, hash_func=xxh3_hash)
     >>> len(res["__signatures__"])
     10
     >>> res["__id__"]

@@ -313,7 +313,7 @@ def embed_func(
 
     Examples
     --------
-    >>> res = embed_func("hello world", 0, f=64, ngram=3)
+    >>> res = embed_func("hello world", 0, f=64, ngram=3, permutations=None)
     >>> res["__id__"]
     0
     >>> len(res["__signature__"])
