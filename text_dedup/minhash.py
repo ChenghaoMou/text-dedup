@@ -129,8 +129,11 @@ def embed_func(
     0
     """
     a, b = permutations
-    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
-    hashvalues: np.ndarray = np.array([sha1_hash(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
+    tokens: Set[bytes] = {
+        bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
+    }
+
+    hashvalues: np.ndarray = np.array([sha1_hash(token) for token in tokens], dtype=np.uint64)
     # Permute the hash values to produce new universal hashes
     # Tiling 'a' to match the shape of 'hashvalues'
     # Element-wise multiplication of 'hashvalues' with tiled 'a'
