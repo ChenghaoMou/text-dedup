@@ -132,15 +132,16 @@ def embed_func(
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
     tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
     hashvalues: np.ndarray = np.array([sha1_hash(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
+    # Permute the hash values to produce new universal hashes
     # Tiling 'a' to match the shape of 'hashvalues'
     # Element-wise multiplication of 'hashvalues' with tiled 'a'
     # Adding 'b' and taking the result modulo 'MERSENNE_PRIME'
     # Performing bitwise AND with 'MAX_HASH'
-    permuted_hashvalues = np.bitwise_and(
+    hashvalues = np.bitwise_and(
         np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), MERSENNE_PRIME),
         MAX_HASH,
     )
-    hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
+    hashvalues = np.vstack([hashvalues, masks]).min(axis=0)
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
