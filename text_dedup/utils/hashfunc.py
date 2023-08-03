@@ -1,6 +1,12 @@
 import hashlib
 import struct
+from hashlib import md5
+from hashlib import sha256
+
 import xxhash
+from xxhash import xxh3_64
+from xxhash import xxh3_64_digest
+from xxhash import xxh3_128
 
 
 def sha1_hash(data: bytes, d: int = 32) -> int:
@@ -36,10 +42,73 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
     return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
 
 
+def xxh3_16hash(data: bytes, seed: int = 0) -> int:
+    """
+    Generate a 16-bit xxhash based hash value from the given data.
+    As of python xxhash 3.3.0 (and since 0.3.0) outputs in big-endian.
+    This is useful as a special purpose xxhash when you only want 16 bits.
+    bit masked xxh3_64 hashes are faster than xxh32 in modern systems.
+
+    Parameters
+    ----------
+    data : bytes
+        The data to be hashed.
+    seed : int
+        xxhashes can all be seeded. Default is int=0
+
+    Returns
+    -------
+    int
+        The hash value.
+
+    Examples
+    --------
+    >>> xxh3_16hash(b"hello world")
+    39051
+    >>> xxh3_16hash(b"hello world",seed=42)
+    13198
+    >>> xxh3_16hash(b"hello world",seed=-42)
+    34281
+    """
+    return xxhash.xxh3_64_intdigest(data, seed) & 0xFFFF
+
+
+def xxh3_32hash(data: bytes, seed: int = 0) -> int:
+    """
+    Generate a 32-bit xxhash based hash value from the given data.
+    As of python xxhash 3.3.0 (and since 0.3.0) outputs in big-endian.
+    This is useful as a special purpose xxhash when you only want 32bits.
+    bit masked xxh3_64 hashes are faster than xxh32 in modern systems.
+
+    Parameters
+    ----------
+    data : bytes
+        The data to be hashed.
+    seed : int
+        xxhashes can all be seeded. Default is int=0
+
+    Returns
+    -------
+    int
+        The hash value.
+
+    Examples
+    --------
+    >>> xxh3_32hash(b"hello world")
+    1088854155
+    >>> xxh3_32hash(b"hello world",seed=42)
+    3913102222
+    >>> xxh3_32hash(b"hello world",seed=-42)
+    3721037289
+    """
+    return xxhash.xxh3_64_intdigest(data, seed) & 0xFFFFFFFF
+
+
 def xxh3_hash(data: bytes, d: int = 32) -> int:
     """
     Generate a d-bit xxhash based hash value from the given data.
     As of python xxhash 3.3.0 (and since 0.3.0) outputs in big-endian.
+    This is useful as a general purpose xxhash that can take multiple `d` values
 
     Parameters
     ----------
@@ -74,3 +143,6 @@ def xxh3_hash(data: bytes, d: int = 32) -> int:
             return xxhash.xxh3_128_intdigest(data)
     # fall back
     return int.from_bytes(xxhash.xxh3_128_digest(data)[: d // 8], byteorder="big")
+
+
+__all__ = ["md5", "sha256", "sha1_hash", "xxh3_64", "xxh3_128", "xxh3_hash", "xxh3_16hash", "xxh3_32hash"]

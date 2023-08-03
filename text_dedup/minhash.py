@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 import gc
-import hashlib
 import multiprocessing as mp
 import os
 import pickle
@@ -14,6 +13,7 @@ import random
 import re
 from collections import defaultdict
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
@@ -32,6 +32,8 @@ from text_dedup.utils.add_args import add_io_args
 from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.analysis import optimal_param
+from text_dedup.utils.hashfunc import sha1_hash
+from text_dedup.utils.hashfunc import xxh3_hash
 from text_dedup.utils.timer import Timer
 
 SEED = 42
@@ -40,34 +42,6 @@ NON_ALPHA = re.compile("\W", re.UNICODE)
 MAX_HASH = np.uint64((1 << 32) - 1)
 MERSENNE_PRIME = np.uint64((1 << 61) - 1)
 datasets.logging.set_verbosity_error()
-
-
-def sha1_hash(data: bytes, d: int = 32) -> int:
-    """
-    Generate a d-bit hash value from the given data.
-
-    Parameters
-    ----------
-    data : bytes
-        The data to be hashed.
-    d : int
-        The number of bits of the hash value.
-
-    Returns
-    -------
-    int
-        The hash value.
-
-    Examples
-    --------
-    >>> sha1_hash(b"hello world", 32)
-    896314922
-    >>> sha1_hash(b"hello world", 64)
-    13028719972609469994
-    >>> sha1_hash(b"hello world", 128)
-    310522945683037930239412421226792791594
-    """
-    return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
 
 
 def embed_func(
@@ -79,6 +53,7 @@ def embed_func(
     min_length: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
+    hash_func: Callable,
 ) -> Dict[str, Any]:
     """
     Calculate hash values for the content.
@@ -99,6 +74,8 @@ def embed_func(
         The ranges of hash values.
     permutations : np.ndarray
         The permutations for the minhash.
+    hash_func : Callable
+        The hash function to use.
 
     Returns
     -------
@@ -122,7 +99,8 @@ def embed_func(
     ...     ],
     ...     dtype=np.uint64,
     ... ).T
-    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, permutations=PERMUTATIONS)
+    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges,
+    ... permutations=PERMUTATIONS, hash_func=xxh3_hash)
     >>> len(res["__signatures__"])
     10
     >>> res["__id__"]
@@ -161,6 +139,11 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_meta_args(parser)
     parser = add_minhash_args(parser)
     args = parser.parse_args()
+
+    hash_func = {
+        "sha1": sha1_hash,
+        "xxh3": xxh3_hash,
+    }[args.hash_func]
 
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
@@ -215,6 +198,7 @@ if __name__ == "__main__":  # pragma: no cover
                     "ngram_size": args.ngram,
                     "min_length": args.min_length,
                     "permutations": PERMUTATIONS,
+                    "hash_func": hash_func,
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,

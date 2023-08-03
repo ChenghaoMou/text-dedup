@@ -8,6 +8,7 @@ import regex as re
 DIGIT_RE = re.compile(r"\d")
 PUNCT_OR_NON_PRINTING_CHARS_RE = re.compile(r"[\p{P}\p{C}\p{S}]+")
 
+
 def normalize(line: str) -> str:
     """
     Normalize a line of text. Source: https://github.com/facebookresearch/cc_net/blob/bda555bd1cf1ee2e0b925363e62a61cd46c8b60d/cc_net/text_normalizer.py#L180
@@ -16,7 +17,7 @@ def normalize(line: str) -> str:
     ----------
     line : str
         The line of text to normalize.
-    
+
     Returns
     -------
     str

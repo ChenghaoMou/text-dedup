@@ -20,7 +20,6 @@ from typing import Tuple
 
 import datasets
 import numpy as np
-import xxhash
 from bitarray import bitarray
 from bitarray import frozenbitarray
 from datasets import load_dataset
@@ -33,6 +32,8 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
+from text_dedup.utils.hashfunc import xxh3_64
+from text_dedup.utils.hashfunc import xxh3_128
 from text_dedup.utils.timer import Timer
 
 datasets.logging.set_verbosity_error()
@@ -145,7 +146,7 @@ class Permutation:
         ----------
         x: int
            The fingerprint to be reversed
-        
+
         Returns
         -------
         int
@@ -245,9 +246,9 @@ def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
     result = bitarray(0)
     match f:
         case 64:
-            result.frombytes(xxhash.xxh64(obj).digest())
+            result.frombytes(xxh3_64(obj).digest())
         case 128:
-            result.frombytes(xxhash.xxh128(obj).digest())
+            result.frombytes(xxh3_128(obj).digest())
         case _:
             raise ValueError(f"Unsupported fingerprint size: {f}")
     return result
@@ -283,7 +284,14 @@ def compute(hashes: List[bitarray]) -> bitarray:
     return res
 
 
-def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List[Permutation] = None) -> Dict[str, Any]:
+def embed_func(
+    content: str,
+    idx: int,
+    *,
+    f: int,
+    ngram: int,
+    permutations: List[Permutation],
+) -> Dict[str, Any]:
     """
     Calculate the simhash signature of a text.
 
@@ -305,7 +313,7 @@ def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List
 
     Examples
     --------
-    >>> res = embed_func("hello world", 0, f=64, ngram=3)
+    >>> res = embed_func("hello world", 0, f=64, ngram=3, permutations=None)
     >>> res["__id__"]
     0
     >>> len(res["__signature__"])
@@ -326,7 +334,6 @@ def embed_func(content: str, idx: int, *, f: int, ngram: int, permutations: List
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         prog="text_dedup.simhash",
         description="Deduplicate text using simhash",
@@ -364,7 +371,11 @@ if __name__ == "__main__":
         with timer("SimHashing"):
             embedded = ds.map(
                 function=embed_func,
-                fn_kwargs={"ngram": args.ngram, "permutations": PERMUTATIONS, "f": args.f},
+                fn_kwargs={
+                    "ngram": args.ngram,
+                    "permutations": PERMUTATIONS,
+                    "f": args.f,
+                },
                 input_columns=[args.column],
                 remove_columns=[args.column],
                 num_proc=os.cpu_count(),
