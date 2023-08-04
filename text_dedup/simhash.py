@@ -253,6 +253,7 @@ def compute(hashes: List[bitarray]) -> bitarray:
     Compute the Simhash of a list of hashes.
 
     Notes to myself: You tried porting this to Cython, but it didn't improve the performance.
+    Others have experimented with numpy types and operators, but it didn't improve performance
 
     Parameters
     ----------
