@@ -283,7 +283,6 @@ def embed_func(
     content: str,
     idx: int,
     *,
-    f: int,
     ngram: int,
     permutations: List[Permutation],
 ) -> Dict[str, Any]:
@@ -308,7 +307,7 @@ def embed_func(
 
     Examples
     --------
-    >>> res = embed_func("hello world", 0, f=64, ngram=3, permutations=None)
+    >>> res = embed_func("hello world", 0, ngram=3, permutations=None)
     >>> res["__id__"]
     0
     >>> len(res["__signature__"])
@@ -373,7 +372,6 @@ if __name__ == "__main__":
                 fn_kwargs={
                     "ngram": args.ngram,
                     "permutations": PERMUTATIONS,
-                    "f": args.f,
                 },
                 input_columns=[args.column],
                 remove_columns=[args.column],
