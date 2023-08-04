@@ -149,7 +149,8 @@ if __name__ == "__main__":  # pragma: no cover
     # hash_bits = 32 will use 32 bit hashes and datatypes, primes
     HASH_BITS = 64
 
-    match args.hash_func:
+    HASH_FUNC = args.hash_func
+    match HASH_FUNC:
         case "sha1":
 
             def hash_func(byte_data):
