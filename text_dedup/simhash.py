@@ -272,7 +272,7 @@ def compute(hashes: List[bitarray]) -> bitarray:
     74633958390507528
     """
     sigs = np.asarray([h.tolist() for h in hashes], dtype=int)
-    sig = np.where(np.sum(2 * sigs - 1, axis=0) > 0, 1, 0).astype(bool)
+    sig = np.where(np.sum(2 * sigs - 1, axis=0) > 0, True, False)
     res = bitarray()
     res.pack(sig.tobytes())
     return res
