@@ -324,7 +324,7 @@ def embed_func(
                     (permutation.permute(sig) & permutation.search_mask).tobytes(),
                 )
             )
-    return {"__signature__": sig.tobytes(), "__id__": idx, "__keys__": keys}
+    return {"__id__": idx, "__keys__": keys, "__signature__": sig.tobytes()}
 
 
 if __name__ == "__main__":
@@ -383,22 +383,29 @@ if __name__ == "__main__":
 
         # TODO Create multiple BUCKETS for parallelization
         with timer("Clustering"):
-            for i in tqdm(
+            for batch_idx in tqdm(
                 range(0, len(embedded), args.batch_size),
                 dynamic_ncols=True,
                 desc="Iterating SimHashes...",
             ):
-                batch = embedded[i : i + args.batch_size]
+                # Iterate over each batch dataset from the total hash embedded dataset
+                batch = embedded[batch_idx : batch_idx + args.batch_size]
                 for idx, keys, sig in tqdm(
                     zip(batch["__id__"], batch["__keys__"], batch["__signature__"]),
                     desc="Indexing...",
                     leave=False,
                     total=len(batch["__id__"]),
                 ):
+                    # each example in a batch has id, key, signatures we built above
+                    # we extract that signature and make it a frozen bitarray
                     sig = frozenbitarray(buffer=sig)
+                    # we make a neighbor set for each batch
                     neighbors = set()
+                    # iterate for for each permutation key
                     for key in keys:
                         key = tuple(key)
+                        # BUCKETS is a defaultdict defaulting to empty list
+                        # this iterates over indicies ALREADY in the bucket
                         for idy, other_fingerprint in BUCKETS[key]:
                             if idy in neighbors:
                                 continue
