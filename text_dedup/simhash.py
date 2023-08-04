@@ -380,7 +380,7 @@ if __name__ == "__main__":
                 remove_columns=[args.column],
                 num_proc=os.cpu_count(),
                 with_indices=True,
-                desc=f"SimHashing...",
+                desc="SimHashing...",
             )
 
         # TODO Create multiple BUCKETS for parallelization
