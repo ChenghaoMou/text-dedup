@@ -112,7 +112,7 @@ def embed_func(
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
-    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=np.uint64)
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=DTYPE)
     # Permute the hash values to produce new universal hashes
     # Tiling 'a' to match the shape of 'hashvalues'
     # Element-wise multiplication of 'hashvalues' with tiled 'a'
@@ -124,7 +124,7 @@ def embed_func(
     )
     # this part is where the name "min" of minhash comes from
     # this stacks all the hashes and then takes the minimum from each column
-    masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
+    masks: np.ndarray = np.full(shape=num_perm, dtype=DTYPE, fill_value=MAX_HASH)
     hashvalues = np.vstack([hashvalues, masks]).min(axis=0)
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
@@ -166,7 +166,7 @@ if __name__ == "__main__":  # pragma: no cover
         case "sha1":
 
             def hash_func(byte_data):
-                return sha1_hash(byte_data, d=max(HASH_BITS, 32))
+                return sha1_hash(byte_data, d=min(HASH_BITS, 32))
 
         case "xxh3":
             if HASH_BITS == 16:
@@ -207,15 +207,15 @@ if __name__ == "__main__":  # pragma: no cover
                 )
 
         DATA_SIZE = len(ds)
-        PERMUTATIONS = np.array(
+        PERMUTATIONS: np.ndarray = np.array(
             [
                 (
-                    RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
-                    RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
+                    RNG.randint(1, MERSENNE_PRIME, dtype=DTYPE),
+                    RNG.randint(0, MERSENNE_PRIME, dtype=DTYPE),
                 )
                 for _ in range(args.num_perm)
             ],
-            dtype=np.uint64,
+            dtype=DTYPE,
         ).T
 
         with timer("MinHashing"):
