@@ -144,12 +144,13 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_minhash_args(parser)
     args = parser.parse_args()
 
-    # this will be replaced with args.hash_bits
-    # we use mostly np.uint64 and this reflects it
-    # hash_bits = 32 will use 32 bit hashes and datatypes, primes
-    HASH_BITS: int = 64
+    HASH_BITS: int = args.hash_bits
 
     # mypy typing with numpy is difficult
+    # 64 bit config is mostly backwards compatibility mode.
+    # 64 bit datatypes but almost entirely 32bit data, except for one mersenne prime 2^61
+    # as to why legacy implementations used what they did, refer to
+    # https://en.wikipedia.org/wiki/Universal_hashing#Hashing_strings
     HASH_CONFIG: Dict[int, Tuple[type, Any, Any]] = {
         64: (np.uint64, np.uint64((1 << 32) - 1), np.uint64((1 << 61) - 1)),
         # 32, 16 bit config does not use a mersenne prime.
@@ -184,6 +185,9 @@ if __name__ == "__main__":  # pragma: no cover
         # Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
         # of probabilities of false positive and false negative, taken from datasketch.
         # You can also refer to the interactive demo at https://huggingface.co/spaces/bigcode/near-deduplication.
+        # The following assumes a "perfect hash". using 16 bit hashes might challenge this assumption
+        # lower precision dtype will cause more collisions, so higher false_positives and less false negatives.
+        # Both effects move the result towards more documents being considered duplicates.
         B, R = optimal_param(args.threshold, args.num_perm, false_positive_weight=0.5, false_negative_weight=0.5)
 
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
