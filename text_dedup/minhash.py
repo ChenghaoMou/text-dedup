@@ -125,6 +125,9 @@ def embed_func(
     # this stacks all the hashes and then takes the minimum from each column
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
     hashvalues = np.vstack([hashvalues, masks]).min(axis=0)
+    # Originally, byteswap was done for speed. Testing show it has a negligible impact
+    # keeping  for backward compatibility, even though theoretically and empirically
+    # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
