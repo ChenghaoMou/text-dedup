@@ -363,6 +363,7 @@ if __name__ == "__main__":
                     split=args.split,
                     revision=args.revision,
                     cache_dir=args.cache_dir,
+                    num_proc=os.cpu_count(),
                     use_auth_token=args.use_auth_token,
                 )
 
