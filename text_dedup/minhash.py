@@ -33,7 +33,7 @@ from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.analysis import optimal_param
 from text_dedup.utils.hashfunc import sha1_hash
-from text_dedup.utils.hashfunc import xxh3_hash
+from text_dedup.utils.hashfunc import xxh3_32hash
 from text_dedup.utils.timer import Timer
 
 SEED = 42
@@ -111,7 +111,7 @@ def embed_func(
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
-    hashvalues: np.ndarray = np.array([sha1_hash(token) for token in tokens], dtype=np.uint64)
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=np.uint64)
     # Permute the hash values to produce new universal hashes
     # Tiling 'a' to match the shape of 'hashvalues'
     # Element-wise multiplication of 'hashvalues' with tiled 'a'
@@ -145,7 +145,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     hash_func = {
         "sha1": sha1_hash,
-        "xxh3": xxh3_hash,
+        "xxh3": xxh3_32hash,
     }[args.hash_func]
 
     mp.set_start_method("fork", force=True)
