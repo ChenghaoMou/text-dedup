@@ -33,6 +33,7 @@ from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.analysis import optimal_param
 from text_dedup.utils.hashfunc import sha1_hash
+from text_dedup.utils.hashfunc import xxh3_16hash
 from text_dedup.utils.hashfunc import xxh3_32hash
 from text_dedup.utils.timer import Timer
 
@@ -143,10 +144,22 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_minhash_args(parser)
     args = parser.parse_args()
 
-    hash_func = {
-        "sha1": sha1_hash,
-        "xxh3": xxh3_32hash,
-    }[args.hash_func]
+    # this will be replaced with args.hash_bits
+    # we use mostly np.uint64 and this reflects it
+    # hash_bits = 32 will use 32 bit hashes and datatypes, primes
+    HASH_BITS = 64
+
+    match args.hash_func:
+        case "sha1":
+
+            def hash_func(byte_data):
+                return sha1_hash(byte_data, d=max(HASH_BITS, 32))
+
+        case "xxh3":
+            if HASH_BITS == 16:
+                hash_func = xxh3_16hash
+            else:
+                hash_func = xxh3_32hash
 
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
