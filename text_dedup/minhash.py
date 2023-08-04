@@ -17,6 +17,7 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
+from typing import SupportsInt
 from typing import Tuple
 
 import datasets
@@ -147,7 +148,20 @@ if __name__ == "__main__":  # pragma: no cover
     # this will be replaced with args.hash_bits
     # we use mostly np.uint64 and this reflects it
     # hash_bits = 32 will use 32 bit hashes and datatypes, primes
-    HASH_BITS = 64
+    HASH_BITS: int = 64
+
+    # mypy typing with numpy is difficult
+    HASH_CONFIG: Dict[int, Tuple[type, Any, Any]] = {
+        64: (np.uint64, np.uint64((1 << 32) - 1), np.uint64((1 << 61) - 1)),
+        # 32, 16 bit config does not use a mersenne prime.
+        # The original reason for using mersenne prime was speed.
+        # Testing reveals, there is no benefit to using a 2^61 mersenne prime for division
+        32: (np.uint32, np.uint32((1 << 32) - 1), np.uint32((1 << 32) - 5)),
+        16: (np.uint16, np.uint16((1 << 16) - 1), np.uint16((1 << 16) - 15)),
+    }
+
+    # defaults to backwards compatible HASH_BITS = 64, which is np.uint64 dtypes with 32bit hashes
+    DTYPE, MAX_HASH, MERSENNE_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[64])
 
     HASH_FUNC = args.hash_func
     match HASH_FUNC:
