@@ -17,7 +17,6 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
-from typing import SupportsInt
 from typing import Tuple
 
 import datasets
@@ -163,8 +162,7 @@ if __name__ == "__main__":  # pragma: no cover
     # defaults to backwards compatible HASH_BITS = 64, which is np.uint64 dtypes with 32bit hashes
     DTYPE, MAX_HASH, MERSENNE_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[64])
 
-    HASH_FUNC = args.hash_func
-    match HASH_FUNC:
+    match args.hash_func:
         case "sha1":
 
             def hash_func(byte_data):
