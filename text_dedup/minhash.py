@@ -40,8 +40,6 @@ from text_dedup.utils.timer import Timer
 SEED = 42
 RNG = np.random.RandomState(SEED)
 NON_ALPHA = re.compile("\W", re.UNICODE)
-MAX_HASH = np.uint64((1 << 32) - 1)
-MERSENNE_PRIME = np.uint64((1 << 61) - 1)
 datasets.logging.set_verbosity_error()
 
 
