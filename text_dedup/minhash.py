@@ -53,6 +53,9 @@ def embed_func(
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
     hash_func: Callable,
+    dtype: type,
+    max_hash: np.uint,
+    modulo_prime: np.uint,
 ) -> Dict[str, Any]:
     """
     Calculate hash values for the content.
@@ -88,18 +91,20 @@ def embed_func(
     >>> num_perm = 250
     >>> ngram_size = 1
     >>> hashranges = [(i, i + 25) for i in range(0, 250, 25)]
+    >>> max_hash = np.uint32((1 << 32) - 1)
+    >>> modulo_prime = np.uint32((1 << 32) - 5)
     >>> PERMUTATIONS = np.array(
     ...     [
     ...         (
-    ...             RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
-    ...             RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
+    ...             RNG.randint(1, np.uint32((1 << 32) - 5), dtype=np.uint32),
+    ...             RNG.randint(0, np.uint32((1 << 32) - 5), dtype=np.uint32),
     ...         )
     ...         for _ in range(num_perm)
     ...     ],
-    ...     dtype=np.uint64,
+    ...     dtype=np.uint32,
     ... ).T
     >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges,
-    ... permutations=PERMUTATIONS, hash_func=xxh3_16hash)
+    ... permutations=PERMUTATIONS, hash_func=xxh3_32hash,dtype=np.uint32, max_hash=max_hash, modulo_prime=modulo_prime)
     >>> len(res["__signatures__"])
     10
     >>> res["__id__"]
@@ -110,19 +115,19 @@ def embed_func(
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
-    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=DTYPE)
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
     # Permute the hash values to produce new universal hashes
     # Tiling 'a' to match the shape of 'hashvalues'
     # Element-wise multiplication of 'hashvalues' with tiled 'a'
     # Adding 'b' and taking the result modulo 'MERSENNE_PRIME'
     # Performing bitwise AND with 'MAX_HASH'
     hashvalues = np.bitwise_and(
-        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), MERSENNE_PRIME),
-        MAX_HASH,
+        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
+        max_hash,
     )
     # this part is where the name "min" of minhash comes from
     # this stacks all the hashes and then takes the minimum from each column
-    masks: np.ndarray = np.full(shape=num_perm, dtype=DTYPE, fill_value=MAX_HASH)
+    masks: np.ndarray = np.full(shape=num_perm, dtype=dtype, fill_value=max_hash)
     hashvalues = np.vstack([hashvalues, masks]).min(axis=0)
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
@@ -145,9 +150,9 @@ if __name__ == "__main__":  # pragma: no cover
     HASH_BITS: int = args.hash_bits
 
     # mypy typing with numpy is difficult
-    # 64 bit config is mostly backwards compatibility mode.
-    # 64 bit datatypes but almost entirely 32bit data, except for one mersenne prime 2^61
-    # as to why legacy implementations used what they did, refer to
+    # 64 bit config is backwards compatibility mode.
+    # it uses 64 bit types but almost entirely 32bit data, except for one mersenne prime 2^61
+    # why legacy implementations used mersenne primes for modulo:
     # https://en.wikipedia.org/wiki/Universal_hashing#Hashing_strings
     HASH_CONFIG: Dict[int, Tuple[type, Any, Any]] = {
         64: (np.uint64, np.uint64((1 << 32) - 1), np.uint64((1 << 61) - 1)),
@@ -159,7 +164,7 @@ if __name__ == "__main__":  # pragma: no cover
     }
 
     # defaults to backwards compatible HASH_BITS = 64, which is np.uint64 dtypes with 32bit hashes
-    DTYPE, MAX_HASH, MERSENNE_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[64])
+    DTYPE, MAX_HASH, MODULO_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[64])
 
     match args.hash_func:
         case "sha1":
@@ -212,8 +217,8 @@ if __name__ == "__main__":  # pragma: no cover
         PERMUTATIONS: np.ndarray = np.array(
             [
                 (
-                    RNG.randint(1, MERSENNE_PRIME, dtype=DTYPE),
-                    RNG.randint(0, MERSENNE_PRIME, dtype=DTYPE),
+                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),
+                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),
                 )
                 for _ in range(args.num_perm)
             ],
@@ -230,6 +235,9 @@ if __name__ == "__main__":  # pragma: no cover
                     "min_length": args.min_length,
                     "permutations": PERMUTATIONS,
                     "hash_func": hash_func,
+                    "dtype": DTYPE,
+                    "max_hash": MAX_HASH,
+                    "modulo_prime": MODULO_PRIME,
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,
