@@ -14,6 +14,7 @@ import random
 from collections import defaultdict
 from itertools import permutations
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Tuple
@@ -218,7 +219,7 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     return results
 
 
-def _unsigned_hash(obj: bytes) -> bitarray:
+def _unsigned_hash(obj: bytes, hash_func: Callable) -> bitarray:
     """
     Compute a hash of an object.
 
@@ -228,9 +229,6 @@ def _unsigned_hash(obj: bytes) -> bitarray:
     ----------
     obj: bytes
         The object to hash.
-    f: int
-        The fingerprint size
-
     Returns
     -------
     bitarray
@@ -238,9 +236,9 @@ def _unsigned_hash(obj: bytes) -> bitarray:
 
     Examples
     --------
-    >>> len(_unsigned_hash(b'hello world', f=64))
+    >>> len(_unsigned_hash(b'hello world',xxh3_64_digest))
     64
-    >>> len(_unsigned_hash(b'hello world', f=128))
+    >>> len(_unsigned_hash(b'hello world',xxh3_128_digest))
     128
     """
     result = bitarray(0)
@@ -285,6 +283,7 @@ def embed_func(
     *,
     ngram: int,
     permutations: List[Permutation],
+    hash_func: Callable,
 ) -> Dict[str, Any]:
     """
     Calculate the simhash signature of a text.
@@ -293,12 +292,12 @@ def embed_func(
     ----------
     content : str
         The text to be hashed.
-    f : int
-        The fingerprint size.
     idx : int
         The index of the text.
     ngram : int
         The ngram size.
+    hash_func : Callable
+        hash function to use
 
     Returns
     -------
@@ -307,14 +306,14 @@ def embed_func(
 
     Examples
     --------
-    >>> res = embed_func("hello world", 0, ngram=3, permutations=None)
+    >>> res = embed_func("hello world", 0, ngram=3, permutations=None,hash_func=xxh3_64_digest)
     >>> res["__id__"]
     0
     >>> len(res["__signature__"])
     8
     """
     tokens = {bytes("".join(ng).lower(), "utf-8") for ng in ngrams(list(content), n=ngram)}
-    sig = compute([_unsigned_hash(t) for t in tokens])
+    sig = compute([_unsigned_hash(t, hash_func) for t in tokens])
     keys: List[Tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:
@@ -372,6 +371,7 @@ if __name__ == "__main__":
                 fn_kwargs={
                     "ngram": args.ngram,
                     "permutations": PERMUTATIONS,
+                    "hash_func": hash_func,
                 },
                 input_columns=[args.column],
                 remove_columns=[args.column],
