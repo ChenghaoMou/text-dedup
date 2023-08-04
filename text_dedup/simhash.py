@@ -32,9 +32,7 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
-from text_dedup.utils.hashfunc import xxh3_64
 from text_dedup.utils.hashfunc import xxh3_64_digest
-from text_dedup.utils.hashfunc import xxh3_128
 from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
@@ -220,7 +218,7 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     return results
 
 
-def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
+def _unsigned_hash(obj: bytes) -> bitarray:
     """
     Compute a hash of an object.
 
@@ -246,13 +244,7 @@ def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
     128
     """
     result = bitarray(0)
-    match f:
-        case 64:
-            result.frombytes(xxh3_64(obj).digest())
-        case 128:
-            result.frombytes(xxh3_128(obj).digest())
-        case _:
-            raise ValueError(f"Unsupported fingerprint size: {f}")
+    result.frombytes(hash_func(obj))
     return result
 
 
@@ -322,7 +314,7 @@ def embed_func(
     8
     """
     tokens = {bytes("".join(ng).lower(), "utf-8") for ng in ngrams(list(content), n=ngram)}
-    sig = compute([_unsigned_hash(t, f=f) for t in tokens])
+    sig = compute([_unsigned_hash(t) for t in tokens])
     keys: List[Tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:
