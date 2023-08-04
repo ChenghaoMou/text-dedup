@@ -33,7 +33,9 @@ from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
 from text_dedup.utils.hashfunc import xxh3_64
+from text_dedup.utils.hashfunc import xxh3_64_digest
 from text_dedup.utils.hashfunc import xxh3_128
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
 datasets.logging.set_verbosity_error()
@@ -349,6 +351,9 @@ if __name__ == "__main__":
     timer = Timer()
     PERMUTATIONS = _create_permutations(args.f, k=args.bit_diff, b=args.num_bucket)
     BUCKETS: Dict[Any, List] = defaultdict(list)
+
+    # current code only supports 64 or 128 bit simhash sizes
+    hash_func = {64: xxh3_64_digest, 128: xxh3_128_digest}.get(args.f, xxh3_64_digest)
 
     with timer("Total"):
         with timer("Loading"):
