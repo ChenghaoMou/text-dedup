@@ -319,8 +319,8 @@ def embed_func(
     >>> len(res["__signature__"])
     8
     """
-    tokens = {"".join(ng) for ng in ngrams(list(content), n=ngram)}
-    sig = compute([_unsigned_hash(t.lower().encode("utf-8"), f=f) for t in tokens])
+    tokens = {bytes("".join(ng).lower(), "utf-8") for ng in ngrams(list(content), n=ngram)}
+    sig = compute([_unsigned_hash(t, f=f) for t in tokens])
     keys: List[Tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:
