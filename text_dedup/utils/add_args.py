@@ -116,6 +116,16 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default="sha1",
         help="Hashing algorithm. Defaults to sha1. xxh3 is faster",
     )
+    parser.add_argument(
+        "--hash_bits",
+        type=int,
+        choices=[16, 32, 64],
+        default=64,
+        help="""uint bit precision for hash. default is (np.uint)64.
+        However, even when using 64bit precision, only 32 bits are extracted from hash.
+        this is due to legacy reasons. refer to ekzhu/datasketch#212.
+        """,
+    )
 
     return parser
 

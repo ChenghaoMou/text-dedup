@@ -23,7 +23,6 @@ import datasets
 import numpy as np
 from datasets import load_dataset
 from datasets import load_from_disk
-from scipy.integrate import quad as integrate
 from tqdm import tqdm
 
 from text_dedup import logger
@@ -32,15 +31,15 @@ from text_dedup.utils import ngrams
 from text_dedup.utils.add_args import add_io_args
 from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
+from text_dedup.utils.analysis import optimal_param
 from text_dedup.utils.hashfunc import sha1_hash
-from text_dedup.utils.hashfunc import xxh3_hash
+from text_dedup.utils.hashfunc import xxh3_16hash
+from text_dedup.utils.hashfunc import xxh3_32hash
 from text_dedup.utils.timer import Timer
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
 NON_ALPHA = re.compile("\W", re.UNICODE)
-MAX_HASH = np.uint64((1 << 32) - 1)
-MERSENNE_PRIME = np.uint64((1 << 61) - 1)
 datasets.logging.set_verbosity_error()
 
 
@@ -54,6 +53,9 @@ def embed_func(
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
     hash_func: Callable,
+    dtype: type,
+    max_hash: np.uint,
+    modulo_prime: np.uint,
 ) -> Dict[str, Any]:
     """
     Calculate hash values for the content.
@@ -89,102 +91,49 @@ def embed_func(
     >>> num_perm = 250
     >>> ngram_size = 1
     >>> hashranges = [(i, i + 25) for i in range(0, 250, 25)]
+    >>> max_hash = np.uint32((1 << 32) - 1)
+    >>> modulo_prime = np.uint32((1 << 32) - 5)
     >>> PERMUTATIONS = np.array(
     ...     [
     ...         (
-    ...             RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
-    ...             RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
+    ...             RNG.randint(1, np.uint32((1 << 32) - 5), dtype=np.uint32),
+    ...             RNG.randint(0, np.uint32((1 << 32) - 5), dtype=np.uint32),
     ...         )
     ...         for _ in range(num_perm)
     ...     ],
-    ...     dtype=np.uint64,
+    ...     dtype=np.uint32,
     ... ).T
-    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, 
-    ... permutations=PERMUTATIONS, hash_func=xxh3_hash)
+    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges,
+    ... permutations=PERMUTATIONS, hash_func=xxh3_32hash,dtype=np.uint32, max_hash=max_hash, modulo_prime=modulo_prime)
     >>> len(res["__signatures__"])
     10
     >>> res["__id__"]
     0
     """
     a, b = permutations
-    masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
-    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
-    hashvalues: np.ndarray = np.array([hash_func(token.lower().encode("utf-8")) for token in tokens], dtype=np.uint64)
-    permuted_hashvalues = np.bitwise_and(
-        ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME,
-        MAX_HASH,
+    tokens: Set[bytes] = {
+        bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
+    }
+
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
+    # Permute the hash values to produce new universal hashes
+    # Tiling 'a' to match the shape of 'hashvalues'
+    # Element-wise multiplication of 'hashvalues' with tiled 'a'
+    # Adding 'b' and taking the result modulo 'MERSENNE_PRIME'
+    # Performing bitwise AND with 'MAX_HASH'
+    hashvalues = np.bitwise_and(
+        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
+        max_hash,
     )
-    hashvalues = np.vstack([permuted_hashvalues, masks]).min(axis=0)
+    # this part is where the name "min" of minhash comes from
+    # this stacks all the hashes and then takes the minimum from each column
+    masks: np.ndarray = np.full(shape=num_perm, dtype=dtype, fill_value=max_hash)
+    hashvalues = np.vstack([hashvalues, masks]).min(axis=0)
+    # Originally, byteswap was done for speed. Testing show it has a negligible impact
+    # keeping  for backward compatibility, even though theoretically and empirically
+    # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
     Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
-
-
-def optimal_param(
-    threshold: float,
-    num_perm: int,
-    false_positive_weight: float = 0.5,
-    false_negative_weight: float = 0.5,
-):
-    """
-    Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
-    of probabilities of false positive and false negative, taken from datasketch.
-
-    You can also refer to the interactive demo at https://huggingface.co/spaces/bigcode/near-deduplication.
-
-    Parameters
-    ----------
-    threshold : float
-        The threshold for similarity.
-    num_perm : int
-        The number of permutations.
-    false_positive_weight : float
-        The weight of false positive.
-    false_negative_weight : float
-        The weight of false negative.
-
-    Returns
-    -------
-    Tuple[int, int]
-        The optimal `b` (bands) and `r` (rows) parameters.
-
-    Examples
-    --------
-    >>> optimal_param(0.75, 256)
-    (21, 12)
-    >>> optimal_param(0.75, 256, 0.1, 0.9)
-    (28, 9)
-    """
-
-    def false_positive_area(threshold: float, b: int, r: int):
-        """Source: `datasketch.lsh`"""
-
-        def proba(s):
-            return 1 - (1 - s ** float(r)) ** float(b)
-
-        a, _ = integrate(proba, 0.0, threshold)
-        return a
-
-    def false_negative_area(threshold: float, b: int, r: int):
-        """Source: `datasketch.lsh`"""
-
-        def proba(s):
-            return 1 - (1 - (1 - s ** float(r)) ** float(b))
-
-        a, _ = integrate(proba, threshold, 1.0)
-        return a
-
-    min_error = float("inf")
-    opt = (0, 0)
-    for b in range(1, num_perm + 1):
-        max_r = int(num_perm / b)
-        for r in range(1, max_r + 1):
-            fp = false_positive_area(threshold, b, r)
-            fn = false_negative_area(threshold, b, r)
-            error = fp * false_positive_weight + fn * false_negative_weight
-            if error < min_error:
-                min_error = error
-                opt = (b, r)
-    return opt
 
 
 if __name__ == "__main__":  # pragma: no cover
@@ -198,10 +147,36 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_minhash_args(parser)
     args = parser.parse_args()
 
-    hash_func = {
-        "sha1": sha1_hash,
-        "xxh3": xxh3_hash,
-    }[args.hash_func]
+    HASH_BITS: int = args.hash_bits
+
+    # mypy typing with numpy is difficult
+    # 64 bit config is backwards compatibility mode.
+    # it uses 64 bit types but almost entirely 32bit data, except for one mersenne prime 2^61
+    # why legacy implementations used mersenne primes for modulo:
+    # https://en.wikipedia.org/wiki/Universal_hashing#Hashing_strings
+    HASH_CONFIG: Dict[int, Tuple[type, Any, Any]] = {
+        64: (np.uint64, np.uint64((1 << 32) - 1), np.uint64((1 << 61) - 1)),
+        # 32, 16 bit config does not use a mersenne prime.
+        # The original reason for using mersenne prime was speed.
+        # Testing reveals, there is no benefit to using a 2^61 mersenne prime for division
+        32: (np.uint32, np.uint32((1 << 32) - 1), np.uint32((1 << 32) - 5)),
+        16: (np.uint16, np.uint16((1 << 16) - 1), np.uint16((1 << 16) - 15)),
+    }
+
+    # defaults to backwards compatible HASH_BITS = 64, which is np.uint64 dtypes with 32bit hashes
+    DTYPE, MAX_HASH, MODULO_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[64])
+
+    match args.hash_func:
+        case "sha1":
+
+            def hash_func(byte_data):
+                return sha1_hash(byte_data, d=min(HASH_BITS, 32))
+
+        case "xxh3":
+            if HASH_BITS == 16:
+                hash_func = xxh3_16hash
+            else:
+                hash_func = xxh3_32hash
 
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
@@ -210,7 +185,13 @@ if __name__ == "__main__":  # pragma: no cover
     if args.b is not None and args.r is not None:
         B, R = args.b, args.r
     else:
-        B, R = optimal_param(args.threshold, args.num_perm)
+        # Compute the optimal `MinHashLSH` parameter that minimizes the weighted sum
+        # of probabilities of false positive and false negative, taken from datasketch.
+        # You can also refer to the interactive demo at https://huggingface.co/spaces/bigcode/near-deduplication.
+        # The following assumes a "perfect hash". using 16 bit hashes might challenge this assumption
+        # lower precision dtype will cause more collisions, so higher false_positives and less false negatives.
+        # Both effects move the result towards more documents being considered duplicates.
+        B, R = optimal_param(args.threshold, args.num_perm, false_positive_weight=0.5, false_negative_weight=0.5)
 
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
     HASH_TABLES: List[Dict[int, Set]] = [defaultdict(set) for _ in range(B)]
@@ -228,19 +209,20 @@ if __name__ == "__main__":  # pragma: no cover
                     split=args.split,
                     revision=args.revision,
                     cache_dir=args.cache_dir,
+                    num_proc=os.cpu_count(),
                     use_auth_token=args.use_auth_token,
                 )
 
         DATA_SIZE = len(ds)
-        PERMUTATIONS = np.array(
+        PERMUTATIONS: np.ndarray = np.array(
             [
                 (
-                    RNG.randint(1, MERSENNE_PRIME, dtype=np.uint64),
-                    RNG.randint(0, MERSENNE_PRIME, dtype=np.uint64),
+                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),
+                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),
                 )
                 for _ in range(args.num_perm)
             ],
-            dtype=np.uint64,
+            dtype=DTYPE,
         ).T
 
         with timer("MinHashing"):
@@ -253,6 +235,9 @@ if __name__ == "__main__":  # pragma: no cover
                     "min_length": args.min_length,
                     "permutations": PERMUTATIONS,
                     "hash_func": hash_func,
+                    "dtype": DTYPE,
+                    "max_hash": MAX_HASH,
+                    "modulo_prime": MODULO_PRIME,
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,
