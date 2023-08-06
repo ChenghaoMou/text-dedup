@@ -29,6 +29,7 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_exact_hash_args(parser)
     args = parser.parse_args()
 
+    NUM_PROC = os.cpu_count()
     timer = Timer()
 
     with timer("Total"):
@@ -41,6 +42,7 @@ if __name__ == "__main__":  # pragma: no cover
                 split=args.split,
                 revision=args.revision,
                 cache_dir=args.cache_dir,
+                num_proc=NUM_PROC,
                 token=args.use_auth_token,
             )
 
@@ -70,11 +72,12 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.filter(
                 lambda _, idx: not flags[idx],
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=NUM_PROC,
             )
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
+        ds.cleanup_cache_files()
 
     PAD = 32
     for k, v in timer.elapsed_times.items():
