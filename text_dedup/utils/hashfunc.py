@@ -7,6 +7,7 @@ import xxhash
 from xxhash import xxh3_64
 from xxhash import xxh3_64_digest
 from xxhash import xxh3_128
+from xxhash import xxh3_128_digest
 
 
 def sha1_hash(data: bytes, d: int = 32) -> int:
@@ -145,4 +146,15 @@ def xxh3_hash(data: bytes, d: int = 32) -> int:
     return int.from_bytes(xxhash.xxh3_128_digest(data)[: d // 8], byteorder="big")
 
 
-__all__ = ["md5", "sha256", "sha1_hash", "xxh3_64", "xxh3_128", "xxh3_hash", "xxh3_16hash", "xxh3_32hash"]
+__all__ = [
+    "md5",
+    "sha256",
+    "sha1_hash",
+    "xxh3_64",
+    "xxh3_64_digest",
+    "xxh3_128",
+    "xxh3_128_digest",
+    "xxh3_hash",
+    "xxh3_16hash",
+    "xxh3_32hash",
+]

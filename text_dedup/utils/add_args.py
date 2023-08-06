@@ -150,7 +150,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default=3,
         help="""Ngram size to use in SimHash.""",
     )
-    parser.add_argument("--f", type=int, default=64, help="Simhash bit size"),
+    parser.add_argument("--f", type=int, default=64, choices=[64, 128], help="Simhash bit size"),
     parser.add_argument("--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"),
     parser.add_argument(
         "--num_bucket", type=int, default=4, help="Number of buckets to use in SimHash, must be larger than bit_diff"
