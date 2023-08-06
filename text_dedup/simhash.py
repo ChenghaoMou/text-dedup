@@ -14,6 +14,7 @@ import random
 from collections import defaultdict
 from itertools import permutations
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Tuple
@@ -32,8 +33,8 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils import add_simhash_args
 from text_dedup.utils import ngrams
-from text_dedup.utils.hashfunc import xxh3_64
-from text_dedup.utils.hashfunc import xxh3_128
+from text_dedup.utils.hashfunc import xxh3_64_digest
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
 datasets.logging.set_verbosity_error()
@@ -218,7 +219,7 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     return results
 
 
-def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
+def _unsigned_hash(obj: bytes, hash_func: Callable) -> bitarray:
     """
     Compute a hash of an object.
 
@@ -228,8 +229,8 @@ def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
     ----------
     obj: bytes
         The object to hash.
-    f: int
-        The fingerprint size
+    hash_func: Callable
+        The hash function to use.
 
     Returns
     -------
@@ -238,19 +239,13 @@ def _unsigned_hash(obj: bytes, f: int = 64) -> bitarray:
 
     Examples
     --------
-    >>> len(_unsigned_hash(b'hello world', f=64))
+    >>> len(_unsigned_hash(b'hello world',xxh3_64_digest))
     64
-    >>> len(_unsigned_hash(b'hello world', f=128))
+    >>> len(_unsigned_hash(b'hello world',xxh3_128_digest))
     128
     """
     result = bitarray(0)
-    match f:
-        case 64:
-            result.frombytes(xxh3_64(obj).digest())
-        case 128:
-            result.frombytes(xxh3_128(obj).digest())
-        case _:
-            raise ValueError(f"Unsupported fingerprint size: {f}")
+    result.frombytes(hash_func(obj))
     return result
 
 
@@ -259,6 +254,7 @@ def compute(hashes: List[bitarray]) -> bitarray:
     Compute the Simhash of a list of hashes.
 
     Notes to myself: You tried porting this to Cython, but it didn't improve the performance.
+    Others have experimented with numpy types and operators, but it didn't improve performance
 
     Parameters
     ----------
@@ -278,7 +274,7 @@ def compute(hashes: List[bitarray]) -> bitarray:
     74633958390507528
     """
     sigs = np.asarray([h.tolist() for h in hashes], dtype=int)
-    sig = np.where(np.sum(2 * sigs - 1, axis=0) > 0, 1, 0).astype(bool)
+    sig = np.where(np.sum(2 * sigs - 1, axis=0) > 0, True, False)
     res = bitarray()
     res.pack(sig.tobytes())
     return res
@@ -288,9 +284,9 @@ def embed_func(
     content: str,
     idx: int,
     *,
-    f: int,
     ngram: int,
     permutations: List[Permutation],
+    hash_func: Callable,
 ) -> Dict[str, Any]:
     """
     Calculate the simhash signature of a text.
@@ -299,12 +295,12 @@ def embed_func(
     ----------
     content : str
         The text to be hashed.
-    f : int
-        The fingerprint size.
     idx : int
         The index of the text.
     ngram : int
         The ngram size.
+    hash_func : Callable
+        hash function to use
 
     Returns
     -------
@@ -313,14 +309,14 @@ def embed_func(
 
     Examples
     --------
-    >>> res = embed_func("hello world", 0, f=64, ngram=3, permutations=None)
+    >>> res = embed_func("hello world", 0, ngram=3, permutations=None,hash_func=xxh3_64_digest)
     >>> res["__id__"]
     0
     >>> len(res["__signature__"])
     8
     """
-    tokens = {"".join(ng) for ng in ngrams(list(content), n=ngram)}
-    sig = compute([_unsigned_hash(t.lower().encode("utf-8"), f=f) for t in tokens])
+    tokens = {bytes("".join(ng).lower(), "utf-8") for ng in ngrams(list(content), n=ngram)}
+    sig = compute([_unsigned_hash(t, hash_func) for t in tokens])
     keys: List[Tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:
@@ -330,7 +326,7 @@ def embed_func(
                     (permutation.permute(sig) & permutation.search_mask).tobytes(),
                 )
             )
-    return {"__signature__": sig.tobytes(), "__id__": idx, "__keys__": keys}
+    return {"__id__": idx, "__keys__": keys, "__signature__": sig.tobytes()}
 
 
 if __name__ == "__main__":
@@ -350,6 +346,9 @@ if __name__ == "__main__":
     PERMUTATIONS = _create_permutations(args.f, k=args.bit_diff, b=args.num_bucket)
     BUCKETS: Dict[Any, List] = defaultdict(list)
 
+    # current code only supports 64 or 128 bit simhash sizes
+    hash_func = {64: xxh3_64_digest, 128: xxh3_128_digest}.get(args.f, xxh3_64_digest)
+
     with timer("Total"):
         with timer("Loading"):
             if args.local:
@@ -363,7 +362,8 @@ if __name__ == "__main__":
                     split=args.split,
                     revision=args.revision,
                     cache_dir=args.cache_dir,
-                    use_auth_token=args.use_auth_token,
+                    num_proc=os.cpu_count(),
+                    token=args.use_auth_token,
                 )
 
         DATA_SIZE = len(ds)
@@ -374,33 +374,40 @@ if __name__ == "__main__":
                 fn_kwargs={
                     "ngram": args.ngram,
                     "permutations": PERMUTATIONS,
-                    "f": args.f,
+                    "hash_func": hash_func,
                 },
                 input_columns=[args.column],
                 remove_columns=[args.column],
                 num_proc=os.cpu_count(),
                 with_indices=True,
-                desc=f"SimHashing...",
+                desc="SimHashing...",
             )
 
         # TODO Create multiple BUCKETS for parallelization
         with timer("Clustering"):
-            for i in tqdm(
+            for batch_idx in tqdm(
                 range(0, len(embedded), args.batch_size),
                 dynamic_ncols=True,
                 desc="Iterating SimHashes...",
             ):
-                batch = embedded[i : i + args.batch_size]
+                # Iterate over each batch dataset from the total hash embedded dataset
+                batch = embedded[batch_idx : batch_idx + args.batch_size]
                 for idx, keys, sig in tqdm(
                     zip(batch["__id__"], batch["__keys__"], batch["__signature__"]),
                     desc="Indexing...",
                     leave=False,
                     total=len(batch["__id__"]),
                 ):
+                    # each example in a batch has id, key, signatures we built above
+                    # we extract that signature and make it a frozen bitarray
                     sig = frozenbitarray(buffer=sig)
+                    # we make a neighbor set for each batch
                     neighbors = set()
+                    # iterate for for each permutation key
                     for key in keys:
                         key = tuple(key)
+                        # BUCKETS is a defaultdict defaulting to empty list
+                        # this iterates over indicies ALREADY in the bucket
                         for idy, other_fingerprint in BUCKETS[key]:
                             if idy in neighbors:
                                 continue

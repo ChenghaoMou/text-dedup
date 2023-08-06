@@ -27,7 +27,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
     parser.add_argument("--cache_dir", type=str, help="`cache_dir` in load_dataset", default=".cache"),
     parser.add_argument("--revision", type=str, help="`revision` in load_dataset"),
     parser.add_argument(
-        "--use_auth_token", action=argparse.BooleanOptionalAction, help="`use_auth_token` in load_dataset"
+        "--use_auth_token", action=argparse.BooleanOptionalAction, help="To use auth token in load_dataset from HF Hub"
     ),
     parser.add_argument("--local", action=argparse.BooleanOptionalAction, help="Use local dataset", default=False),
     parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
@@ -150,7 +150,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         default=3,
         help="""Ngram size to use in SimHash.""",
     )
-    parser.add_argument("--f", type=int, default=64, help="Simhash bit size"),
+    parser.add_argument("--f", type=int, default=64, choices=[64, 128], help="Simhash bit size"),
     parser.add_argument("--bit_diff", type=int, default=3, help="Bit difference to use in SimHash"),
     parser.add_argument(
         "--num_bucket", type=int, default=4, help="Number of buckets to use in SimHash, must be larger than bit_diff"

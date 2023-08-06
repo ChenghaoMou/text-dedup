@@ -4,6 +4,7 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
 import os
+from typing import Callable
 
 import datasets
 from datasets.load import load_dataset
@@ -43,14 +44,14 @@ if __name__ == "__main__":  # pragma: no cover
                 split=args.split,
                 revision=args.revision,
                 cache_dir=args.cache_dir,
-                use_auth_token=args.use_auth_token,
+                token=args.use_auth_token,
                 num_proc=os.cpu_count(),
             )
 
-        hash_func = {
-            "md5": md5,
-            "sha256": sha256,
-            "xxh3": xxh3_128,
+        hash_func: Callable = {
+            "md5": md5,  # type: ignore
+            "sha256": sha256,  # type: ignore
+            "xxh3": xxh3_128,  # type: ignore
         }[args.hash_func]
 
         bf = ScalableBloomFilter(
