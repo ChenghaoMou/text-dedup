@@ -229,6 +229,9 @@ def _unsigned_hash(obj: bytes, hash_func: Callable) -> bitarray:
     ----------
     obj: bytes
         The object to hash.
+    hash_func: Callable
+        The hash function to use.
+
     Returns
     -------
     bitarray
@@ -360,7 +363,7 @@ if __name__ == "__main__":
                     revision=args.revision,
                     cache_dir=args.cache_dir,
                     num_proc=os.cpu_count(),
-                    use_auth_token=args.use_auth_token,
+                    token=args.use_auth_token,
                 )
 
         DATA_SIZE = len(ds)

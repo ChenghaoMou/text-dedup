@@ -27,7 +27,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
     parser.add_argument("--cache_dir", type=str, help="`cache_dir` in load_dataset", default=".cache"),
     parser.add_argument("--revision", type=str, help="`revision` in load_dataset"),
     parser.add_argument(
-        "--use_auth_token", action=argparse.BooleanOptionalAction, help="`use_auth_token` in load_dataset"
+        "--use_auth_token", action=argparse.BooleanOptionalAction, help="To use auth token in load_dataset from HF Hub"
     ),
     parser.add_argument("--local", action=argparse.BooleanOptionalAction, help="Use local dataset", default=False),
     parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),

@@ -115,7 +115,7 @@ if __name__ == "__main__":  # pragma: no cover
                 split=args.split,
                 revision=args.revision,
                 cache_dir=args.cache_dir,
-                use_auth_token=args.use_auth_token,
+                token=args.use_auth_token,
                 num_proc=os.cpu_count(),
             )
 
