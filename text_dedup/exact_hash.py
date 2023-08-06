@@ -61,6 +61,8 @@ if __name__ == "__main__":  # pragma: no cover
             for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
                 batch = ds[idx : idx + args.batch_size]
                 for example in tqdm(batch[args.column], leave=False):
+                    # moving this byte conversion outside the loop saw no improvement <1 GiB datasets
+                    # might not be worth the added overhead
                     h = hash_func(example.encode("utf-8"))
                     if h in hashes:
                         flags.append(True)
