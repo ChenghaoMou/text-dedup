@@ -13,9 +13,9 @@ from text_dedup import logger
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.hashfunc import md5
-from text_dedup.utils.hashfunc import sha256
-from text_dedup.utils.hashfunc import xxh3_128
+from text_dedup.utils.hashfunc import md5_hexdigest
+from text_dedup.utils.hashfunc import sha256_hexdigest
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
 if __name__ == "__main__":  # pragma: no cover
@@ -44,10 +44,12 @@ if __name__ == "__main__":  # pragma: no cover
                 token=args.use_auth_token,
             )
 
+        # we use the hex digests for md5 and sha256 for legacy compatibility reasons
+        # we use the raw xxh3_128 byte digests for speed
         hash_func: Callable = {
-            "md5": md5,  # type: ignore
-            "sha256": sha256,  # type: ignore
-            "xxh3": xxh3_128,  # type: ignore
+            "md5": md5_hexdigest,  # type: ignore
+            "sha256": sha256_hexdigest,  # type: ignore
+            "xxh3": xxh3_128_digest,  # type: ignore
         }[args.hash_func]
 
         hashes = set()
@@ -57,7 +59,7 @@ if __name__ == "__main__":  # pragma: no cover
             for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
                 batch = ds[idx : idx + args.batch_size]
                 for example in tqdm(batch[args.column], leave=False):
-                    h = hash_func(example.encode("utf-8")).hexdigest()
+                    h = hash_func(example.encode("utf-8"))
                     if h in hashes:
                         flags.append(True)
                     else:
