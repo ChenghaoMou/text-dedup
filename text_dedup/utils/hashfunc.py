@@ -88,7 +88,7 @@ def sha256_hexdigest(data: bytes) -> str:
     >>> len(sha256_hexdigest(b"hello world"))
     64
     """
-    return sha256(b"hello world").hexdigest()
+    return sha256(data).hexdigest()
 
 
 def xxh3_16hash(data: bytes, seed: int = 0) -> int:
