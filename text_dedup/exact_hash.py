@@ -59,16 +59,20 @@ if __name__ == "__main__":  # pragma: no cover
 
         with timer("Processing"):
             # currently processing is done on a single thread.
-            # still, due to the nature of the calculations it is O(length_of_dataset)
-            for example in tqdm(ds[args.column], leave=True, desc="Processing..."):
-                # moving byte conversion outside the loop saw no improvement <1 GiB datasets
-                # might not be worth the added overhead
-                h = hash_func(example.encode("utf-8"))
-                if h in hashes:
-                    flags.append(True)
-                else:
-                    flags.append(False)
-                    hashes.add(h)
+            # still, due to the nature of the calculations it is O(len(ds))
+            # to make multithreaded, would have to handle shared data structs etc.
+            # most approaches are not low hanging fruit.
+            for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
+                batch = ds[idx : idx + args.batch_size]
+                for example in tqdm(batch[args.column], leave=False):
+                    # moving this byte conversion outside the loop saw no improvement <1 GiB datasets
+                    # might not be worth the added overhead
+                    h = hash_func(example.encode("utf-8"))
+                    if h in hashes:
+                        flags.append(True)
+                    else:
+                        flags.append(False)
+                        hashes.add(h)
 
         with timer("Filtering"):
             # batch size here would be a trade off between memory and speed
