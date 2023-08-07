@@ -153,3 +153,4 @@ benchmark.py
 visualize.py
 requirements.txt
 output
+*.arrow
