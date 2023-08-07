@@ -58,6 +58,10 @@ if __name__ == "__main__":  # pragma: no cover
         flags = []
 
         with timer("Processing"):
+            # currently processing is done on a single thread.
+            # still, due to the nature of the calculations it is O(len(ds))
+            # to make multithreaded, would have to handle shared data structs etc.
+            # most approaches are not low hanging fruit.
             for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
                 batch = ds[idx : idx + args.batch_size]
                 for example in tqdm(batch[args.column], leave=False):
