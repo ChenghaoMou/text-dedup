@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import os
 import random
+import shutil
 import subprocess
 from collections import deque
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import Sequence
 from typing import Tuple
 
 import datasets
+from datasets import Dataset
 from datasets import load_dataset
 
 from text_dedup import logger
@@ -290,15 +292,17 @@ if __name__ == "__main__":
 
     assert args.path is not None, "Please specify `path` for `load_dataset`."
 
-    (Path(args.google_repo_path) / "output").mkdir(exist_ok=True, parents=True)
-    (Path(args.google_repo_path) / "tmp").mkdir(exist_ok=True, parents=True)
+    temp_output_dir = Path(args.google_repo_path) / "output"
+    temp_dir = Path(args.google_repo_path) / "tmp"
+    temp_output_dir.mkdir(exist_ok=True, parents=True)
+    temp_dir.mkdir(exist_ok=True, parents=True)
     temp_text = "output/temp_text.txt"
     temp_output = "output/temp_output.txt"
     timer = Timer()
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_dataset(
+            ds: Dataset = load_dataset(  # type: ignore
                 path=args.path,
                 name=args.name,
                 data_dir=args.data_dir,
@@ -363,6 +367,13 @@ if __name__ == "__main__":
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
+
+        with timer("Cleaning"):
+            if args.clean_cache:
+                ds.cleanup_cache_files()
+                shutil.rmtree(temp_output_dir)
+                shutil.rmtree(temp_dir)
+                shutil.rmtree(args.cache_dir)
 
     PAD = 30
     for k, v in timer.elapsed_times.items():

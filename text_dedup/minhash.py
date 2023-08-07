@@ -294,6 +294,10 @@ if __name__ == "__main__":  # pragma: no cover
                 with open(os.path.join(args.output, "uf.pkl"), "wb") as f:
                     pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
 
+        with timer("Cleaning"):
+            if args.clean_cache:
+                ds.cleanup_cache_files()
+
     PAD = 32
     for k, v in timer.elapsed_times.items():
         logger.info(f"{k:<{PAD}}: {v:.2f}s")
