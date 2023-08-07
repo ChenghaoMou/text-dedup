@@ -366,7 +366,7 @@ if __name__ == "__main__":
                     token=args.use_auth_token,
                 )
 
-        DATA_SIZE = len(ds)
+        DATA_SIZE = len(ds)  # type: ignore
 
         with timer("SimHashing"):
             embedded = ds.map(
@@ -378,9 +378,9 @@ if __name__ == "__main__":
                 },
                 input_columns=[args.column],
                 remove_columns=[args.column],
-                num_proc=os.cpu_count(),
+                num_proc=os.cpu_count(),  # type: ignore
                 with_indices=True,
-                desc="SimHashing...",
+                desc="SimHashing...",  # type: ignore
             )
 
         # TODO Create multiple BUCKETS for parallelization
@@ -424,9 +424,9 @@ if __name__ == "__main__":
             ds = ds.map(
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
-                num_proc=os.cpu_count(),
-                new_fingerprint=str(random.getrandbits(128)),
-                desc="Finding clusters...",
+                num_proc=os.cpu_count(),  # type: ignore
+                new_fingerprint=str(random.getrandbits(128)),  # type: ignore
+                desc="Finding clusters...",  # type: ignore
             )
             gc.enable()
             gc.collect()
@@ -446,6 +446,10 @@ if __name__ == "__main__":
             if args.debug:
                 with open(os.path.join(args.output, "uf.pkl"), "wb") as f:
                     pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        with timer("Cleaning"):
+            if args.clean_cache:
+                ds.cleanup_cache_files()
 
     PAD = 32
     for k, v in timer.elapsed_times.items():

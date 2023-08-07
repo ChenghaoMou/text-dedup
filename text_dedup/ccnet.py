@@ -13,6 +13,7 @@ from typing import Dict
 from typing import List
 
 import numpy as np
+from datasets import Dataset
 from datasets import load_dataset
 from tqdm import tqdm
 
@@ -107,7 +108,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_dataset(
+            ds: Dataset = load_dataset(  # type: ignore
                 path=args.path,
                 name=args.name,
                 data_dir=args.data_dir,
@@ -119,11 +120,10 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        match args.hash_func:
-            case "md5":
-                hash_func = md5
-            case _:
-                hash_func = sha256
+        hash_func: Callable = {
+            "md5": md5,
+            "sha256": sha256,
+        }.get(args.hash_func, sha256)
 
         hashes = set()
         remove = set()
@@ -162,6 +162,10 @@ if __name__ == "__main__":  # pragma: no cover
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
+
+        with timer("Cleaning"):
+            if args.clean_cache:
+                ds.cleanup_cache_files()
 
     PAD = 32
     for k, v in timer.elapsed_times.items():
