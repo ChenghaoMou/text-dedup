@@ -52,10 +52,7 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
     """
     lines = batch[column][0].split("\n")
     n = len(lines)
-    if hash_func == xxh3_64_digest:
-        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
-    else:
-        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE] for l in lines]
+    hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
     return {
         "__hash__": hashes,
         "__id__": [idx[0] for _ in range(n)],
@@ -120,10 +117,27 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        hash_func: Callable = {
-            "md5": md5,
-            "sha256": sha256,
-        }.get(args.hash_func, sha256)
+        match args.hash_func:
+            case "md5":
+
+                def hash_func(data: bytes) -> bytes:
+                    return md5(data).digest()[:HASH_SIZE]
+
+            case "sha256":
+
+                def hash_func(data: bytes) -> bytes:
+                    return sha256(data).digest()[:HASH_SIZE]
+
+            case "xxh3":
+                if HASH_SIZE == 8:
+
+                    def hash_func(data: bytes) -> bytes:
+                        return xxh3_64_digest(data)
+
+                if HASH_SIZE == 4:
+
+                    def hash_func(data: bytes) -> bytes:
+                        return xxh3_64_digest(bytes)[:HASH_SIZE]  # type: ignore
 
         hashes = set()
         remove = set()
