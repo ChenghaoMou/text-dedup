@@ -71,10 +71,13 @@ if __name__ == "__main__":  # pragma: no cover
                         hashes.add(h)
 
         with timer("Filtering"):
+            # batch size here would be a trade off between memory and speed
+            # default is 1000
             ds = ds.filter(
                 lambda _, idx: not flags[idx],
                 with_indices=True,
                 num_proc=NUM_PROC,
+                writer_batch_size=args.batch_size,
             )
 
         with timer("Saving"):
