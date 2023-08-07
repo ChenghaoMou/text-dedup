@@ -63,6 +63,8 @@ if __name__ == "__main__":  # pragma: no cover
             # still, due to the nature of the calculations it is O(len(ds))
             # to make multithreaded, would have to handle shared data structs etc.
             # most approaches are not low hanging fruit.
+            # the batching process itself is very costly. set as large a batch as memory can handle
+            # Tested for around 30GiB datasets, 64GiB system could fill it in one batch.
             for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
                 batch = ds[idx : idx + args.batch_size]
                 for example in tqdm(batch[args.column], leave=False):
