@@ -34,6 +34,9 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
     parser.add_argument(
         "--debug", action=argparse.BooleanOptionalAction, help="Whether to run in debug mode", default=False
     )
+    parser.add_argument(
+        "--clean_cache", action=argparse.BooleanOptionalAction, help="Whether to remove all cache files", default=True
+    )
     return parser
 
 
