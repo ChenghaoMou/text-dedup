@@ -63,7 +63,9 @@ def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  
     parser.add_argument(
         "--batch_size",
         type=int,
-        help="""Batch size to use for dataset iteration. Mainly for memory efficiency.""",
+        help="""Batch size to use for dataset iteration. Mainly for memory efficiency.
+        Single-threaded dedups like exacthash especially benefit from higher batches.
+        Batching process itself can take a lot of time. """,
         default=10000,
     ),
     return parser

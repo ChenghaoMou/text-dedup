@@ -10,6 +10,30 @@ from xxhash import xxh3_128
 from xxhash import xxh3_128_digest
 
 
+def md5_hexdigest(data: bytes) -> str:
+    """
+    Generate a md5 hex hash from the given data.
+
+    Parameters
+    ----------
+    data : bytes
+        The data to be hashed.
+
+    Returns
+    -------
+    str
+        The hex hash value.
+
+    Examples
+    --------
+    >>> md5_hexdigest(b"hello world")
+    '5eb63bbbe01eeed093cb22bb8f5acdc3'
+    >>> len(md5_hexdigest(b"hello world"))
+    32
+    """
+    return md5(data).hexdigest()
+
+
 def sha1_hash(data: bytes, d: int = 32) -> int:
     """
     Generate a d-bit hash value from the given data.
@@ -41,6 +65,30 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
         return struct.unpack("<Q", hashlib.sha1(data).digest()[:8])[0]
     # struct is faster but does not support arbitrary bit lengths
     return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
+
+
+def sha256_hexdigest(data: bytes) -> str:
+    """
+    Generate a sha256 hex hash from the given data.
+
+    Parameters
+    ----------
+    data : bytes
+        The data to be hashed.
+
+    Returns
+    -------
+    str
+        The hex hash value.
+
+    Examples
+    --------
+    >>> sha256_hexdigest(b"hello world")
+    'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9'
+    >>> len(sha256_hexdigest(b"hello world"))
+    64
+    """
+    return sha256(data).hexdigest()
 
 
 def xxh3_16hash(data: bytes, seed: int = 0) -> int:
