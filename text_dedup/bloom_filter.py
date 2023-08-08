@@ -17,7 +17,7 @@ from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
 from text_dedup.utils.hashfunc import md5
 from text_dedup.utils.hashfunc import sha256
-from text_dedup.utils.hashfunc import xxh3_128
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
 if __name__ == "__main__":  # pragma: no cover
@@ -48,11 +48,19 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        hash_func: Callable = {
-            "md5": md5,  # type: ignore
-            "sha256": sha256,  # type: ignore
-            "xxh3": xxh3_128,  # type: ignore
-        }[args.hash_func]
+        match args.hash_func:
+            case "md5":
+
+                def hash_func(data: bytes) -> bytes:
+                    return md5(data).digest()
+
+            case "sha256":
+
+                def hash_func(data: bytes) -> bytes:
+                    return sha256(data).digest()
+
+            case "xxh3":
+                hash_func = xxh3_128_digest  # type: ignore
 
         bf = ScalableBloomFilter(
             initial_capacity=args.initial_capacity,
@@ -63,7 +71,7 @@ if __name__ == "__main__":  # pragma: no cover
             for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
                 batch = ds[idx : idx + args.batch_size]
                 for example in tqdm(batch[args.column], leave=False):
-                    h = hash_func(example.encode("utf-8")).hexdigest()
+                    h = hash_func(example.encode("utf-8"))
                     # True if the element is seen, False otherwise
                     flags.append(bf.add(h))
 
