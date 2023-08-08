@@ -67,7 +67,10 @@ if __name__ == "__main__":  # pragma: no cover
             # most approaches are not low hanging fruit.
             NUM_SHARDS = int(np.ceil(LEN_DATASET / args.batch_size))
             for idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
-                ds_shard = ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
+                ds_shard = (
+                    ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
+                    # TODO .map(either preprocessing like example.encode("utf-8") or multithreaded)
+                )
                 for example in tqdm(ds_shard[args.column], leave=False):
                     # moving this byte conversion outside the loop saw no improvement <1 GiB datasets
                     # might not be worth the added overhead
