@@ -7,6 +7,7 @@ import os
 from typing import Callable
 
 import datasets
+import numpy as np
 from datasets.load import load_dataset
 from pybloom_live import ScalableBloomFilter
 from tqdm import tqdm
@@ -62,15 +63,21 @@ if __name__ == "__main__":  # pragma: no cover
             case "xxh3":
                 hash_func = xxh3_128_digest  # type: ignore
 
+        LEN_DATASET = len(ds)
+
         bf = ScalableBloomFilter(
             initial_capacity=args.initial_capacity,
             mode=ScalableBloomFilter.SMALL_SET_GROWTH,
             error_rate=args.error_rate,
         )
         with timer("Processing"):
-            for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
-                batch = ds[idx : idx + args.batch_size]
-                for example in tqdm(batch[args.column], leave=False):
+            NUM_SHARDS = int(np.ceil(LEN_DATASET / args.batch_size))
+            for idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
+                ds_shard = (
+                    ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
+                    # TODO .map(either preprocessing like example.encode("utf-8") or multithreaded)
+                )
+                for example in tqdm(ds_shard[args.column], leave=False):
                     h = hash_func(example.encode("utf-8"))
                     # True if the element is seen, False otherwise
                     flags.append(bf.add(h))
