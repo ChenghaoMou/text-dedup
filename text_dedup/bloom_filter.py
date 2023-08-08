@@ -16,8 +16,8 @@ from text_dedup import logger
 from text_dedup.utils import add_bloom_filter_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.hashfunc import md5
-from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import md5_digest
+from text_dedup.utils.hashfunc import sha256_digest
 from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
@@ -48,12 +48,6 @@ if __name__ == "__main__":  # pragma: no cover
                 token=args.use_auth_token,
                 num_proc=os.cpu_count(),
             )
-
-        def md5_digest(data: bytes) -> bytes:
-            return md5(data).digest()
-
-        def sha256_digest(data: bytes) -> bytes:
-            return sha256(data).digest()
 
         hash_func: Callable = {
             "md5": md5_digest,  # type: ignore
