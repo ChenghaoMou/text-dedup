@@ -61,6 +61,7 @@ if __name__ == "__main__":  # pragma: no cover
                     return sha256(data).digest()
 
             case "xxh3":
+                # xxhash provides primitives that is fastest when called directly
                 hash_func = xxh3_128_digest  # type: ignore
 
         LEN_DATASET = len(ds)
