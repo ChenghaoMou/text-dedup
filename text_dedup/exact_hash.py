@@ -6,6 +6,7 @@ import argparse
 import os
 from typing import Callable
 
+import numpy as np
 from datasets import Dataset
 from datasets import load_dataset
 from tqdm import tqdm
@@ -55,6 +56,7 @@ if __name__ == "__main__":  # pragma: no cover
             "xxh3": xxh3_128_digest,  # type: ignore
         }[args.hash_func]
 
+        LEN_DATASET: int = len(ds)
         hashes = set()
         flags = []
 
@@ -63,11 +65,10 @@ if __name__ == "__main__":  # pragma: no cover
             # still, due to the nature of the calculations it is O(len(ds))
             # to make multithreaded, would have to handle shared data structs etc.
             # most approaches are not low hanging fruit.
-            # the batching process itself is very costly. set as large a batch as memory can handle
-            # Tested for around 30GiB datasets, 64GiB system could fill it in one batch.
-            for idx in tqdm(range(0, len(ds), args.batch_size), desc="Processing..."):
-                batch = ds[idx : idx + args.batch_size]
-                for example in tqdm(batch[args.column], leave=False):
+            NUM_SHARDS = int(np.ceil(LEN_DATASET / args.batch_size))
+            for idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
+                ds_shard = ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
+                for example in tqdm(ds_shard[args.column], leave=False):
                     # moving this byte conversion outside the loop saw no improvement <1 GiB datasets
                     # might not be worth the added overhead
                     h = hash_func(example.encode("utf-8"))
