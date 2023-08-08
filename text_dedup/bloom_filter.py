@@ -49,20 +49,17 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        match args.hash_func:
-            case "md5":
+        def md5_digest(data: bytes) -> bytes:
+            return md5(data).digest()
 
-                def hash_func(data: bytes) -> bytes:
-                    return md5(data).digest()
+        def sha256_digest(data: bytes) -> bytes:
+            return sha256(data).digest()
 
-            case "sha256":
-
-                def hash_func(data: bytes) -> bytes:
-                    return sha256(data).digest()
-
-            case "xxh3":
-                # xxhash provides primitives that is fastest when called directly
-                hash_func = xxh3_128_digest  # type: ignore
+        hash_func: Callable = {
+            "md5": md5_digest,  # type: ignore
+            "sha256": sha256_digest,  # type: ignore
+            "xxh3": xxh3_128_digest,  # type: ignore
+        }[args.hash_func]
 
         LEN_DATASET = len(ds)
 
