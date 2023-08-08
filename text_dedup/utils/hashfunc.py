@@ -11,6 +11,27 @@ from xxhash import xxh3_128_digest
 
 
 def md5_digest(data: bytes) -> bytes:
+    """
+    Generate a md5 hash in bytestring form from the given data.
+
+    Parameters
+    ----------
+    data : bytes
+        The data to be hashed.
+
+    Returns
+    -------
+    bytes
+        The hash value in raw byte strings.
+
+    Examples
+    --------
+    # raw byte strings cause problems on doctests
+    >>> int.from_bytes(md5_digest(b"hello world"),"little")
+    260265716838465564751810390803223393886
+    >>> len(md5_digest(b"hello world"))
+    16
+    """
     return md5(data).digest()
 
 
@@ -72,6 +93,27 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
 
 
 def sha256_digest(data: bytes) -> bytes:
+    """
+    Generate a sha256 hash in bytestring form from the given data.
+
+    Parameters
+    ----------
+    data : bytes
+        The data to be hashed.
+
+    Returns
+    -------
+    bytes
+        The hash value in raw byte strings.
+
+    Examples
+    --------
+    # raw byte strings cause problems on doctests
+    >>> int.from_bytes(sha256_digest(b"hello world"),"little")
+    105752752996721010526070019734402373604975086831773275823333741804099920678329
+    >>> len(sha256_digest(b"hello world"))
+    32
+    """
     return sha256(data).digest()
 
 
