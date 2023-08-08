@@ -10,6 +10,10 @@ from xxhash import xxh3_128
 from xxhash import xxh3_128_digest
 
 
+def md5_digest(data: bytes) -> bytes:
+    return md5(data).digest()
+
+
 def md5_hexdigest(data: bytes) -> str:
     """
     Generate a md5 hex hash from the given data.
@@ -65,6 +69,10 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
         return struct.unpack("<Q", hashlib.sha1(data).digest()[:8])[0]
     # struct is faster but does not support arbitrary bit lengths
     return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
+
+
+def sha256_digest(data: bytes) -> bytes:
+    return sha256(data).digest()
 
 
 def sha256_hexdigest(data: bytes) -> str:
