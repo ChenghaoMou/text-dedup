@@ -53,7 +53,7 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
     """
     lines = batch[column][0].split("\n")
     n = len(lines)
-    hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
+    hashes = [hash_func(bytes(normalize_for_dedup(line), encoding="utf-8")) for line in lines]
     return {
         "__hash__": hashes,
         "__id__": [idx[0] for _ in range(n)],
@@ -169,9 +169,9 @@ if __name__ == "__main__":  # pragma: no cover
                 with_indices=True,
                 num_proc=os.cpu_count(),
                 fn_kwargs={"column": args.column, "lookup": remove},
-                desc="deduping",
+                desc="Deduping",
             )
-            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count(), desc="Filtering 0 length")
+            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count(), desc="Filtering 0 length docs")
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
