@@ -117,27 +117,24 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        match args.hash_func:
-            case "md5":
+        def md5_digest(data: bytes) -> bytes:
+            return md5(data).digest()[:HASH_SIZE]
 
-                def hash_func(data: bytes) -> bytes:
-                    return md5(data).digest()[:HASH_SIZE]
+        def sha256_digest(data: bytes) -> bytes:
+            return sha256(data).digest()[:HASH_SIZE]
 
-            case "sha256":
+        def xxh3_digest(data: bytes) -> bytes:
+            return xxh3_64_digest(data)
 
-                def hash_func(data: bytes) -> bytes:
-                    return sha256(data).digest()[:HASH_SIZE]
+        def xxh3_digest_sized(data: bytes) -> bytes:
+            return xxh3_64_digest(data)[:HASH_SIZE]
 
-            case "xxh3":
-                if HASH_SIZE == 8:
-
-                    def hash_func(data: bytes) -> bytes:
-                        return xxh3_64_digest(data)
-
-                if HASH_SIZE == 4:
-
-                    def hash_func(data: bytes) -> bytes:
-                        return xxh3_64_digest(bytes)[:HASH_SIZE]  # type: ignore
+        hash_func = {
+            "md5": md5_digest,
+            "sha256": sha256_digest,
+            # xxh3 is much faster when used raw
+            "xxh3": xxh3_digest if HASH_SIZE == 8 else xxh3_digest_sized,
+        }[args.hash_func]
 
         hashes = set()
         remove = set()
