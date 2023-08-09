@@ -21,9 +21,10 @@ from text_dedup import logger
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.hashfunc import md5
-from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import md5_digest
+from text_dedup.utils.hashfunc import sha256_digest
 from text_dedup.utils.hashfunc import xxh3_64_digest
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
 from text_dedup.utils.timer import Timer
 
@@ -117,23 +118,20 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        def md5_digest(data: bytes) -> bytes:
-            return md5(data).digest()[:HASH_SIZE]
+        def md5_digest_sized(data: bytes) -> bytes:
+            return md5_digest(data)[:HASH_SIZE]
 
-        def sha256_digest(data: bytes) -> bytes:
-            return sha256(data).digest()[:HASH_SIZE]
-
-        def xxh3_digest(data: bytes) -> bytes:
-            return xxh3_64_digest(data)
+        def sha256_digest_sized(data: bytes) -> bytes:
+            return sha256_digest(data)[:HASH_SIZE]
 
         def xxh3_digest_sized(data: bytes) -> bytes:
-            return xxh3_64_digest(data)[:HASH_SIZE]
+            return xxh3_128_digest(data)[:HASH_SIZE]
 
         hash_func = {
             "md5": md5_digest,
             "sha256": sha256_digest,
             # xxh3 is much faster when used raw
-            "xxh3": xxh3_digest if HASH_SIZE == 8 else xxh3_digest_sized,
+            "xxh3": xxh3_64_digest if HASH_SIZE == 8 else xxh3_digest_sized,
         }[args.hash_func]
 
         hashes = set()
