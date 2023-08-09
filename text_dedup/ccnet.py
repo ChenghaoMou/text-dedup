@@ -134,6 +134,7 @@ if __name__ == "__main__":  # pragma: no cover
             "xxh3": xxh3_64_digest if HASH_SIZE == 8 else xxh3_digest_sized,
         }[args.hash_func]
 
+        LEN_DATASET = len(ds)
         hashes = set()
         remove = set()
 
@@ -146,12 +147,14 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
                 fn_kwargs={"column": args.column, "hash_func": hash_func},
                 remove_columns=ds.column_names,
+                desc="Computing hashes...",
             )
 
-            for idx in tqdm(range(0, len(hashed), args.batch_size), desc="Processing..."):
-                batch = hashed[idx : idx + args.batch_size]
+            NUM_SHARDS = int(np.ceil(len(hashed) / args.batch_size))
+            for batch_idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
+                ds_shard = hashed.shard(NUM_SHARDS, batch_idx, contiguous=True)
                 for h, id_, idx in tqdm(
-                    zip(batch["__hash__"], batch["__id__"], batch["__idx__"]),
+                    zip(ds_shard["__hash__"], ds_shard["__id__"], ds_shard["__idx__"]),
                     leave=False,
                 ):
                     if h in hashes:
@@ -166,8 +169,9 @@ if __name__ == "__main__":  # pragma: no cover
                 with_indices=True,
                 num_proc=os.cpu_count(),
                 fn_kwargs={"column": args.column, "lookup": remove},
+                desc="deduping",
             )
-            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count())
+            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count(), desc="Filtering 0 length")
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
@@ -180,5 +184,6 @@ if __name__ == "__main__":  # pragma: no cover
     for k, v in timer.elapsed_times.items():
         logger.info(f"{k:<{PAD}}: {v:.2f}s")
 
-    logger.info(f"{'Before':<{PAD}}: {len(hashed)}")
-    logger.info(f"{'After':<{PAD}}: {len(ds)}")
+    logger.info(f"{'Before document count':<{PAD}}: {LEN_DATASET}")
+    logger.info(f"{'Before line count':<{PAD}}: {len(hashed)}")
+    logger.info(f"{'After document count':<{PAD}}: {len(ds)}")
