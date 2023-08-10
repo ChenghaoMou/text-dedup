@@ -7,7 +7,6 @@ from typing import Dict
 from typing import List
 
 from ftfy import TextFixerConfig
-from ftfy import apply_plan
 from ftfy import fix_and_explain
 from ftfy import fix_encoding
 from ftfy import fix_text
@@ -101,6 +100,4 @@ DEFAULT_TextFixerConfig = ftfy.TextFixerConfig()
 """
 
 
-__all__ = [
-    "fix_text",
-]
+__all__ = ["fix_text", "fix_and_explain"]
