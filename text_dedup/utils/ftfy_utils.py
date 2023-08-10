@@ -26,12 +26,12 @@ def fix_text_batch(batch: Dict[str, List], column: str = "text") -> Dict[str, Li
     Parameters
     ----------
     batch : Dict[str, List]
-        The batch to be fixed with ftfy.
+        The batch to be fixed with fix_text.
 
     Returns
     -------
     batch : Dict[str, List]
-        The batch fixed with ftfy.
+        The batch fixed with fix_text.
 
     Examples
     --------
@@ -58,12 +58,12 @@ def fix_encoding_batch(batch: Dict[str, List], column: str = "text") -> Dict[str
     Parameters
     ----------
     batch : Dict[str, List]
-        The batch to be fixed with ftfy.
+        The batch to be fixed with fix_encode.
 
     Returns
     -------
     batch : Dict[str, List]
-        The batch fixed with ftfy.
+        The batch fixed with fix_encode.
 
     Examples
     --------
