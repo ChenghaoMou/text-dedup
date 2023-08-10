@@ -245,15 +245,17 @@ if __name__ == "__main__":  # pragma: no cover
                 with_indices=True,
                 desc="Fingerprinting...",
             )
+            LEN_EMBEDDED = len(embedded)
+            NUM_SHARDS = np.ceil(LEN_EMBEDDED / args.batch_size).astype(int)
 
         with timer("Clustering"):
             for i in tqdm(
-                range(0, len(embedded), args.batch_size),
+                range(0, NUM_SHARDS),
                 dynamic_ncols=True,
                 desc="Iterating MinHashes...",  # noqa: E501
             ):
-                batch = embedded[i : i + args.batch_size]
-                for key, Hs in zip(batch["__id__"], batch["__signatures__"]):
+                embedded_shard = embedded.shard(NUM_SHARDS, i, contiguous=True, writer_batch_size=args.batch_size)
+                for key, Hs in zip(embedded_shard["__id__"], embedded_shard["__signatures__"]):
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 
