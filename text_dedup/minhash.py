@@ -254,7 +254,9 @@ if __name__ == "__main__":  # pragma: no cover
                 dynamic_ncols=True,
                 desc="Iterating MinHashes...",  # noqa: E501
             ):
-                embedded_shard = embedded.shard(NUM_SHARDS, i, contiguous=True, writer_batch_size=args.batch_size)
+                embedded_shard = embedded.shard(
+                    num_shards=NUM_SHARDS, index=i, contiguous=True, writer_batch_size=args.batch_size
+                )
                 for key, Hs in zip(embedded_shard["__id__"], embedded_shard["__signatures__"]):
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
