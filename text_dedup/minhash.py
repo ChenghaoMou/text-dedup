@@ -151,7 +151,6 @@ if __name__ == "__main__":  # pragma: no cover
 
     HASH_BITS: int = args.hash_bits
 
-    # mypy typing with numpy is difficult
     # 64 bit config is backwards compatibility mode.
     # it uses 64 bit types but almost entirely 32bit data, except for one mersenne prime 2^61
     # why legacy implementations used mersenne primes for modulo:
@@ -215,7 +214,7 @@ if __name__ == "__main__":  # pragma: no cover
                     token=args.use_auth_token,
                 )
 
-        DATA_SIZE = len(ds)
+        LEN_DATASET = len(ds)
         # for minhash, we need to make a lot of hashes(=num_perms).
         # In many previous implementations, this is achieved through a method described in
         # `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8

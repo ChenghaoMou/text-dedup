@@ -366,7 +366,7 @@ if __name__ == "__main__":
                     token=args.use_auth_token,
                 )
 
-        DATA_SIZE = len(ds)  # type: ignore
+        LEN_DATASET = len(ds)  # type: ignore
 
         with timer("SimHashing"):
             embedded = ds.map(
