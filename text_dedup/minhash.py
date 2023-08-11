@@ -262,6 +262,7 @@ if __name__ == "__main__":  # pragma: no cover
                         HASH_TABLES[i][H].add(key)
 
             for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
+                # cluster: Set[int]
                 for cluster in table.values():
                     if len(cluster) <= 1:
                         continue
