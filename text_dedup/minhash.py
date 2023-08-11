@@ -134,7 +134,7 @@ def embed_func(
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
     # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
-    Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    Hs: List[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
 
