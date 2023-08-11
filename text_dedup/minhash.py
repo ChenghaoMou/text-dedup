@@ -11,6 +11,7 @@ import os
 import pickle
 import random
 import re
+import sys
 from collections import defaultdict
 from typing import Any
 from typing import Callable
@@ -178,7 +179,8 @@ if __name__ == "__main__":  # pragma: no cover
             else:
                 hash_func = xxh3_32hash
 
-    mp.set_start_method("fork", force=True)
+    if sys.platform == "darwin":
+        mp.set_start_method("fork", force=True)  # this fixes loop in python 3.8 on MacOS
     uf = UnionFind()
     timer = Timer()
 
