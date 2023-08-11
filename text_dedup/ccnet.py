@@ -21,9 +21,10 @@ from text_dedup import logger
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
-from text_dedup.utils.hashfunc import md5
-from text_dedup.utils.hashfunc import sha256
+from text_dedup.utils.hashfunc import md5_digest
+from text_dedup.utils.hashfunc import sha256_digest
 from text_dedup.utils.hashfunc import xxh3_64_digest
+from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
 from text_dedup.utils.timer import Timer
 
@@ -52,10 +53,7 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
     """
     lines = batch[column][0].split("\n")
     n = len(lines)
-    if hash_func == xxh3_64_digest:
-        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")) for l in lines]
-    else:
-        hashes = [hash_func(bytes(normalize_for_dedup(l), encoding="utf-8")).digest()[:HASH_SIZE] for l in lines]
+    hashes = [hash_func(bytes(normalize_for_dedup(line), encoding="utf-8")) for line in lines]
     return {
         "__hash__": hashes,
         "__id__": [idx[0] for _ in range(n)],
@@ -120,11 +118,23 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
             )
 
-        hash_func: Callable = {
-            "md5": md5,
-            "sha256": sha256,
-        }.get(args.hash_func, sha256)
+        def md5_digest_sized(data: bytes) -> bytes:
+            return md5_digest(data)[:HASH_SIZE]
 
+        def sha256_digest_sized(data: bytes) -> bytes:
+            return sha256_digest(data)[:HASH_SIZE]
+
+        def xxh3_digest_sized(data: bytes) -> bytes:
+            return xxh3_128_digest(data)[:HASH_SIZE]
+
+        hash_func = {
+            "md5": md5_digest,
+            "sha256": sha256_digest,
+            # xxh3 is much faster when used raw
+            "xxh3": xxh3_64_digest if HASH_SIZE == 8 else xxh3_digest_sized,
+        }[args.hash_func]
+
+        LEN_DATASET = len(ds)
         hashes = set()
         remove = set()
 
@@ -137,12 +147,14 @@ if __name__ == "__main__":  # pragma: no cover
                 num_proc=os.cpu_count(),
                 fn_kwargs={"column": args.column, "hash_func": hash_func},
                 remove_columns=ds.column_names,
+                desc="Computing hashes...",
             )
 
-            for idx in tqdm(range(0, len(hashed), args.batch_size), desc="Processing..."):
-                batch = hashed[idx : idx + args.batch_size]
+            NUM_SHARDS = int(np.ceil(len(hashed) / args.batch_size))
+            for batch_idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
+                ds_shard = hashed.shard(NUM_SHARDS, batch_idx, contiguous=True)
                 for h, id_, idx in tqdm(
-                    zip(batch["__hash__"], batch["__id__"], batch["__idx__"]),
+                    zip(ds_shard["__hash__"], ds_shard["__id__"], ds_shard["__idx__"]),
                     leave=False,
                 ):
                     if h in hashes:
@@ -157,8 +169,9 @@ if __name__ == "__main__":  # pragma: no cover
                 with_indices=True,
                 num_proc=os.cpu_count(),
                 fn_kwargs={"column": args.column, "lookup": remove},
+                desc="Deduping",
             )
-            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count())
+            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count(), desc="Filtering 0 length docs")
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
@@ -171,5 +184,6 @@ if __name__ == "__main__":  # pragma: no cover
     for k, v in timer.elapsed_times.items():
         logger.info(f"{k:<{PAD}}: {v:.2f}s")
 
-    logger.info(f"{'Before':<{PAD}}: {len(hashed)}")
-    logger.info(f"{'After':<{PAD}}: {len(ds)}")
+    logger.info(f"{'Before document count':<{PAD}}: {LEN_DATASET}")
+    logger.info(f"{'Before line count':<{PAD}}: {len(hashed)}")
+    logger.info(f"{'After document count':<{PAD}}: {len(ds)}")
