@@ -113,10 +113,11 @@ def embed_func(
     # a, b are each np.ndarray arrays containing {num_perm} pairs of random numbers used for building new hashes
     # the formula is a * x(base hash of each shingle) + b
     a, b = permutations
-    tokens: Set[bytes] = {
-        bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
-    }
-
+    tokens: np.ndarray = np.unique(
+        np.array(
+            [bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)]
+        )
+    )
     hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
     # Permute the hash values to produce new universal hashes
     # Tiling 'a' to match the shape of 'hashvalues'
