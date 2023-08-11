@@ -454,6 +454,7 @@ if __name__ == "__main__":
         with timer("Cleaning"):
             if args.clean_cache:
                 ds.cleanup_cache_files()
+                final_data.cleanup_cache_files()
 
     PAD = 32
     for k, v in timer.elapsed_times.items():
