@@ -110,6 +110,8 @@ def embed_func(
     >>> res["__id__"]
     0
     """
+    # a, b are each np.ndarray arrays containing {num_perm} pairs of random numbers used for building new hashes
+    # the formula is a * x(base hash of each shingle) + b
     a, b = permutations
     tokens: Set[bytes] = {
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
@@ -214,11 +216,17 @@ if __name__ == "__main__":  # pragma: no cover
                 )
 
         DATA_SIZE = len(ds)
+        # for minhash, we need to make a lot of hashes(=num_perms).
+        # In many previous implementations, this is achieved through a method described in
+        # `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8
+        # There we start with a know good hash x (=hash_func) and permutate it as the following:
+        # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
+        # the following produces these a, b pairs
         PERMUTATIONS: np.ndarray = np.array(
             [
                 (
-                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),
-                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),
+                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),  # a is a multiplier so should not be 0
+                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),  # b
                 )
                 for _ in range(args.num_perm)
             ],
