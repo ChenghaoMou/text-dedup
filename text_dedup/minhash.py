@@ -179,6 +179,8 @@ if __name__ == "__main__":  # pragma: no cover
             else:
                 hash_func = xxh3_32hash
 
+    # for is originally used to reduce memory usage in MacOS but also ensures that the Union Find data structure
+    # is not copied to child processes as long as it is not modified.
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
     timer = Timer()
@@ -278,6 +280,7 @@ if __name__ == "__main__":  # pragma: no cover
                         uf.union(x, idx)
 
         with timer("Filtering"):
+            # gc manipulations to ensure that uf object is not unneccessarily copied across processes
             gc.freeze()
             gc.disable()
             ds = ds.map(
