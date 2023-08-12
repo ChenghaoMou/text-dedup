@@ -93,7 +93,6 @@ if __name__ == "__main__":  # pragma: no cover
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
-        ds.cleanup_cache_files()
 
         with timer("Cleaning"):
             if args.clean_cache:

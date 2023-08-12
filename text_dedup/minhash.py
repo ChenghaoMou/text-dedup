@@ -110,6 +110,8 @@ def embed_func(
     >>> res["__id__"]
     0
     """
+    # a, b are each np.ndarray arrays containing {num_perm} pairs of random numbers used for building new hashes
+    # the formula is a * x(base hash of each shingle) + b
     a, b = permutations
     tokens: Set[bytes] = {
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
@@ -132,7 +134,7 @@ def embed_func(
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
     # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
-    Hs = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    Hs: List[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
 
@@ -149,7 +151,6 @@ if __name__ == "__main__":  # pragma: no cover
 
     HASH_BITS: int = args.hash_bits
 
-    # mypy typing with numpy is difficult
     # 64 bit config is backwards compatibility mode.
     # it uses 64 bit types but almost entirely 32bit data, except for one mersenne prime 2^61
     # why legacy implementations used mersenne primes for modulo:
@@ -178,6 +179,8 @@ if __name__ == "__main__":  # pragma: no cover
             else:
                 hash_func = xxh3_32hash
 
+    # for is originally used to reduce memory usage in MacOS but also ensures that the Union Find data structure
+    # is not copied to child processes as long as it is not modified.
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
     timer = Timer()
@@ -213,12 +216,18 @@ if __name__ == "__main__":  # pragma: no cover
                     token=args.use_auth_token,
                 )
 
-        DATA_SIZE = len(ds)
+        LEN_DATASET = len(ds)
+        # for minhash, we need to make a lot of hashes(=num_perms).
+        # In many previous implementations, this is achieved through a method described in
+        # `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8
+        # There we start with a know good hash x (=hash_func) and permutate it as the following:
+        # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
+        # the following produces these a, b pairs
         PERMUTATIONS: np.ndarray = np.array(
             [
                 (
-                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),
-                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),
+                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),  # a is a multiplier so should not be 0
+                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),  # b
                 )
                 for _ in range(args.num_perm)
             ],
@@ -245,19 +254,24 @@ if __name__ == "__main__":  # pragma: no cover
                 with_indices=True,
                 desc="Fingerprinting...",
             )
+            LEN_EMBEDDED = len(embedded)
+            NUM_SHARDS = np.ceil(LEN_EMBEDDED / args.batch_size).astype(int)
 
         with timer("Clustering"):
             for i in tqdm(
-                range(0, len(embedded), args.batch_size),
+                range(0, NUM_SHARDS),
                 dynamic_ncols=True,
                 desc="Iterating MinHashes...",  # noqa: E501
             ):
-                batch = embedded[i : i + args.batch_size]
-                for key, Hs in zip(batch["__id__"], batch["__signatures__"]):
+                embedded_shard = embedded.shard(
+                    num_shards=NUM_SHARDS, index=i, contiguous=True, writer_batch_size=args.batch_size
+                )
+                for key, Hs in zip(embedded_shard["__id__"], embedded_shard["__signatures__"]):
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 
             for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
+                # cluster: Set[int]
                 for cluster in table.values():
                     if len(cluster) <= 1:
                         continue
@@ -266,6 +280,7 @@ if __name__ == "__main__":  # pragma: no cover
                         uf.union(x, idx)
 
         with timer("Filtering"):
+            # gc manipulations to ensure that uf object is not unneccessarily copied across processes
             gc.freeze()
             gc.disable()
             ds = ds.map(
@@ -297,6 +312,7 @@ if __name__ == "__main__":  # pragma: no cover
         with timer("Cleaning"):
             if args.clean_cache:
                 ds.cleanup_cache_files()
+                final_data.cleanup_cache_files()
 
     PAD = 32
     for k, v in timer.elapsed_times.items():

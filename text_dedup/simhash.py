@@ -366,7 +366,7 @@ if __name__ == "__main__":
                     token=args.use_auth_token,
                 )
 
-        DATA_SIZE = len(ds)  # type: ignore
+        LEN_DATASET = len(ds)  # type: ignore
 
         with timer("SimHashing"):
             embedded = ds.map(
@@ -384,19 +384,23 @@ if __name__ == "__main__":
             )
 
         # TODO Create multiple BUCKETS for parallelization
+        LEN_EMBEDDED = len(embedded)
+        NUM_SHARDS = np.ceil(LEN_EMBEDDED / args.batch_size).astype(int)
         with timer("Clustering"):
             for batch_idx in tqdm(
-                range(0, len(embedded), args.batch_size),
+                range(0, NUM_SHARDS),
                 dynamic_ncols=True,
                 desc="Iterating SimHashes...",
             ):
                 # Iterate over each batch dataset from the total hash embedded dataset
-                batch = embedded[batch_idx : batch_idx + args.batch_size]
+                embedded_shard = embedded.shard(
+                    num_shards=NUM_SHARDS, index=batch_idx, contiguous=True, writer_batch_size=args.batch_size
+                )
                 for idx, keys, sig in tqdm(
-                    zip(batch["__id__"], batch["__keys__"], batch["__signature__"]),
+                    zip(embedded_shard["__id__"], embedded_shard["__keys__"], embedded_shard["__signature__"]),
                     desc="Indexing...",
                     leave=False,
-                    total=len(batch["__id__"]),
+                    total=len(embedded_shard),
                 ):
                     # each example in a batch has id, key, signatures we built above
                     # we extract that signature and make it a frozen bitarray
@@ -450,6 +454,7 @@ if __name__ == "__main__":
         with timer("Cleaning"):
             if args.clean_cache:
                 ds.cleanup_cache_files()
+                final_data.cleanup_cache_files()
 
     PAD = 32
     for k, v in timer.elapsed_times.items():
