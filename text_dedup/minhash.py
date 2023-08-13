@@ -39,7 +39,7 @@ from text_dedup.utils.timer import Timer
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
-NON_ALPHA = re.compile("\W", re.UNICODE)
+NON_ALPHA = re.compile(r"\W", re.UNICODE)
 datasets.logging.set_verbosity_error()
 
 
@@ -113,16 +113,16 @@ def embed_func(
     # a, b are each np.ndarray arrays containing {num_perm} pairs of random numbers used for building new hashes
     # the formula is a * x(base hash of each shingle) + b
     a, b = permutations
+    # split content on whitespace (NON_ALPHA regex), tokenize with ngrams(), and join these n-grams into a single space separated string.
+    # we then convert to lower case and then bytestrings which is then hashed. Only unique hashed n-grams are left.
     tokens: Set[bytes] = {
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
     hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
     # Permute the hash values to produce new universal hashes
-    # Tiling 'a' to match the shape of 'hashvalues'
-    # Element-wise multiplication of 'hashvalues' with tiled 'a'
-    # Adding 'b' and taking the result modulo 'MERSENNE_PRIME'
-    # Performing bitwise AND with 'MAX_HASH'
+    # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
+    # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
     hashvalues = np.bitwise_and(
         np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
         max_hash,
