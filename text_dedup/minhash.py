@@ -113,6 +113,8 @@ def embed_func(
     # a, b are each np.ndarray arrays containing {num_perm} pairs of random numbers used for building new hashes
     # the formula is a * x(base hash of each shingle) + b
     a, b = permutations
+    # split content on whitespace (NON_ALPHA regex), tokenize with ngrams(), and join these n-grams into a single space separated string.
+    # we then convert to lower case and then bytestrings which is then hashed. Only unique hashed n-grams are left.
     hashvalues: np.ndarray = np.unique(
         np.array(
             [hash_func(" ".join(t).lower().encode()) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)],
