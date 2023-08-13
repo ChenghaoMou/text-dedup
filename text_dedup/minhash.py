@@ -122,10 +122,8 @@ def embed_func(
         )
     )
     # Permute the hash values to produce new universal hashes
-    # Tiling 'a' to match the shape of 'hashvalues'
-    # Element-wise multiplication of 'hashvalues' with tiled 'a'
-    # Adding 'b' and taking the result modulo 'MERSENNE_PRIME'
-    # Performing bitwise AND with 'MAX_HASH'
+    # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
+    # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
     hashvalues = np.bitwise_and(
         np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
         max_hash,
