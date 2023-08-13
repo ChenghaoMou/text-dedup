@@ -115,12 +115,11 @@ def embed_func(
     a, b = permutations
     # split content on whitespace (NON_ALPHA regex), tokenize with ngrams(), and join these n-grams into a single space separated string.
     # we then convert to lower case and then bytestrings which is then hashed. Only unique hashed n-grams are left.
-    hashvalues: np.ndarray = np.unique(
-        np.array(
-            [hash_func(" ".join(t).lower().encode()) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)],
-            dtype=DTYPE,
-        )
-    )
+    tokens: Set[bytes] = {
+        bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
+    }
+
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
     # Permute the hash values to produce new universal hashes
     # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
     # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
