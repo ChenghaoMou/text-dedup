@@ -45,11 +45,15 @@ Not a lot of people have access to enough compute resources or the need to dedup
 ```bash
 export CLUSTER_NAME=chenghao-temp
 export PROJECT_ID=xx
+export REGION=us-central1
+export ZONE=us-central1-a
+export INPUT_GCS_PATH="gs://chenghao-temp-exp/data/ada"
+export OUTPUT_GCS_PATH="gs://chenghao-temp-exp/output/ada"
 
 gcloud dataproc clusters create $CLUSTER_NAME \
     --enable-component-gateway \
-    --region us-central1 \
-    --zone us-central1-a \
+    --region $REGION \
+    --zone $ZONE \
     --master-machine-type c2d-standard-16 \
     --master-boot-disk-size 500 \
     --num-workers 10 \
@@ -58,14 +62,12 @@ gcloud dataproc clusters create $CLUSTER_NAME \
     --image-version 2.0-debian10 \
     --project $PROJECT_ID
 
-gcloud dataproc jobs submit pyspark --cluster ${CLUSTER_NAME} \
-    --region us-central1 \
-    --jars gs://spark-lib/bigquery/spark-bigquery-latest_2.12.jar \
-    --driver-log-levels root=WARN \
+gcloud dataproc jobs submit pyspark --cluster ${CLUSTER_NAME}\
+    --region $REGION \
+    --jars gs://spark-lib/bigquery/spark-3.3-bigquery-0.32.2.jar \
+    --driver-log-levels root=FATAL,__main__=DEBUG \
     --properties="spark.executor.memory"="50g","spark.driver.memory"="8g","spark.executor.cores"="14" \
-    minhash_spark.py -- \
-    --table "huggingface-science-codeparrot.the_stack_java.java" \
-    --output "gs://chenghao-data/dataproc_output/deduplicated"
+    minhash_spark.py -- --input $INPUT_GCS_PATH --output $OUTPUT_GCS_PATH
 ```
 
 For reference, the script finished deduplicating 42 million rows in less than 40 minutes with above settings (160 cores, 640GB memory in total), while the python version would take around 10 hours with a 80-core machine with 1.8TB memory.
