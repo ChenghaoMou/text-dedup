@@ -446,6 +446,7 @@ if __name__ == "__main__":  # pragma: no cover
         iteration += 1
         b = a.flatMap(large_star_map).groupByKey().flatMap(large_star_reduce).distinct().cache()
         a = b.map(small_star_map).groupByKey().flatMap(small_star_reduce).distinct().cache()
+        # TODO: This can be optimized by counting changes during the reduce phase
         if b.subtract(a).union(a.subtract(b)).isEmpty():
             break
 
