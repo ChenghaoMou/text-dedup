@@ -39,7 +39,7 @@ from text_dedup.utils.timer import Timer
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
-NON_ALPHA = re.compile("\W", re.UNICODE)
+NON_ALPHA = re.compile(r"\W", re.UNICODE)
 datasets.logging.set_verbosity_error()
 
 
