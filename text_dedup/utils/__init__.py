@@ -14,6 +14,7 @@ from text_dedup.utils.hashfunc import sha1_hash
 from text_dedup.utils.hashfunc import xxh3_hash
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.tokenization import ngrams
+from text_dedup.utils.union_find import RankUnionFind
 from text_dedup.utils.union_find import UnionFind
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "Timer",
     "ngrams",
     "UnionFind",
+    "RankUnionFind",
     "sha1_hash",
     "xxh3_hash",
 ]
