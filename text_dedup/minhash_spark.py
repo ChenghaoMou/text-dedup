@@ -12,9 +12,9 @@ import re
 import struct
 import sys
 import time
-from collections import defaultdict
 from itertools import tee
 from logging import Logger
+from operator import add
 from typing import Any
 from typing import List
 from typing import Text
@@ -130,38 +130,78 @@ def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
 
 # endregion
 
-# region: PACC: Large scale connected component computation on Hadoop and Spark
+# region: Updated version
 
 
-class UnionFind:
-    def run(self, edges):
+def small_star(edges):
+    def small_star_map(edge):
+        x, y = edge
+        if y <= x:
+            return (x, y)
+        else:
+            return (y, x)
 
-        parent = defaultdict(lambda: -1)
+    def small_star_reduce(x):
+        node, neighbors = x
+        nodes = neighbors + [node]
+        min_node = min(nodes)
+        new_pairs = list(set((neighbor, min_node) for neighbor in nodes if (neighbor <= node and neighbor != min_node)))
+        change = len(set(new_pairs).difference(set([(node, neighbor) for neighbor in neighbors])))
+        return (new_pairs, change)
 
-        def find(x):
-            px = parent[x]
-            if px != -1:
-                actual_px = find(px)
-                parent[x] = actual_px
-                return actual_px
-            return x
+    neighbors = edges.map(small_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
+    edges_with_change = neighbors.map(small_star_reduce).cache()
+    total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
+    edges = edges_with_change.flatMap(lambda x: x[0])
+    edges_with_change.unpersist()
 
-        def union(x, y):
-            px, py = find(x), find(y)
-            if px > py:
-                parent[px] = py
-            elif px < py:
-                parent[py] = px
+    return edges, total_change
 
-        for x, y in edges:
-            if find(x) != find(y):
-                union(x, y)
 
-        for x in parent:
-            yield x, find(x)
+def large_star(edges):
+    def large_star_map(edge):
+        if edge[0] == edge[1]:
+            return [(edge[0], edge[1])]
+        return [(edge[0], edge[1]), (edge[1], edge[0])]
 
-    def run_rdd(self, edges):
-        return edges.sparkContext.parallelize(self.run(edges.collect()))
+    def large_star_reduce(x):
+        node, neighbors = x
+        nodes = neighbors + [node]
+        min_node = min(nodes)
+        new_pairs = list(set((neighbor, min_node) for neighbor in (neighbors + [node]) if (neighbor > node)))
+        change = len(set(new_pairs).difference(set([(node, neighbor) for neighbor in neighbors])))
+        return new_pairs, change
+
+    neighbors = edges.flatMap(large_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
+    edges_with_change = neighbors.map(large_star_reduce).cache()
+    total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
+    edges = edges_with_change.flatMap(lambda x: x[0])
+    edges_with_change.unpersist()
+    return edges, total_change
+
+
+def alternating_algo(edges, max_iteration: int) -> Tuple[Any, bool, int]:
+
+    prev_lchanges: int = sys.maxsize
+    prev_schanges: int = sys.maxsize
+    curr_iteration: int = 0
+
+    while max_iteration:
+
+        edges, curr_lchanges = large_star(edges)
+        edges, curr_schanges = small_star(edges)
+
+        if (curr_lchanges == prev_lchanges and curr_schanges == prev_schanges) or (
+            curr_schanges == 0 and curr_lchanges == 0
+        ):
+            return edges, True, curr_iteration
+
+        prev_lchanges = curr_lchanges
+        prev_schanges = curr_schanges
+        curr_iteration += 1
+        max_iteration -= 1
+
+    return edges, False, curr_iteration
 
 
 # endregion
@@ -368,6 +408,7 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument("--column", "-c", type=str, default="content", help="Column to deduplicate")
     parser.add_argument("--repo_column", "-r", type=str, default="max_stars_repo_name", help="Column for repo index")
     parser.add_argument("--output", "-o", type=str, required=True, help="GCS Output directory of parquet files")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
     conf = SparkConf()
@@ -389,35 +430,32 @@ if __name__ == "__main__":  # pragma: no cover
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
     PERMUTATIONS = np.array(
         [
-            (
-                RNG.randint(1, MOD_PRIME, dtype=DTYPE),
-                RNG.randint(0, MOD_PRIME, dtype=DTYPE),
-            )
+            (RNG.randint(1, MOD_PRIME, dtype=DTYPE), RNG.randint(0, MOD_PRIME, dtype=DTYPE))
             for _ in range(args.num_perm)
         ],
         dtype=DTYPE,
     ).T
 
     df = spark.read.option("mergeSchema", "true").parquet(args.input)
+
+    if args.debug:
+        DATA_SIZE = df.count()
+        log.debug(f"Using {B=}, {R=}")
+        log.debug(f"{args.input=}")
+        log.debug(f"{args.output=}")
+        log.debug(f"{args.threshold=}")
+        log.debug(f"{args.ngram_size=}")
+        log.debug(f"{args.min_length=}")
+        log.debug(f"{args.num_perm=}")
+        log.debug(f"{args.column=}")
+        log.debug(f"{args.repo_column=}")
+        log.debug(f"{WRITE_ROWS=}")
+        log.debug(f"{DATA_SIZE=}")
+
+        for col, dtype in df.dtypes:
+            log.debug(f"{col:<64}: {dtype}")
+
     df = df.withColumn("__id__", F.monotonically_increasing_id()).cache()
-
-    DATA_SIZE = df.count()
-
-    log.debug(f"Using {B=}, {R=}")
-    log.debug(f"{args.input=}")
-    log.debug(f"{args.output=}")
-    log.debug(f"{args.threshold=}")
-    log.debug(f"{args.ngram_size=}")
-    log.debug(f"{args.min_length=}")
-    log.debug(f"{args.num_perm=}")
-    log.debug(f"{args.column=}")
-    log.debug(f"{args.repo_column=}")
-    log.debug(f"{WRITE_ROWS=}")
-    log.debug(f"{DATA_SIZE=}")
-
-    for col, dtype in df.dtypes:
-        log.debug(f"{col:<64}: {dtype}")
-
     records = df.select("__id__", args.column).rdd
     records = records.repartition(args.num_perm * 2).cache()
 
@@ -439,34 +477,40 @@ if __name__ == "__main__":  # pragma: no cover
         .cache()
     )
 
-    a = edges
-    iteration = 0
+    # a = edges
+    # iteration = 0
 
-    while True:
-        iteration += 1
-        b = a.flatMap(large_star_map).groupByKey().flatMap(large_star_reduce).distinct().cache()
-        a = b.map(small_star_map).groupByKey().flatMap(small_star_reduce).distinct().cache()
-        # TODO: This can be optimized by counting changes during the reduce phase
-        if b.subtract(a).union(a.subtract(b)).isEmpty():
-            break
+    # while True:
+    #     iteration += 1
+    #     b = a.flatMap(large_star_map).groupByKey().flatMap(large_star_reduce).distinct().cache()
+    #     a = b.map(small_star_map).groupByKey().flatMap(small_star_reduce).distinct().cache()
+    #     # TODO: This can be optimized by counting changes during the reduce phase
+    #     if b.subtract(a).union(a.subtract(b)).isEmpty():
+    #         break
 
-    if a.count() == 0:
+    duplicate_edges, converged, iteration = alternating_algo(edges, max_iteration=20)
+
+    if duplicate_edges.count() == 0:
         log.debug("No components found.")
         df = df.drop("__id__").cache()
         count = df.count()
-        log.debug(f"Output:                                 {args.output}")
-        log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
         df.repartition(max(1, count // WRITE_ROWS)).withColumn("__pid__", F.spark_partition_id()).write.partitionBy(
             "__pid__"
         ).parquet(args.output, mode="overwrite")
+
+        log.debug(f"Output:                                 {args.output}")
+        log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
+
         sys.exit(0)
 
-    self_nodes = a.values().distinct().map(lambda x: (x, x))
-    results = a.union(self_nodes).collect()
-    NUM_CLUSTER = self_nodes.count()
-    NUM_DUPLICATE = len(results)
+    self_nodes = duplicate_edges.values().distinct().map(lambda x: (x, x))
+    results = duplicate_edges.union(self_nodes)
     components = spark.createDataFrame(results, schema=["__id__", "__component__"]).sort(["__component__", "__id__"])
     df = df.join(components, on="__id__", how="left").cache()
+
+    if args.debug:
+        NUM_CLUSTER = self_nodes.count()
+        NUM_DUPLICATE = results.count()
 
     # Quality Control
     # This section is hard-coded for The Stack
@@ -497,24 +541,22 @@ if __name__ == "__main__":  # pragma: no cover
         .cache()
     )
 
-    # Take a look at one of the clusters
-    cluster_id, examples = clusters.first()
-    examples = list(examples)
-    records = df.filter(F.col("__component__") == cluster_id).head(5)
-    log.debug("-" * 120)
-    for i, record in enumerate(records):
-        content = "\n".join(record.content.split("\n")[:10])
-        log.debug(f"{i}-th example repo name: {record.max_stars_repo_name}")
-        log.debug(f"{i}-th example code:\n{content[:200]}\n")
+    if args.debug:
+        # Take a look at one of the clusters
+        cluster_id, examples = clusters.first()
+        examples = list(examples)
+        records = df.filter(F.col("__component__") == cluster_id).head(5)
         log.debug("-" * 120)
+        for i, record in enumerate(records):
+            content = "\n".join(record.content.split("\n")[:10])
+            log.debug(f"{i}-th example repo name: {record.max_stars_repo_name}")
+            log.debug(f"{i}-th example code:\n{content[:200]}\n")
+            log.debug("-" * 120)
 
-    kept_files = (
-        clusters.mapValues(lambda x: process_cluster(cluster=list(x)))  # process cluster
-        .flatMap(lambda x: [(ele[0], True) for ele in x[1]])  # flatten
-        .cache()
-    )
-    kept_files = spark.createDataFrame(kept_files, schema=["__id__", "__keep__"]).cache()
-
+    kept_files = clusters.mapValues(lambda x: process_cluster(cluster=list(x))).flatMap(  # process cluster
+        lambda x: [(ele[0], True) for ele in x[1]]
+    )  # flatten
+    kept_files = spark.createDataFrame(kept_files, schema=["__id__", "__keep__"])
     df = df.join(kept_files, on="__id__", how="left")
     df = df.filter(F.col("__component__").isNull() | F.col("__keep__"))
     df = df.drop("__id__", "__component__", "__keep__").cache()
@@ -525,11 +567,16 @@ if __name__ == "__main__":  # pragma: no cover
         "__pid__"
     ).parquet(args.output, mode="overwrite")
 
-    log.debug(f"Number of iterations:                   {iteration}")
-    log.debug(f"Number of rows before deduplication:    {DATA_SIZE}")
-    log.debug(f"Number of duplicate ids:                {NUM_DUPLICATE}")
-    log.debug(f"Number of clusters:                     {NUM_CLUSTER}")
-    log.debug(f"Number of rows after deduplication:     {FINAL_SIZE}")
-    log.debug(f"Percentage of rows kept:                {FINAL_SIZE / DATA_SIZE * 100:.2f}%")
+    if args.debug:
+        log.debug(f"CC converged:                           {converged}")
+        log.debug(f"CC iterations:                          {iteration}")
+        log.debug(f"Number of rows before:                  {DATA_SIZE}")  # type: ignore
+        log.debug(f"Number of duplicate rows:               {NUM_DUPLICATE}")  # type: ignore
+        log.debug(f"Number of duplicate clusters:           {NUM_CLUSTER}")  # type: ignore
+        log.debug(f"Number of rows after:                   {FINAL_SIZE}")
+        log.debug(f"Percentage of rows kept:                {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")  # type: ignore
+
+    log.debug("-" * 120)
     log.debug(f"Output:                                 {args.output}")
     log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
+    log.debug("-" * 120)
