@@ -136,7 +136,8 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         action=argparse.BooleanOptionalAction,
         default=False,
         help="""During clustering and filtering we use Union Find with path compression.
-        Setting this adds Union by rank to further improve scaling at this step.""",
+        Setting this adds Union by rank which might improve behavior at this step.
+        Pickled version becomes mutually incompatible and doubles saved size""",
     ),
 
     return parser

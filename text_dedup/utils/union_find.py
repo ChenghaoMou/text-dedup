@@ -52,7 +52,6 @@ class RankUnionFind:
     Applying either union by rank or path compression results in a time complexity of O( log (n) ) each.
     Applying both further reduces this to O( inverse_ackermann (n) )
     (inverse ackermann is a very slow growing function.)
-    The size of the additional rank also grows at O (log log (n)) .
 
 
     Examples
