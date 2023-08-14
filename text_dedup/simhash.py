@@ -28,6 +28,7 @@ from datasets import load_from_disk
 from tqdm import tqdm
 
 from text_dedup import logger
+from text_dedup.utils import RankUnionFind
 from text_dedup.utils import UnionFind
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
@@ -341,7 +342,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     mp.set_start_method("fork", force=True)
-    uf = UnionFind()
+
+    if not args.rank_unionfind:
+        uf = UnionFind()
+    else:
+        uf = RankUnionFind()  # type: ignore
+
     timer = Timer()
     PERMUTATIONS = _create_permutations(args.f, k=args.bit_diff, b=args.num_bucket)
     BUCKETS: Dict[Any, List] = defaultdict(list)
