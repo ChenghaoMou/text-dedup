@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date    : 2022-12-26 15:37:44
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+from collections import Counter
 
 
 class UnionFind:
@@ -85,12 +86,11 @@ class RankUnionFind:
 
     def __init__(self):
         self.parent = {}
-        self.rank = {}
+        self.rank = Counter()
 
     def find(self, x):
         if x not in self.parent:
             self.parent[x] = x
-            self.rank[x] = 0
             return x
 
         # path compression
