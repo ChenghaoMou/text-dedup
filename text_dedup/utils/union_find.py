@@ -86,11 +86,15 @@ class RankUnionFind:
 
     def __init__(self):
         self.parent = {}
+        # Counter is a subclass of dict with slightly different python and c implementations
+        # you think of it as an optimized defaultdict(int)
         self.rank = Counter()
 
     def find(self, x):
         if x not in self.parent:
             self.parent[x] = x
+            # the following line becomes unnecessary saving time and space
+            # self.rank[x] = x
             return x
 
         # path compression
