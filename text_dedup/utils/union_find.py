@@ -96,6 +96,7 @@ class RankUnionFind:
             if self.parent[x] != x:
                 self.parent[x] = self.find(self.parent[x])
         except KeyError:
+            # KeyError happens if x not in parent
             self.parent[x] = x
         finally:
             return self.parent[x]
