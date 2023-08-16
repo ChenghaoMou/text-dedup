@@ -109,12 +109,15 @@ class RankUnionFind:
         # The line in original UnionFind `self.parent[px] = self.parent[py] = min(px, py)` is redundant when px == py
         if px == py:
             return
-        # Attach the smaller rank tree under the root of the larger rank tree
-        if self.rank[px] < self.rank[py]:
-            self.parent[px] = py
-        elif self.rank[px] > self.rank[py]:
-            self.parent[py] = px
-        else:
+
+        if self.rank[px] == self.rank[py]:
             # If ranks are equal, choose one as the new root and increment its rank
+            # with few duplicates this is likely to be the most common case
             self.parent[py] = px
             self.rank[px] += 1
+        # otherwise, assume that leftside is more likely to be higher rank
+        # Attach the smaller rank tree under the root of the larger rank tree
+        elif self.rank[px] > self.rank[py]:
+            self.parent[py] = px
+        elif self.rank[px] < self.rank[py]:
+            self.parent[px] = py
