@@ -87,7 +87,7 @@ class RankUnionFind:
     def __init__(self):
         self.parent = {}
         # Counter is a subclass of dict with slightly different python and c implementations
-        # you think of it as an optimized defaultdict(int)
+        # you can think of it as an optimized defaultdict(int)
         self.rank = Counter()
 
     def find(self, x):
