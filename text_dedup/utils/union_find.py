@@ -91,17 +91,14 @@ class RankUnionFind:
         self.rank = Counter()
 
     def find(self, x):
-        if x not in self.parent:
+        try:
+            # path compression
+            if self.parent[x] != x:
+                self.parent[x] = self.find(self.parent[x])
+        except KeyError:
             self.parent[x] = x
-            # the following line becomes unnecessary saving time and space
-            # self.rank[x] = x
-            return x
-
-        # path compression
-        if self.parent[x] != x:
-            self.parent[x] = self.find(self.parent[x])
-
-        return self.parent[x]
+        finally:
+            return self.parent[x]
 
     def union(self, x, y):
         px = self.find(x)
