@@ -119,5 +119,5 @@ class RankUnionFind:
         # Attach the smaller rank tree under the root of the larger rank tree
         elif self.rank[px] > self.rank[py]:
             self.parent[py] = px
-        elif self.rank[px] < self.rank[py]:
+        else:
             self.parent[px] = py
