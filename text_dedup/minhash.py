@@ -26,7 +26,6 @@ from datasets import load_from_disk
 from tqdm import tqdm
 
 from text_dedup import logger
-from text_dedup.utils import RankUnionFind
 from text_dedup.utils import UnionFind
 from text_dedup.utils import ngrams
 from text_dedup.utils.add_args import add_io_args
@@ -184,10 +183,7 @@ if __name__ == "__main__":  # pragma: no cover
     # is not copied to child processes as long as it is not modified.
     mp.set_start_method("fork", force=True)
 
-    if not args.rank_unionfind:
-        uf = UnionFind()
-    else:
-        uf = RankUnionFind()  # type: ignore
+    uf = UnionFind()
     timer = Timer()
 
     if args.b is not None and args.r is not None:
