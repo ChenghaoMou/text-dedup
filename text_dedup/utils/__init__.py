@@ -10,9 +10,11 @@ from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
 from text_dedup.utils.add_args import add_sa_args
 from text_dedup.utils.add_args import add_simhash_args
+from text_dedup.utils.add_args import add_fix_text_args
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.tokenization import ngrams
 from text_dedup.utils.union_find import UnionFind
+from text_dedup.utils.load_datasets import load_dataset
 
 __all__ = [
     "add_bloom_filter_args",
@@ -22,7 +24,9 @@ __all__ = [
     "add_minhash_args",
     "add_sa_args",
     "add_simhash_args",
+    "add_fix_text_args",
     "Timer",
     "ngrams",
     "UnionFind",
+    "load_dataset",
 ]

@@ -367,7 +367,7 @@ if __name__ == "__main__":
                 fn_kwargs={"ngram": args.ngram, "permutations": PERMUTATIONS, "f": args.f},
                 input_columns=[args.column],
                 remove_columns=[args.column],
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 with_indices=True,
                 desc=f"SimHashing...",
             )
@@ -406,7 +406,7 @@ if __name__ == "__main__":
             ds = ds.map(
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 new_fingerprint=str(random.getrandbits(128)),
                 desc="Finding clusters...",
             )
@@ -418,7 +418,7 @@ if __name__ == "__main__":
             final_data = ds.filter(
                 function=lambda record, idx: record["__cluster__"] == idx,
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 desc="Filtering clusters...",
             )
 

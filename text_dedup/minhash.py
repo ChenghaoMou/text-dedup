@@ -21,14 +21,13 @@ from typing import Tuple
 
 import datasets
 import numpy as np
-from datasets import load_dataset
-from datasets import load_from_disk
 from scipy.integrate import quad as integrate
 from tqdm import tqdm
 
 from text_dedup import logger
 from text_dedup.utils import UnionFind
 from text_dedup.utils import ngrams
+from text_dedup.utils import load_dataset
 from text_dedup.utils.add_args import add_io_args
 from text_dedup.utils.add_args import add_meta_args
 from text_dedup.utils.add_args import add_minhash_args
@@ -234,19 +233,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     with timer("Total"):
         with timer("Loading"):
-            if args.local:
-                ds = load_from_disk(args.path)
-            else:
-                ds = load_dataset(
-                    path=args.path,
-                    name=args.name,
-                    data_dir=args.data_dir,
-                    data_files=args.data_files,
-                    split=args.split,
-                    revision=args.revision,
-                    cache_dir=args.cache_dir,
-                    use_auth_token=args.use_auth_token,
-                )
+            ds = load_dataset(args)
 
         DATA_SIZE = len(ds)
         PERMUTATIONS = np.array(
@@ -272,7 +259,7 @@ if __name__ == "__main__":  # pragma: no cover
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 with_indices=True,
                 desc="Fingerprinting...",
             )
@@ -302,9 +289,9 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.map(
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 new_fingerprint=str(random.getrandbits(128)),
-                desc="Finding clusters...",
+                desc="Finding clusters..."
             )
             gc.enable()
             gc.collect()
@@ -314,7 +301,7 @@ if __name__ == "__main__":  # pragma: no cover
             final_data = ds.filter(
                 function=lambda record, idx: record["__cluster__"] == idx,
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 desc="Filtering clusters...",
             )
 

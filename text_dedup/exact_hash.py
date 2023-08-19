@@ -6,10 +6,10 @@ import argparse
 import os
 from hashlib import md5
 
-from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
+from text_dedup.utils import load_dataset
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
@@ -18,7 +18,7 @@ from text_dedup.utils.timer import Timer
 if __name__ == "__main__":  # pragma: no cover
 
     parser = argparse.ArgumentParser(
-        prog="text_dedup.exacthash",
+        prog="text_dedup.exact_hash",
         description="Deduplicate text using exact hashing",
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -31,16 +31,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_dataset(
-                path=args.path,
-                name=args.name,
-                data_dir=args.data_dir,
-                data_files=args.data_files,
-                split=args.split,
-                revision=args.revision,
-                cache_dir=args.cache_dir,
-                use_auth_token=args.use_auth_token,
-            )
+            ds = load_dataset(args)
 
         hash_func = {
             "md5": md5,
@@ -60,7 +51,7 @@ if __name__ == "__main__":  # pragma: no cover
                         hashes.add(h)
 
         with timer("Filtering"):
-            ds = ds.filter(lambda _, idx: not flags[idx], with_indices=True, num_proc=os.cpu_count())
+            ds = ds.filter(lambda _, idx: not flags[idx], with_indices=True, num_proc=args.num_workers)
 
         with timer("Saving"):
             ds.save_to_disk(args.output)

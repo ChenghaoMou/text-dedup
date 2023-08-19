@@ -330,7 +330,7 @@ if __name__ == "__main__":
         with timer("SelfSimilar"):
             __run_command(
                 f"cargo run self-similar --data-file {temp_text}"
-                f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {os.cpu_count()}",
+                f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {args.num_workers}",
                 args.google_repo_path,
             )
             __run_command(

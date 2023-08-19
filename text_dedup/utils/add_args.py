@@ -3,7 +3,7 @@
 # @Date    : 2022-11-05 09:16:34
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
-
+import os
 
 def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
     """
@@ -30,6 +30,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
         "--use_auth_token", action=argparse.BooleanOptionalAction, help="`use_auth_token` in load_dataset"
     ),
     parser.add_argument("--local", action=argparse.BooleanOptionalAction, help="Use local dataset", default=False),
+    parser.add_argument("--num_workers", type=int, help="Number of workers", default=os.cpu_count()),
     parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
     parser.add_argument(
         "--debug", action=argparse.BooleanOptionalAction, help="Whether to run in debug mode", default=False
@@ -212,4 +213,25 @@ def add_exact_hash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         Parser with added arguments.
     """
     parser.add_argument("--hash_func", type=str, default="md5", help="Hash function to use in ExactHash"),
+    return parser
+
+def add_fix_text_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
+    """
+    Add Exact Hash arguments to parser.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add arguments to.
+
+    Returns
+    -------
+    parser : argparse.ArgumentParser
+        Parser with added arguments.
+    """
+    parser.add_argument("--not_run_ftfy", action=argparse.BooleanOptionalAction, help="Do not run ftfy", default=False),
+    parser.add_argument("--not_strip", action=argparse.BooleanOptionalAction, help="Do not strip the final text", default=False),
+    parser.add_argument("--min_words", type=int, default=5, help="Minimum of words per document"),
+    parser.add_argument("--not_shuffle", action=argparse.BooleanOptionalAction, help="Do not shuffle the dataset", default=False)
+    
     return parser
