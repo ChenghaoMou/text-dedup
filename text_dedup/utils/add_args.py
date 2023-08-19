@@ -130,7 +130,7 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         However, even when using 64bit precision, only 32 bits are extracted from hash.
         this is due to legacy reasons. refer to ekzhu/datasketch#212.
         """,
-    )
+    ),
 
     return parser
 
@@ -160,6 +160,7 @@ def add_simhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     parser.add_argument(
         "--num_bucket", type=int, default=4, help="Number of buckets to use in SimHash, must be larger than bit_diff"
     ),
+
     return parser
 
 

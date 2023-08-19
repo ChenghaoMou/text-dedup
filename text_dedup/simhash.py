@@ -341,7 +341,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     mp.set_start_method("fork", force=True)
+
     uf = UnionFind()
+
     timer = Timer()
     PERMUTATIONS = _create_permutations(args.f, k=args.bit_diff, b=args.num_bucket)
     BUCKETS: Dict[Any, List] = defaultdict(list)
