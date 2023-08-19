@@ -8,10 +8,10 @@ from typing import Callable
 
 import numpy as np
 from datasets import Dataset
-from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
+from text_dedup.utils import load_dataset
 from text_dedup.utils import add_exact_hash_args
 from text_dedup.utils import add_io_args
 from text_dedup.utils import add_meta_args
@@ -22,7 +22,7 @@ from text_dedup.utils.timer import Timer
 
 if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(
-        prog="text_dedup.exacthash",
+        prog="text_dedup.exact_hash",
         description="Deduplicate text using exact hashing",
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -31,22 +31,11 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_exact_hash_args(parser)
     args = parser.parse_args()
 
-    NUM_PROC = os.cpu_count()
     timer = Timer()
 
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_dataset(  # type: ignore
-                path=args.path,
-                name=args.name,
-                data_dir=args.data_dir,
-                data_files=args.data_files,
-                split=args.split,
-                revision=args.revision,
-                cache_dir=args.cache_dir,
-                num_proc=NUM_PROC,
-                token=args.use_auth_token,
-            )
+            ds: Dataset = load_dataset(args)
 
         # we use the hex digests for md5 and sha256 for legacy compatibility reasons
         # we use the raw xxh3_128 byte digests for speed
@@ -87,9 +76,10 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.filter(
                 lambda _, idx: not flags[idx],
                 with_indices=True,
-                num_proc=NUM_PROC,
+                num_proc=args.num_workers,
                 writer_batch_size=args.batch_size,
             )
+
 
         with timer("Saving"):
             ds.save_to_disk(args.output)

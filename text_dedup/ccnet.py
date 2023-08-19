@@ -114,8 +114,8 @@ if __name__ == "__main__":  # pragma: no cover
                 split=args.split,
                 revision=args.revision,
                 cache_dir=args.cache_dir,
-                token=args.use_auth_token,
-                num_proc=os.cpu_count(),
+                use_auth_token=args.use_auth_token,
+                num_proc=args.num_workers
             )
 
         def md5_digest_sized(data: bytes) -> bytes:
@@ -144,7 +144,7 @@ if __name__ == "__main__":  # pragma: no cover
                 batched=True,
                 batch_size=1,
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 fn_kwargs={"column": args.column, "hash_func": hash_func},
                 remove_columns=ds.column_names,
                 desc="Computing hashes...",
@@ -167,11 +167,11 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.map(
                 dedup,
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_workers,
                 fn_kwargs={"column": args.column, "lookup": remove},
                 desc="Deduping",
             )
-            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=os.cpu_count(), desc="Filtering 0 length docs")
+            ds = ds.filter(lambda x: len(x[args.column]) > 0, num_proc=args.num_workers, desc="Filtering 0 length docs")
 
         with timer("Saving"):
             ds.save_to_disk(args.output)
