@@ -110,12 +110,12 @@ def embed_func(
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
-    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype).reshape(len(tokens), 1)
     # Permute the hash values to produce new universal hashes
     # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
     # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
     hashvalues = np.bitwise_and(
-        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
+        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1))), b), modulo_prime),
         max_hash,
     )
     # this part is where the name "min" of minhash comes from
