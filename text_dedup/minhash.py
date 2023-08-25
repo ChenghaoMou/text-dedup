@@ -148,7 +148,7 @@ if __name__ == "__main__":  # pragma: no cover
     }
 
     # defaults to backwards compatible HASH_BITS = 64, which is np.uint64 dtypes with 32bit hashes
-    DTYPE, MAX_HASH, MODULO_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[64])
+    DTYPE, MAX_HASH, MODULO_PRIME = HASH_CONFIG.get(HASH_BITS, HASH_CONFIG[32])
 
     # for is originally used to reduce memory usage in MacOS but also ensures that the Union Find data structure
     # is not copied to child processes as long as it is not modified.
