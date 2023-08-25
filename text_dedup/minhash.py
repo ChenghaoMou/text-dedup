@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import multiprocessing as mp
 import os
 import pickle
@@ -118,15 +119,20 @@ def embed_func(
     tokens: Set[bytes] = {
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
+    HASH_SIZE = dtype(0).nbytes
 
-    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
+    def hv1(token: bytes):
+        return int.from_bytes(hashlib.sha1(token).digest()[:HASH_SIZE], "little")
+
+    def hv2(token: bytes):
+        return int.from_bytes(hashlib.sha1(token).digest()[-HASH_SIZE:], "little")
+
+    hashes_1: np.ndarray = np.array([hv1(token) for token in tokens], dtype=dtype, ndmin=2).T
+    hashes_2: np.ndarray = np.array([hv2(token) for token in tokens], dtype=dtype, ndmin=2).T
+    i: np.ndarray = np.arange(num_perm, dtype=dtype).reshape((1, num_perm))
     # Permute the hash values to produce new universal hashes
-    # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
-    # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
-    hashvalues = np.bitwise_and(
-        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
-        max_hash,
-    )
+    hashvalues = np.mod(hashes_1 + i * hashes_2 + i**2, modulo_prime, dtype=dtype)
+
     # this part is where the name "min" of minhash comes from
     # this stacks all the hashes and then takes the minimum from each column
     masks: np.ndarray = np.full(shape=num_perm, dtype=dtype, fill_value=max_hash)
@@ -134,7 +140,7 @@ def embed_func(
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
     # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
-    Hs: List[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    Hs: List[bytes] = [bytes(hashvalues[start:end]) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
 
