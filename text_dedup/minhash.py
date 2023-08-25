@@ -114,10 +114,7 @@ def embed_func(
     # Permute the hash values to produce new universal hashes
     # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
     # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
-    hashvalues = np.bitwise_and(
-        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1))), b), modulo_prime),
-        max_hash,
-    )
+    hashvalues = (hashvalues * np.tile(a, (len(hashvalues), 1)) + b) % modulo_prime & max_hash
     # this part is where the name "min" of minhash comes from
     # this stacks all the hashes and then takes the minimum from each column
     masks: np.ndarray = np.full(shape=num_perm, fill_value=max_hash)
