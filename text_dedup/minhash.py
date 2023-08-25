@@ -93,16 +93,7 @@ def embed_func(
     >>> hashranges = [(i, i + 25) for i in range(0, 250, 25)]
     >>> max_hash = np.uint32((1 << 32) - 1)
     >>> modulo_prime = np.uint32((1 << 32) - 5)
-    >>> PERMUTATIONS = np.array(
-    ...     [
-    ...         (
-    ...             RNG.randint(1, np.uint32((1 << 32) - 5), dtype=np.uint32),
-    ...             RNG.randint(0, np.uint32((1 << 32) - 5), dtype=np.uint32),
-    ...         )
-    ...         for _ in range(num_perm)
-    ...     ],
-    ...     dtype=np.uint32,
-    ... ).T
+    >>> PERMUTATIONS = (RNG.randint(1, modulo_prime, size=num_perm),RNG.randint(0, modulo_prime, size=num_perm))
     >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges,
     ... permutations=PERMUTATIONS, hash_func=xxh3_32hash,dtype=np.uint32, max_hash=max_hash, modulo_prime=modulo_prime)
     >>> len(res["__signatures__"])
