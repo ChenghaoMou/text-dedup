@@ -224,16 +224,10 @@ if __name__ == "__main__":  # pragma: no cover
         # There we start with a know good hash x (=hash_func) and permutate it as the following:
         # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
         # the following produces these a, b pairs
-        PERMUTATIONS: np.ndarray = np.array(
-            [
-                (
-                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),  # a is a multiplier so should not be 0
-                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),  # b
-                )
-                for _ in range(args.num_perm)
-            ],
-            dtype=DTYPE,
-        ).T
+        PERMUTATIONS: Tuple[np.ndarray, np.ndarray] = (
+            RNG.randint(1, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # a is a multiplier so should not be 0
+            RNG.randint(0, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # b
+        )
 
         with timer("MinHashing"):
             embedded = ds.map(
