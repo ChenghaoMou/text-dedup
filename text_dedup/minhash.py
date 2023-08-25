@@ -36,6 +36,7 @@ from text_dedup.utils.analysis import optimal_param
 from text_dedup.utils.hashfunc import sha1_hash
 from text_dedup.utils.hashfunc import xxh3_16hash
 from text_dedup.utils.hashfunc import xxh3_32hash
+from text_dedup.utils.hashfunc import xxh3_hash
 from text_dedup.utils.timer import Timer
 
 SEED = 42
@@ -119,16 +120,9 @@ def embed_func(
     tokens: Set[bytes] = {
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
-    HASH_SIZE = dtype(0).nbytes
 
-    def hv1(token: bytes):
-        return int.from_bytes(hashlib.sha1(token).digest()[:HASH_SIZE], "little")
-
-    def hv2(token: bytes):
-        return int.from_bytes(hashlib.sha1(token).digest()[-HASH_SIZE:], "little")
-
-    hashes_1: np.ndarray = np.array([hv1(token) for token in tokens], dtype=dtype, ndmin=2).T
-    hashes_2: np.ndarray = np.array([hv2(token) for token in tokens], dtype=dtype, ndmin=2).T
+    hashes_1: np.ndarray = np.array([xxh3_hash(token, HASH_BITS) for token in tokens], dtype=dtype, ndmin=2).T
+    hashes_2: np.ndarray = np.array([sha1_hash(token, HASH_BITS) for token in tokens], dtype=dtype, ndmin=2).T
     i: np.ndarray = np.arange(num_perm, dtype=dtype).reshape((1, num_perm))
     # Permute the hash values to produce new universal hashes
     hashvalues = np.mod(hashes_1 + i * hashes_2 + i**2, modulo_prime, dtype=dtype)
