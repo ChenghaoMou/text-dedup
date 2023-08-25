@@ -84,12 +84,17 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
     >>> sha1_hash(b"hello world", 128)
     310522945683037930239412421226792791594
     """
-    if d == 32:
-        return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
-    if d == 64:
-        return struct.unpack("<Q", hashlib.sha1(data).digest()[:8])[0]
-    # struct is faster but does not support arbitrary bit lengths
-    return int.from_bytes(hashlib.sha1(data).digest()[: d // 8], byteorder="little")
+    digest = hashlib.sha1(data).digest()
+    match d:
+        case 16:
+            return struct.unpack("<H", digest[:2])[0]
+        case 32:
+            return struct.unpack("<I", digest[:4])[0]
+        case 64:
+            return struct.unpack("<Q", digest[:8])[0]
+        # struct is faster but does not support arbitrary bit lengths
+        case _:
+            return int.from_bytes(digest[: d // 8], byteorder="little")
 
 
 def sha256_digest(data: bytes) -> bytes:
@@ -224,6 +229,8 @@ def xxh3_hash(data: bytes, d: int = 32) -> int:
 
     Examples
     --------
+    >>> xxh3_hash(b"hello world", 16)
+    39051
     >>> xxh3_hash(b"hello world", 32)
     1088854155
     >>> xxh3_hash(b"hello world", 64)
@@ -231,13 +238,10 @@ def xxh3_hash(data: bytes, d: int = 32) -> int:
     >>> xxh3_hash(b"hello world", 128)
     297150157938599054391163723952090887879
     """
+    BITMASKS = {16: 0xFFFF, 32: 0xFFFFFFFF, 64: 0xFFFFFFFFFFFFFFFF}
     match d:
-        case 32:
-            # with sse2 or later, xxh3 is much faster
-            # with avx, the difference is much larger
-            return xxhash.xxh3_64_intdigest(data) & 0xFFFFFFFF
-        case 64:
-            return xxhash.xxh3_64_intdigest(data)
+        case d_val if d_val in BITMASKS:
+            return xxhash.xxh3_64_intdigest(data) & BITMASKS[d_val]
         case 128:
             return xxhash.xxh3_128_intdigest(data)
     # fall back
