@@ -117,7 +117,7 @@ def embed_func(
     hashvalues = (hashvalues * np.tile(a, (len(hashvalues), 1)) + b) % modulo_prime & max_hash
     # this part is where the name "min" of minhash comes from
     # this stacks all the hashes and then takes the minimum from each column
-    masks: np.ndarray = np.full(shape=num_perm, fill_value=max_hash)
+    masks: np.ndarray = np.full(shape=num_perm, dtype=dtype, fill_value=max_hash)
     hashvalues = np.vstack([hashvalues, masks]).min(axis=0)
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
