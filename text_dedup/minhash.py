@@ -93,16 +93,7 @@ def embed_func(
     >>> hashranges = [(i, i + 25) for i in range(0, 250, 25)]
     >>> max_hash = np.uint32((1 << 32) - 1)
     >>> modulo_prime = np.uint32((1 << 32) - 5)
-    >>> PERMUTATIONS = np.array(
-    ...     [
-    ...         (
-    ...             RNG.randint(1, np.uint32((1 << 32) - 5), dtype=np.uint32),
-    ...             RNG.randint(0, np.uint32((1 << 32) - 5), dtype=np.uint32),
-    ...         )
-    ...         for _ in range(num_perm)
-    ...     ],
-    ...     dtype=np.uint32,
-    ... ).T
+    >>> PERMUTATIONS = (RNG.randint(1, modulo_prime, size=num_perm),RNG.randint(0, modulo_prime, size=num_perm))
     >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges,
     ... permutations=PERMUTATIONS, hash_func=xxh3_32hash,dtype=np.uint32, max_hash=max_hash, modulo_prime=modulo_prime)
     >>> len(res["__signatures__"])
@@ -119,14 +110,11 @@ def embed_func(
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
-    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype)
+    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype).reshape(len(tokens), 1)
     # Permute the hash values to produce new universal hashes
-    # Tile 'a' to match the shape of 'hashvalues' and Element-wise multiplication with 'hashvalues'
-    # Adding 'b' and taking the modulo 'Modulo_prime' and bitwise_AND with 'MAX_HASH' to keep only the necessary bits.
-    hashvalues = np.bitwise_and(
-        np.mod(np.add(np.multiply(hashvalues, np.tile(a, (len(hashvalues), 1)).T).T, b), modulo_prime),
-        max_hash,
-    )
+    # Element-wise multiplication with 'hashvalues' and a (non 0 random value) and then adding b
+    # Then, take modulo 'MODULO_PRIME' and bitwise_and with 'MAX_HASH' to keep only the necessary bits.
+    hashvalues = (hashvalues * a + b) % modulo_prime & max_hash
     # this part is where the name "min" of minhash comes from
     # this stacks all the hashes and then takes the minimum from each column
     masks: np.ndarray = np.full(shape=num_perm, dtype=dtype, fill_value=max_hash)
@@ -156,7 +144,7 @@ if __name__ == "__main__":  # pragma: no cover
     # why legacy implementations used mersenne primes for modulo:
     # https://en.wikipedia.org/wiki/Universal_hashing#Hashing_strings
     HASH_CONFIG: Dict[int, Tuple[type, Any, Any]] = {
-        64: (np.uint64, np.uint64((1 << 32) - 1), np.uint64((1 << 61) - 1)),
+        64: (np.uint64, np.uint32((1 << 32) - 1), np.uint64((1 << 61) - 1)),
         # 32, 16 bit config does not use a mersenne prime.
         # The original reason for using mersenne prime was speed.
         # Testing reveals, there is no benefit to using a 2^61 mersenne prime for division
@@ -214,16 +202,10 @@ if __name__ == "__main__":  # pragma: no cover
         # There we start with a know good hash x (=hash_func) and permutate it as the following:
         # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
         # the following produces these a, b pairs
-        PERMUTATIONS: np.ndarray = np.array(
-            [
-                (
-                    RNG.randint(1, MODULO_PRIME, dtype=DTYPE),  # a is a multiplier so should not be 0
-                    RNG.randint(0, MODULO_PRIME, dtype=DTYPE),  # b
-                )
-                for _ in range(args.num_perm)
-            ],
-            dtype=DTYPE,
-        ).T
+        PERMUTATIONS: Tuple[np.ndarray, np.ndarray] = (
+            RNG.randint(1, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # a is a multiplier so should not be 0
+            RNG.randint(0, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # b
+        )
 
         with timer("MinHashing"):
             embedded = ds.map(
