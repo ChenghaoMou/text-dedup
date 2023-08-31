@@ -14,4 +14,5 @@ def load_dataset(args):
             revision=args.revision,
             cache_dir=args.cache_dir,
             use_auth_token=args.use_auth_token,
+            num_proc=10
         )

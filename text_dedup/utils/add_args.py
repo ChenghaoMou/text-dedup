@@ -34,7 +34,7 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
     parser.add_argument("--output", type=str, help="Path to deduplicated dataset output", required=True),
     parser.add_argument(
         "--debug", action=argparse.BooleanOptionalAction, help="Whether to run in debug mode", default=False
-    )
+    ),
     parser.add_argument(
         "--clean_cache", action=argparse.BooleanOptionalAction, help="Whether to remove all cache files", default=True
     )
@@ -60,7 +60,7 @@ def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  
         type=str,
         help="""Text column to use for deduplication. Concatenate desired columns beforehand if needed.""",
         required=True,
-    ),
+    )
     parser.add_argument(
         "--batch_size",
         type=int,
@@ -68,7 +68,19 @@ def add_meta_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  
         Single-threaded dedups like exacthash especially benefit from higher batches.
         Batching process itself can take a lot of time. """,
         default=10000,
-    ),
+    )
+    parser.add_argument(
+        "--filter",
+        action=argparse.BooleanOptionalAction,
+        help="""Whether to filter the final dataset and not only add metadata""",
+        default=True
+    )
+    parser.add_argument(
+        "--save_both",
+        action=argparse.BooleanOptionalAction,
+        help="""If filter save filtered and non-filtered datasets""",
+        default=False
+    )
     return parser
 
 

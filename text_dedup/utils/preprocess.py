@@ -7,6 +7,7 @@ import regex as re
 
 DIGIT_RE = re.compile(r"\d")
 PUNCT_OR_NON_PRINTING_CHARS_RE = re.compile(r"[\p{P}\p{C}\p{S}]+")
+SPACE_RE = re.compile(r"\s\s+")
 
 
 def normalize(line: str) -> str:
@@ -37,3 +38,8 @@ def normalize(line: str) -> str:
     line = DIGIT_RE.sub("0", line)
     line = PUNCT_OR_NON_PRINTING_CHARS_RE.sub("", line)
     return line
+
+def normalize_new_lines(text: str) -> str:
+    text = text.replace('\n',' ').replace('\r',' ').replace('\t',' ')
+    text = SPACE_RE.sub(" ", text)
+    return text

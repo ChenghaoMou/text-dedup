@@ -17,6 +17,9 @@ from text_dedup.utils.timer import Timer
 from text_dedup.utils.tokenization import ngrams
 from text_dedup.utils.union_find import UnionFind
 from text_dedup.utils.load_datasets import load_dataset
+from text_dedup.utils.utils import (
+    deep_update
+)
 
 __all__ = [
     "add_bloom_filter_args",
@@ -33,4 +36,5 @@ __all__ = [
     "sha1_hash",
     "xxh3_hash",
     "load_dataset",
+    "deep_update"
 ]
