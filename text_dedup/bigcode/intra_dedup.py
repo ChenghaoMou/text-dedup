@@ -6,6 +6,7 @@
 import argparse
 import hashlib
 import math
+import os
 import re
 import struct
 import sys
@@ -19,6 +20,7 @@ from typing import Text
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 import pyspark
 from pyspark import SparkConf
 from pyspark.sql import DataFrame
@@ -359,11 +361,22 @@ def partitioned_save(df, batch_size, max_batch, output):
     total_rows = df.count()
     partitions = max(1, min(math.ceil(total_rows / batch_size), max_batch))
 
+    def save_partition(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore
+        pid = df["__pid__"].iloc[0]
+        res = df["__pid__"].to_frame()
+        df = df.drop("__pid__", axis=1)
+        pd.DataFrame([]).to_csv(os.path.join(output, "_SUCCESS"), index=False, header=False)
+        df.to_parquet(
+            os.path.join(output, f"part-{pid:05d}-{partitions:05d}.parquet"), index=False, compression="snappy"
+        )
+        return res
+
     (
         df.repartition(partitions)
         .withColumn("__pid__", F.spark_partition_id())
-        .write.partitionBy("__pid__")
-        .parquet(output, mode="overwrite")
+        .groupBy("__pid__")
+        .applyInPandas(save_partition, schema="__pid__ int")
+        .count()
     )
 
 

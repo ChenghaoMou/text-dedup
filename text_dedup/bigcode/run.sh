@@ -37,6 +37,11 @@ if ! gcloud dataproc clusters list --region $REGION | grep -q $CLUSTER_NAME; the
         --project $PROJECT_ID
 fi
 
+# Start cluster if it's not running
+if ! gcloud dataproc clusters list --region $REGION | grep -q RUNNING | grep -q $CLUSTER_NAME; then
+    gcloud dataproc clusters start $CLUSTER_NAME --region $REGION
+fi
+
 # Progress bar
 TOTAL=$(echo "${DIRS}" | wc -w)
 LENGTH=20
@@ -60,7 +65,7 @@ for DIR in $DIRS; do
     LAN=$(echo "$DIR" | rev | cut -d'/' -f1 | rev)
     OUTPUT_GCS_PATH="${CONTAINER}/${DEDUPED_DIRECTORY}/${LAN}"
     OUTPUT_INDEX_GCS_PATH="${CONTAINER}/${DEDUPED_INDEX_DIRECTORY}/${LAN}"
-    OUTPUT_STATUS_GCS_PATH="${CONTAINER}/${DEDUPED_DIRECTORY}/${LAN}/_SUCCESS"
+    OUTPUT_STATUS_GCS_PATH="${CONTAINER}/${DEDUPED_INDEX_DIRECTORY}/${LAN}/_SUCCESS"
     result=$(gsutil stat "${OUTPUT_STATUS_GCS_PATH}" 2>&1 | grep -c "No URLs matched")
     if [[ $result != 1 ]]; then
         echo "Skipping ${LAN}"
