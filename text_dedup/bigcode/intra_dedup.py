@@ -81,7 +81,10 @@ def small_star(edges):
 
     neighbors = edges.map(small_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
     edges_with_change = neighbors.map(small_star_reduce).cache()
-    total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
+    if edges_with_change.isEmpty():
+        total_change = 0
+    else:
+        total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
     edges = edges_with_change.flatMap(lambda x: x[0])
     edges_with_change.unpersist()
 
@@ -104,7 +107,10 @@ def large_star(edges):
 
     neighbors = edges.flatMap(large_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
     edges_with_change = neighbors.map(large_star_reduce).cache()
-    total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
+    if edges_with_change.isEmpty():
+        total_change = 0
+    else:
+        total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
     edges = edges_with_change.flatMap(lambda x: x[0])
     edges_with_change.unpersist()
     return edges, total_change
@@ -510,6 +516,43 @@ if __name__ == "__main__":  # pragma: no cover
     #
     # A file's quality is therefore measured by the quality of its repo to prioritize
     # the integrity of the repo so training context can be maximized at the repo level.
+    # directory_id                     object
+    # blob_id                          object
+    # content_id                       object
+    # path                             object
+    # length                            int64
+    # content                          object
+    # src_encoding                     object
+    # language                         object
+    # is_vendor                          bool
+    # is_generated                       bool
+    # blob_prefix                      object
+    # repo_name                        object
+    # repo_url                         object
+    # snapshot_id                      object
+    # revision_id                      object
+    # branch_name                      object
+    # visit_date               datetime64[ns]
+    # revision_date            datetime64[ns]
+    # committer_date           datetime64[ns]
+    # github_id                       float64
+    # star_events_count                 int64
+    # fork_events_count                 int64
+    # gha_license_id                   object
+    # gha_fork                         object
+    # gha_event_created_at     datetime64[ns]
+    # gha_created_at           datetime64[ns]
+    # gha_updated_at           datetime64[ns]
+    # gha_pushed_at            datetime64[ns]
+    # gha_size                        float64
+    # gha_stargazers_count            float64
+    # gha_forks_count                 float64
+    # gha_open_issues_count           float64
+    # gha_language                     object
+    # gha_archived                     object
+    # gha_disabled                     object
+    # detected_licenses                object
+    # license_type                     object
 
     duplicates: pyspark.RDD = (
         df.filter(F.col("__component__").isNotNull())
@@ -517,8 +560,8 @@ if __name__ == "__main__":  # pragma: no cover
             "__id__",
             "__component__",
             args.repo_column,
-            "max_stars_count",
-            "max_forks_count",
+            "star_events_count",
+            "fork_events_count",
         )
         .rdd
     ).cache()
@@ -536,7 +579,7 @@ if __name__ == "__main__":  # pragma: no cover
         log.debug("-" * 120)
         for i, record in enumerate(rows):
             content = "\n".join(record.content.split("\n")[:10])
-            log.debug(f"{i}-th example repo name: {record.max_stars_repo_name}")
+            log.debug(f"{i}-th example repo name: {getattr(record, args.repo_column)}")
             log.debug(f"{i}-th example code:\n{content[:200]}\n")
             log.debug("-" * 120)
 
@@ -566,16 +609,16 @@ if __name__ == "__main__":  # pragma: no cover
     partitioned_save(df, WRITE_ROWS, MAX_WRITE_PARTITIONS, args.output)
 
     if args.debug:
-        log.debug(f"CC converged:                           {converged}")
-        log.debug(f"CC iterations:                          {iteration}")
-        log.debug(f"Number of rows before:                  {DATA_SIZE}")  # type: ignore
-        log.debug(f"Number of duplicate rows:               {NUM_DUPLICATE}")  # type: ignore
-        log.debug(f"Number of duplicate clusters:           {NUM_CLUSTER}")  # type: ignore
-        log.debug(f"Number of rows after:                   {FINAL_SIZE}")
-        log.debug(f"Percentage of rows kept:                {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")  # type: ignore
+        log.debug(f"CC converged:                  {converged}")
+        log.debug(f"CC iterations:                 {iteration}")
+        log.debug(f"Number of rows before:         {DATA_SIZE}")  # type: ignore
+        log.debug(f"Number of duplicate rows:      {NUM_DUPLICATE}")  # type: ignore
+        log.debug(f"Number of duplicate clusters:  {NUM_CLUSTER}")  # type: ignore
+        log.debug(f"Number of rows after:          {FINAL_SIZE}")
+        log.debug(f"Percentage of rows kept:       {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")  # type: ignore
 
     log.debug("-" * 120)
-    log.debug(f"Output:                                 {args.output}")
-    log.debug(f"Index Output:                           {args.output_index}")
-    log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
+    log.debug(f"Output:                        {args.output}")
+    log.debug(f"Index Output:                  {args.output_index}")
+    log.debug(f"Time:                          {time.time() - start_time:.2f}s")
     log.debug("-" * 120)
