@@ -354,20 +354,19 @@ def process_cluster(cluster: List[Any]) -> List[Any]:
 # endregion
 
 # region: IO
-
-
-def partitioned_save(df: DataFrame, batch_size: int, max_batch: int, output: str):
+def partitioned_save(df: DataFrame, chunk_size: int, max_partitions: int, output: str):
     """
-    Save a Spark DataFrame to a GCS directory in batches of `batch_size` rows.
+    Save a Spark DataFrame to a GCS directory in batches of `chunk_size` rows. PySpark natively does not support this
+    functionality, so this workaround is necessary.
 
     Parameters
     ----------
     df : pyspark.sql.DataFrame
         The Spark DataFrame to save.
-    batch_size : int
+    chunk_size : int
         The number of rows per batch.
-    max_batch : int
-        The maximum number of batches.
+    max_partitions : int
+        The maximum number of partitions.
     output : str
         The GCS output directory.
 
@@ -378,7 +377,7 @@ def partitioned_save(df: DataFrame, batch_size: int, max_batch: int, output: str
     """
 
     total_rows = df.count()
-    partitions = max(1, min(math.ceil(total_rows / batch_size), max_batch))
+    partitions = max(1, min(math.ceil(total_rows / chunk_size), max_partitions))
 
     def save_partition(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore
         pid = df["__pid__"].iloc[0]
@@ -440,7 +439,7 @@ if __name__ == "__main__":  # pragma: no cover
     if B is None or R is None:
         B, R = optimal_param(args.threshold, args.num_perm)
 
-    WRITE_ROWS: int = 1_000_000
+    MAX_WRITE_CHUNK_SIZE: int = 1_000_000
     MAX_WRITE_PARTITIONS: int = 256
     HASH_RANGES: List[Tuple[int, int]] = [(i * R, (i + 1) * R) for i in range(B)]
     PERMUTATIONS: Tuple[np.ndarray, np.ndarray] = (
@@ -501,7 +500,7 @@ if __name__ == "__main__":  # pragma: no cover
         ).persist(pyspark.StorageLevel.DISK_ONLY)
 
     if args.output_index and args.index_only and index_df is not None:
-        partitioned_save(index_df, WRITE_ROWS, MAX_WRITE_PARTITIONS, args.output_index)
+        partitioned_save(index_df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
         log.debug(f"Output:                                 {args.output_index}")
         log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
         sys.exit(0)
@@ -516,14 +515,14 @@ if __name__ == "__main__":  # pragma: no cover
 
     if duplicate_edges.isEmpty():
         if args.output_index and index_df is not None:
-            partitioned_save(index_df, WRITE_ROWS, MAX_WRITE_PARTITIONS, args.output_index)
-        partitioned_save(df, WRITE_ROWS, MAX_WRITE_PARTITIONS, args.output)
+            partitioned_save(index_df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
+        partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
 
         log.debug("-" * 120)
         log.debug("No duplicates found.")
-        log.debug(f"Data Output:                            {args.output}")
-        log.debug(f"Index Output:                           {args.output_index}")
-        log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
+        log.debug(f"Data Output:    {args.output}")
+        log.debug(f"Index Output:   {args.output_index}")
+        log.debug(f"Time:           {time.time() - start_time:.2f}s")
         log.debug("-" * 120)
 
         sys.exit(0)
@@ -548,7 +547,6 @@ if __name__ == "__main__":  # pragma: no cover
     # A repo's quality is measured by, in order of importance:
     #  1. The number of stars (higher is better)
     #  2. The number of forks (higher is better)
-    #  3. TODO: The number of contributors (higher is better)
     #
     # A file's quality is therefore measured by the quality of its repo to prioritize
     # the integrity of the repo so training context can be maximized at the repo level.
@@ -641,8 +639,8 @@ if __name__ == "__main__":  # pragma: no cover
 
     FINAL_SIZE = df.count()
     if args.output_index and kept_index is not None:
-        partitioned_save(kept_index, WRITE_ROWS, MAX_WRITE_PARTITIONS, args.output_index)
-    partitioned_save(df, WRITE_ROWS, MAX_WRITE_PARTITIONS, args.output)
+        partitioned_save(kept_index, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
+    partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
 
     if args.debug:
         log.debug(f"CC converged:                  {converged}")
@@ -654,7 +652,7 @@ if __name__ == "__main__":  # pragma: no cover
         log.debug(f"Percentage of rows kept:       {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")  # type: ignore
 
     log.debug("-" * 120)
-    log.debug(f"Output:                        {args.output}")
-    log.debug(f"Index Output:                  {args.output_index}")
-    log.debug(f"Time:                          {time.time() - start_time:.2f}s")
+    log.debug(f"Output:        {args.output}")
+    log.debug(f"Index Output:  {args.output_index}")
+    log.debug(f"Time:          {time.time() - start_time:.2f}s")
     log.debug("-" * 120)
