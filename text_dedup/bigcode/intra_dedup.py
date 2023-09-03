@@ -356,28 +356,51 @@ def process_cluster(cluster: List[Any]) -> List[Any]:
 # region: IO
 
 
-def partitioned_save(df, batch_size, max_batch, output):
+def partitioned_save(df: DataFrame, batch_size: int, max_batch: int, output: str):
+    """
+    Save a Spark DataFrame to a GCS directory in batches of `batch_size` rows.
+
+    Parameters
+    ----------
+    df : pyspark.sql.DataFrame
+        The Spark DataFrame to save.
+    batch_size : int
+        The number of rows per batch.
+    max_batch : int
+        The maximum number of batches.
+    output : str
+        The GCS output directory.
+
+    Raises
+    ------
+    RuntimeError
+        If the save fails.
+    """
 
     total_rows = df.count()
     partitions = max(1, min(math.ceil(total_rows / batch_size), max_batch))
 
     def save_partition(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore
         pid = df["__pid__"].iloc[0]
-        res = df["__pid__"].to_frame()
         df = df.drop("__pid__", axis=1)
-        pd.DataFrame([]).to_csv(os.path.join(output, "_SUCCESS"), index=False, header=False)
         df.to_parquet(
             os.path.join(output, f"part-{pid:05d}-{partitions:05d}.parquet"), index=False, compression="snappy"
         )
-        return res
+        return pd.DataFrame([{"__status__": True, "__pid__": pid}])
 
-    (
-        df.repartition(partitions)
+    results = (
+        df.repartition(partitions)  # random and uniform hash partitioning
         .withColumn("__pid__", F.spark_partition_id())
         .groupBy("__pid__")
-        .applyInPandas(save_partition, schema="__pid__ int")
-        .count()
+        .applyInPandas(save_partition, schema="__status__ boolean, __pid__ int")
+        .toPandas()
     )
+
+    if results["__status__"].all():
+        pd.DataFrame([]).to_csv(os.path.join(output, "_SUCCESS"), index=False, header=False)
+        return
+
+    raise RuntimeError("Failed to save partitions.")
 
 
 # endregion

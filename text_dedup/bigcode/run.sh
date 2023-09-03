@@ -52,8 +52,8 @@ for DIR in $DIRS; do
 
     # Progress bar
     echo -n "[ "
-    percent=$((i * LENGTH / TOTAL))
-    for ((k = 0 ; k <= percent; k++)); do echo -n "==="; done
+    curr_pos=$((i * LENGTH / TOTAL))
+    for ((k = 0 ; k <= curr_pos; k++)); do echo -n "==="; done
     for ((j = k + 1; j <= LENGTH ; j++)); do echo -n "   "; done
     v=$(((i + 1) * 100 / TOTAL))
     echo -n " ] "
