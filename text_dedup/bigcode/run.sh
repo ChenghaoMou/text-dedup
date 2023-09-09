@@ -6,12 +6,12 @@
 CLUSTER_NAME="chenghao-temp"
 PROJECT_ID="huggingface-science-codeparrot"
 REGION="us-central1"
-CONTAINER="gs://the_stack_v2"
-DIRECTORY="licensed_files_sample"
-NUM_WORKERS=5
+CONTAINER=""
+DIRECTORY=""
+NUM_WORKERS=18
 MASTER_MACHINE_TYPE="c2d-standard-16"
 MASTER_BOOT_DISK_SIZE=1024
-WORKER_MACHINE_TYPE="c2-standard-60"
+WORKER_MACHINE_TYPE="c2-standard-16"
 WORKER_BOOT_DISK_SIZE=1024
 IMAGE_VERSION="2.0-debian10"
 SPARK_JARS="gs://spark-lib/bigquery/spark-3.3-bigquery-0.32.2.jar"
@@ -84,6 +84,7 @@ for DIR in $DIRS; do
         --threshold $THRESHOLD \
         --output_index "$OUTPUT_INDEX_GCS_PATH" \
         --repo_column $REPO_COLUMN \
+        --rank \
         --debug
 done
 

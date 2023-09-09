@@ -341,11 +341,16 @@ def optimal_param(
 # endregion
 
 # region: Quality Control
-def process_cluster(cluster: List[Any]) -> List[Any]:
+def process_cluster(cluster: List[Any], enabled: bool = False) -> List[Any]:
+    if not enabled:
+        np.random.shuffle(cluster)
+        return cluster[:1]
+
     cluster.sort(
         key=lambda x: (
-            -x[-1] if x[-1] is not None else 0.0,
-            -x[-2] if x[-2] is not None else 0.0,
+            -x[-1] if x[-1] is not None else 0.0,  # star_events_count
+            -x[-2] if x[-2] is not None else 0.0,  # fork_events_count
+            -np.datetime64(x[-3]).astype(np.uint64) if x[-3] is not None else 0.0,  # visit_date
         )
     )
     return cluster[:1]
@@ -421,6 +426,7 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument("--output", "-o", type=str, required=True, help="GCS output directory of parquet files")
     parser.add_argument("--output_index", "-oi", type=str, help="GCS output directory of index parquet files")
     parser.add_argument("--index_only", action="store_true", help="Only output the index, skip deduplication")
+    parser.add_argument("--rank", action="store_true", help="Rank the duplicates by quality indicators")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
@@ -588,17 +594,27 @@ if __name__ == "__main__":  # pragma: no cover
     # detected_licenses                object
     # license_type                     object
 
-    duplicates: pyspark.RDD = (
-        df.filter(F.col("__component__").isNotNull())
-        .select(
+    rank_columns = (
+        [
             "__id__",
             "__component__",
             args.repo_column,
+            "visit_date",
             "star_events_count",
-            "fork_events_count",
-        )
-        .rdd
-    ).cache()
+            "fork_events_count"
+            # "max_stars_repo_stars_event_min_datetime",
+            # "max_stars_count",
+            # "max_forks_count",
+        ]
+        if args.rank
+        else [
+            "__id__",
+            "__component__",
+            args.repo_column,
+        ]
+    )
+
+    duplicates: pyspark.RDD = (df.filter(F.col("__component__").isNotNull()).select(*rank_columns).rdd).cache()
 
     if args.debug:
         NUM_DUPLICATE = duplicates.count()
@@ -620,7 +636,7 @@ if __name__ == "__main__":  # pragma: no cover
     # region: Remove Low Quality Duplicates
     df = df.join(
         spark.createDataFrame(
-            cliques.mapValues(lambda x: process_cluster(cluster=list(x))).flatMap(
+            cliques.mapValues(lambda x: process_cluster(cluster=list(x), enabled=args.rank)).flatMap(
                 lambda x: [(ele[0], True) for ele in x[1]]
             ),
             schema=["__id__", "__keep__"],
