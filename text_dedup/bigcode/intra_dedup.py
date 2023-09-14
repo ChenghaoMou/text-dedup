@@ -343,14 +343,19 @@ def optimal_param(
 # region: Quality Control
 def process_cluster(cluster: List[Any], enabled: bool = False) -> List[Any]:
     if not enabled:
-        np.random.shuffle(cluster)
+        RNG.shuffle(cluster)
         return cluster[:1]
 
     cluster.sort(
         key=lambda x: (
-            -x[-1] if x[-1] is not None else 0.0,  # star_events_count
-            -x[-2] if x[-2] is not None else 0.0,  # fork_events_count
-            -np.datetime64(x[-3]).astype(np.uint64) if x[-3] is not None else 0.0,  # visit_date
+            # license_type, the more permissive the better
+            ["permissive", "no_license", "non_permissive"].index(x[-1]) if x[-1] is not None else float("inf"),
+            # star_events_count, the more the better
+            -x[-2] if x[-2] is not None else 0.0,
+            # fork_events_count, the more the better
+            -x[-3] if x[-3] is not None else 0.0,
+            # visit_date, the earliest the better, tie breaker
+            np.datetime64(x[-4]).astype(np.uint64) if x[-4] is not None else float("inf"),
         )
     )
     return cluster[:1]
@@ -382,7 +387,7 @@ def partitioned_save(df: DataFrame, chunk_size: int, max_partitions: int, output
     """
 
     total_rows = df.count()
-    partitions = max(1, min(math.ceil(total_rows / chunk_size), max_partitions))
+    partitions = max(256, min(math.ceil(total_rows / chunk_size), max_partitions))
 
     def save_partition(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore
         pid = df["__pid__"].iloc[0]
@@ -392,15 +397,17 @@ def partitioned_save(df: DataFrame, chunk_size: int, max_partitions: int, output
         )
         return pd.DataFrame([{"__status__": True, "__pid__": pid}])
 
+    log.debug(f"Saving {total_rows} rows to {partitions} partitions.")
+
     results = (
         df.repartition(partitions)  # random and uniform hash partitioning
         .withColumn("__pid__", F.spark_partition_id())
         .groupBy("__pid__")
         .applyInPandas(save_partition, schema="__status__ boolean, __pid__ int")
-        .toPandas()
+        .cache()
     )
 
-    if results["__status__"].all():
+    if results.filter(~F.col("__status__")).count() == 0:
         pd.DataFrame([]).to_csv(os.path.join(output, "_SUCCESS"), index=False, header=False)
         return
 
@@ -433,6 +440,8 @@ if __name__ == "__main__":  # pragma: no cover
     conf = SparkConf()
     conf.set("spark.app.name", "MinHashLSH")
     conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
+    conf.set("spark.storage.memoryFraction", "1")
+    conf.set("spark.default.parallelism", "100")
     spark = SparkSession.builder.config(conf=conf).getOrCreate()  # type: ignore
     log: Logger = spark.sparkContext._jvm.org.apache.log4j.LogManager.getLogger(__name__)  # type: ignore
 
@@ -445,8 +454,8 @@ if __name__ == "__main__":  # pragma: no cover
     if B is None or R is None:
         B, R = optimal_param(args.threshold, args.num_perm)
 
-    MAX_WRITE_CHUNK_SIZE: int = 1_000_000
-    MAX_WRITE_PARTITIONS: int = 256
+    MAX_WRITE_CHUNK_SIZE: int = 80_000
+    MAX_WRITE_PARTITIONS: int = 2048
     HASH_RANGES: List[Tuple[int, int]] = [(i * R, (i + 1) * R) for i in range(B)]
     PERMUTATIONS: Tuple[np.ndarray, np.ndarray] = (
         RNG.randint(1, MOD_PRIME, size=(args.num_perm,), dtype=DTYPE),
@@ -455,6 +464,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     # region: Data Loading
     df: DataFrame = spark.read.option("mergeSchema", "true").parquet(args.input)
+    # df = df.filter(F.col("license_type") == "permissive").cache()
     if args.index_column is None:
         df = df.withColumn("__id__", F.monotonically_increasing_id()).cache()
     else:
@@ -600,11 +610,9 @@ if __name__ == "__main__":  # pragma: no cover
             "__component__",
             args.repo_column,
             "visit_date",
+            "fork_events_count",
             "star_events_count",
-            "fork_events_count"
-            # "max_stars_repo_stars_event_min_datetime",
-            # "max_stars_count",
-            # "max_forks_count",
+            "license_type",
         ]
         if args.rank
         else [

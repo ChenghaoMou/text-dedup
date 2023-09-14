@@ -6,9 +6,9 @@
 CLUSTER_NAME="chenghao-temp"
 PROJECT_ID="huggingface-science-codeparrot"
 REGION="us-central1"
-CONTAINER=""
-DIRECTORY=""
-NUM_WORKERS=18
+CONTAINER="gs://the_stack_v2"
+DIRECTORY="licensed_files"
+NUM_WORKERS=25
 MASTER_MACHINE_TYPE="c2d-standard-16"
 MASTER_BOOT_DISK_SIZE=1024
 WORKER_MACHINE_TYPE="c2-standard-16"
@@ -19,8 +19,9 @@ THRESHOLD=0.7
 REPO_COLUMN="repo_url"
 
 DEDUPED_DIRECTORY="${DIRECTORY}_deduped"
-DEDUPED_INDEX_DIRECTORY="${DEDUPED_DIRECTORY}_index"
-DIRS=$(gsutil ls "${CONTAINER}/${DIRECTORY}")
+# DEDUPED_INDEX_DIRECTORY="${DEDUPED_DIRECTORY}_index"
+# DIRS=("gs://the_stack_v2/licensed_files/language_id=Python")
+DIRS=$(cat dirs.list)
 
 # Create cluster if it doesn't exist
 if ! gcloud dataproc clusters list --region $REGION | grep -q $CLUSTER_NAME; then
@@ -49,12 +50,11 @@ i=0
 
 echo "Total number of directories: $TOTAL"
 for DIR in $DIRS; do
-
     # Progress bar
     echo -n "[ "
     curr_pos=$((i * LENGTH / TOTAL))
-    for ((k = 0 ; k <= curr_pos; k++)); do echo -n "==="; done
-    for ((j = k + 1; j <= LENGTH ; j++)); do echo -n "   "; done
+    for ((k = 0; k <= curr_pos; k++)); do echo -n "==="; done
+    for ((j = k + 1; j <= LENGTH; j++)); do echo -n "   "; done
     v=$(((i + 1) * 100 / TOTAL))
     echo -n " ] "
     echo "$v %" $'\r'
@@ -64,8 +64,8 @@ for DIR in $DIRS; do
     INPUT_GCS_PATH="${DIR}"
     LAN=$(echo "$DIR" | rev | cut -d'/' -f1 | rev)
     OUTPUT_GCS_PATH="${CONTAINER}/${DEDUPED_DIRECTORY}/${LAN}"
-    OUTPUT_INDEX_GCS_PATH="${CONTAINER}/${DEDUPED_INDEX_DIRECTORY}/${LAN}"
-    OUTPUT_STATUS_GCS_PATH="${CONTAINER}/${DEDUPED_INDEX_DIRECTORY}/${LAN}/_SUCCESS"
+    # OUTPUT_INDEX_GCS_PATH="${CONTAINER}/${DEDUPED_INDEX_DIRECTORY}/${LAN}"
+    OUTPUT_STATUS_GCS_PATH="${OUTPUT_GCS_PATH}/_SUCCESS"
     result=$(gsutil stat "${OUTPUT_STATUS_GCS_PATH}" 2>&1 | grep -c "No URLs matched")
     if [[ $result != 1 ]]; then
         echo "Skipping ${LAN}"
@@ -82,10 +82,13 @@ for DIR in $DIRS; do
         --input "$INPUT_GCS_PATH" \
         --output "$OUTPUT_GCS_PATH" \
         --threshold $THRESHOLD \
-        --output_index "$OUTPUT_INDEX_GCS_PATH" \
         --repo_column $REPO_COLUMN \
-        --rank \
-        --debug
+        --rank
+
+    # --rank
+    # --debug
+    # --output_index "$OUTPUT_INDEX_GCS_PATH"
+
 done
 
 gcloud dataproc clusters stop $CLUSTER_NAME --region $REGION
