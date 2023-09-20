@@ -1,6 +1,7 @@
 <center><img src="./banner.png"/ style="background-color:white;"></center>
 
-![GitHub](https://img.shields.io/github/license/ChenghaoMou/text-dedup) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage)
+![GitHub](https://img.shields.io/github/license/ChenghaoMou/text-dedup) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/cc66178e49d24908ac1fb2b2dbe4e5b3)](https://www.codacy.com/gh/ChenghaoMou/text-dedup/dashboard?utm_source=github.com&utm_medium=referral&utm_content=ChenghaoMou/text-dedup&utm_campaign=Badge_Coverage) [![DOI](https://zenodo.org/badge/347428086.svg)](https://zenodo.org/badge/latestdoi/347428086)
+
 
 ## Documentation
 
@@ -234,7 +235,19 @@ Because the google repo is licensed under Apache 2.0, I have to update from MIT.
 Generally, you can cite this repository as:
 
 ```bibtex
-
+@software{chenghao_mou_2023_8364980,
+  author       = {Chenghao Mou and
+                  Chris Ha and
+                  Kenneth Enevoldsen and
+                  Peiyuan Liu},
+  title        = {ChenghaoMou/text-dedup: Reference Snapshot},
+  month        = sep,
+  year         = 2023,
+  publisher    = {Zenodo},
+  version      = {2023.09.20},
+  doi          = {10.5281/zenodo.8364980},
+  url          = {https://doi.org/10.5281/zenodo.8364980}
+}
 ```
 
 The spark version was born from [BigCode (Apache 2.0)](https://github.com/bigcode-project) and [BigScience (Apache 2.0)](https://github.com/bigscience-workshop), and you can cite the original paper if you want:
