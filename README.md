@@ -221,6 +221,10 @@ For quick reference, here are the results:
 
 Early versions of the code uses object-oriented design for hashing and indexing, which was very difficult because different methods share little to no abstraction. In order to complie something that is useful, a lot of the wrapper code was used, and that actually increased the overhead of using this library. Additionally, deduplicating is often a one-time thing in data preprocessing pipeline, there isn't really a need for inline access. -->
 
+## Use Cases
+
+[CulturaX](https://arxiv.org/abs/2309.09400): A Cleaned, Enormous, and Multilingual Dataset for Large Language Models in 167 Languages
+
 <!-- ### Why license change?
 
 Because the google repo is licensed under Apache 2.0, I have to update from MIT. Util that part of code is completely re-implemented, Apache 2.0. will be the license I use. -->
