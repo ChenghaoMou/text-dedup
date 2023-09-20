@@ -8,10 +8,10 @@ PROJECT_ID="huggingface-science-codeparrot"
 REGION="us-central1"
 CONTAINER="gs://the_stack_v2"
 DIRECTORY="licensed_files"
-NUM_WORKERS=25
-MASTER_MACHINE_TYPE="c2d-standard-16"
+NUM_WORKERS=8
+MASTER_MACHINE_TYPE="c2-standard-16"
 MASTER_BOOT_DISK_SIZE=1024
-WORKER_MACHINE_TYPE="c2-standard-16"
+WORKER_MACHINE_TYPE="c2-standard-60"
 WORKER_BOOT_DISK_SIZE=1024
 IMAGE_VERSION="2.0-debian10"
 SPARK_JARS="gs://spark-lib/bigquery/spark-3.3-bigquery-0.32.2.jar"
@@ -20,8 +20,9 @@ REPO_COLUMN="repo_url"
 
 DEDUPED_DIRECTORY="${DIRECTORY}_deduped"
 # DEDUPED_INDEX_DIRECTORY="${DEDUPED_DIRECTORY}_index"
-# DIRS=("gs://the_stack_v2/licensed_files/language_id=Python")
-DIRS=$(cat dirs.list)
+# TODO: 250M is too large for 30 workers (400 cpus and 1.8TB memory)
+DIRS=("gs://the_stack_v2/licensed_files/language_id=JSON")
+# DIRS=$(cat dirs.list)
 
 # Create cluster if it doesn't exist
 if ! gcloud dataproc clusters list --region $REGION | grep -q $CLUSTER_NAME; then
@@ -77,7 +78,7 @@ for DIR in $DIRS; do
         --region $REGION \
         --jars $SPARK_JARS \
         --driver-log-levels root=FATAL,__main__=DEBUG \
-        --properties="spark.executor.memory=50g,spark.driver.memory=8g,spark.executor.cores=15" \
+        --properties="spark.executor.memory=200g,spark.driver.memory=8g,spark.executor.cores=58" \
         intra_dedup.py -- \
         --input "$INPUT_GCS_PATH" \
         --output "$OUTPUT_GCS_PATH" \

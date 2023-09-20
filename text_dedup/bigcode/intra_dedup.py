@@ -4,40 +4,39 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
 import argparse
-import hashlib
 import math
-import os
 import re
-import struct
 import sys
 import time
-from itertools import tee
+import warnings
 from logging import Logger
-from operator import add
 from typing import Any
 from typing import List
-from typing import Text
+from typing import Set
 from typing import Tuple
 
-import numpy as np
-import pandas as pd
-import pyspark
-from pyspark import SparkConf
-from pyspark.sql import DataFrame
-from pyspark.sql import Row
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from scipy.integrate import quad as integrate
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import numpy as np
+    import numpy.typing as npt
+    import pyspark
+    import xxhash
+    from graphframes import GraphFrame  # type: ignore
+    from pyspark import SparkConf
+    from pyspark.sql import DataFrame
+    from pyspark.sql import Row
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
+    from scipy.integrate import quad as integrate
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
 NON_ALPHA = re.compile(r"\W", re.UNICODE)
 DTYPE = np.uint32
-MAX_HASH = 4_294_967_295
-MOD_PRIME = 4_294_967_291
+MAX_HASH = 4_294_967_295  # maximum 32-bit unsigned integer
+MOD_PRIME = 4_294_967_291  # maximum 32-bit prime number
 
 
-# region: Connected Components in MapReduce and Beyond, 2014
 def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
     """
     Generate edges from a cluster. Instead of generating N^2 edges, we only need all nodes align to a single node, since
@@ -65,96 +64,15 @@ def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
     return [(n, min_node) for n in nodes if n != min_node]
 
 
-def small_star(edges):
-    def small_star_map(edge):
-        x, y = edge
-        if y <= x:
-            return (x, y)
-        else:
-            return (y, x)
-
-    def small_star_reduce(x):
-        node, neighbors = x
-        nodes = neighbors + [node]
-        min_node = min(nodes)
-        new_edges = set((neighbor, min_node) for neighbor in nodes if (neighbor <= node and neighbor != min_node))
-        change = len(new_edges.difference(set([(node, neighbor) for neighbor in neighbors])))
-        return (list(new_edges), change)
-
-    neighbors = edges.map(small_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
-    edges_with_change = neighbors.map(small_star_reduce).cache()
-    if edges_with_change.isEmpty():
-        total_change = 0
-    else:
-        total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
-    edges = edges_with_change.flatMap(lambda x: x[0])
-    edges_with_change.unpersist()
-
-    return edges, total_change
-
-
-def large_star(edges):
-    def large_star_map(edge):
-        if edge[0] == edge[1]:
-            return [(edge[0], edge[1])]
-        return [(edge[0], edge[1]), (edge[1], edge[0])]
-
-    def large_star_reduce(x):
-        node, neighbors = x
-        nodes = neighbors + [node]
-        min_node = min(nodes)
-        new_edges = set((neighbor, min_node) for neighbor in (neighbors + [node]) if (neighbor > node))
-        change = len(new_edges.difference(set([(node, neighbor) for neighbor in neighbors])))
-        return list(new_edges), change
-
-    neighbors = edges.flatMap(large_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
-    edges_with_change = neighbors.map(large_star_reduce).cache()
-    if edges_with_change.isEmpty():
-        total_change = 0
-    else:
-        total_change = edges_with_change.map(lambda x: x[1]).reduce(add)
-    edges = edges_with_change.flatMap(lambda x: x[0])
-    edges_with_change.unpersist()
-    return edges, total_change
-
-
-def alternating_algo(edges, max_iteration: int) -> Tuple[Any, bool, int]:
-
-    prev_lchanges: int = sys.maxsize
-    prev_schanges: int = sys.maxsize
-    curr_iteration: int = 0
-
-    while max_iteration:
-
-        edges, curr_lchanges = large_star(edges)
-        edges, curr_schanges = small_star(edges)
-
-        if (curr_lchanges == prev_lchanges and curr_schanges == prev_schanges) or (
-            curr_schanges == 0 and curr_lchanges == 0
-        ):
-            return edges, True, curr_iteration
-
-        prev_lchanges = curr_lchanges
-        prev_schanges = curr_schanges
-        curr_iteration += 1
-        max_iteration -= 1
-
-    return edges, False, curr_iteration
-
-
-# endregion
-
 # region: Hashing
-def ngrams(sequence: List[Text], n: int, min_length: int = 5):
+def ngrams(content: str, n: int, min_length: int = 5) -> Set[int]:
     """
-    Return the ngrams generated from a sequence of items, as an iterator.
-
-    This is a modified version of nltk.util.ngrams.
+    Return the ngrams in hash values. This function fuses few steps together for performance reasons.
 
     Parameters
     ----------
-    sequence : List[Text]
-        The sequence of items.
+    content : str
+        The content of the document.
     n : int
         The length of each ngram.
     min_length : int, optional
@@ -162,52 +80,24 @@ def ngrams(sequence: List[Text], n: int, min_length: int = 5):
 
     Returns
     -------
-    iterator
-        The ngrams.
+    Set[int]
+        The set of ngrams in hash values.
 
     Examples
     --------
-    >>> list(ngrams(["a", "b", "c", "d"], 2, min_length=1))
-    [('a', 'b'), ('b', 'c'), ('c', 'd')]
-    >>> list(ngrams(["a", "b", "c", "d"], 2, min_length=5))
+    >>> sorted(list(ngrams("a b c d", 2, min_length=1)))
+    [145323813, 433422276, 459146835]
+    >>> list(ngrams("a b c d", 2, min_length=5))
     []
-    >>> list(ngrams(["a", "b"], 3, min_length=1))
-    [('a', 'b')]
+    >>> list(ngrams("a b", 3, min_length=1))
+    [433422276]
     """
-    if len(sequence) < min_length:
-        return []
-    if len(sequence) < n:
-        return [tuple(sequence)]
-    iterables = tee(iter(sequence), n)
-    for i, sub_iterable in enumerate(iterables):
-        for _ in range(i):
-            next(sub_iterable, None)
-    return zip(*iterables)
+    tokens: List[str] = NON_ALPHA.split(content.lower())
+    if len(tokens) < min_length:
+        return set()
 
-
-def sha1_hash32(data):
-    """
-    Directly taken from datasketch package to avoid abstraction.
-
-    Parameters
-    ----------
-    data : bytes
-
-    Returns
-    -------
-    int
-        The first 4 bytes (32 bits) of the SHA1 hash of the input data.
-
-    Examples
-    --------
-    >>> sha1_hash32(b"hello")
-    499578026
-    >>> bin(sha1_hash32(b"hello"))
-    '0b11101110001101111010010101010'
-    >>> sha1_hash32(b"hello world").bit_length()
-    30
-    """
-    return struct.unpack("<I", hashlib.sha1(data).digest()[:4])[0]
+    ng: Set[str] = {" ".join(tokens[i : i + n]) for i in range(0, max(1, len(tokens) - n + 1))}
+    return {xxhash.xxh32_intdigest(n) for n in ng}
 
 
 def generate_hash_values(
@@ -217,7 +107,7 @@ def generate_hash_values(
     ngram_size: int,
     min_length: int,
     hashranges: List[Tuple[int, int]],
-    permutations: Tuple[np.ndarray, np.ndarray],
+    permutations: Tuple[npt.NDArray[DTYPE], npt.NDArray[DTYPE]],
 ) -> List[Tuple[int, bytes, int]]:
     """
     Generate the MinHashLSH values for a given document.
@@ -261,16 +151,15 @@ def generate_hash_values(
     >>> sum(len(h) for _, h, _ in res) == len(res) * 25 * np.dtype(DTYPE).itemsize
     True
     """
-    tokens = {" ".join(t).encode("utf-8") for t in ngrams(NON_ALPHA.split(content.lower()), ngram_size, min_length)}
     a, b = permutations
-    hv = np.array([sha1_hash32(token) for token in tokens], dtype=DTYPE)
-    phv = np.bitwise_and(((hv * np.tile(a, (len(tokens), 1)).T).T + b) % MOD_PRIME, MAX_HASH)  # type: ignore
-    hash_values = np.vstack([phv, np.ones(num_perm, dtype=DTYPE) * MAX_HASH]).min(axis=0)
-    Hs = [bytes(hash_values[start:end].byteswap().data) for start, end in hashranges]
-    return [(band_idx, H, idx) for band_idx, H in enumerate(Hs)]
+    hashes = np.array(list(ngrams(content, ngram_size, min_length)), dtype=DTYPE)
+    p_hashes = ((np.outer(hashes, a) + b) % MOD_PRIME) & MAX_HASH
+    min_hashes = np.vstack([p_hashes, np.full(num_perm, MAX_HASH, dtype=DTYPE)]).min(axis=0)
+    return [(band_idx, min_hashes[start:end].data.tobytes(), idx) for band_idx, (start, end) in enumerate(hashranges)]
 
 
 # endregion
+
 
 # region: MinHashLSH
 def optimal_param(
@@ -340,10 +229,10 @@ def optimal_param(
 
 # endregion
 
+
 # region: Quality Control
 def process_cluster(cluster: List[Any], enabled: bool = False) -> List[Any]:
     if not enabled:
-        RNG.shuffle(cluster)
         return cluster[:1]
 
     cluster.sort(
@@ -362,6 +251,7 @@ def process_cluster(cluster: List[Any], enabled: bool = False) -> List[Any]:
 
 
 # endregion
+
 
 # region: IO
 def partitioned_save(df: DataFrame, chunk_size: int, max_partitions: int, output: str):
@@ -389,36 +279,19 @@ def partitioned_save(df: DataFrame, chunk_size: int, max_partitions: int, output
     total_rows = df.count()
     partitions = max(256, min(math.ceil(total_rows / chunk_size), max_partitions))
 
-    def save_partition(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore
-        pid = df["__pid__"].iloc[0]
-        df = df.drop("__pid__", axis=1)
-        df.to_parquet(
-            os.path.join(output, f"part-{pid:05d}-{partitions:05d}.parquet"), index=False, compression="snappy"
-        )
-        return pd.DataFrame([{"__status__": True, "__pid__": pid}])
-
-    log.debug(f"Saving {total_rows} rows to {partitions} partitions.")
-
-    results = (
-        df.repartition(partitions)  # random and uniform hash partitioning
+    (
+        df.repartition(partitions)
         .withColumn("__pid__", F.spark_partition_id())
-        .groupBy("__pid__")
-        .applyInPandas(save_partition, schema="__status__ boolean, __pid__ int")
-        .cache()
+        .write.partitionBy("__pid__")
+        .parquet(output, mode="overwrite", compression="snappy")
     )
-
-    if results.filter(~F.col("__status__")).count() == 0:
-        pd.DataFrame([]).to_csv(os.path.join(output, "_SUCCESS"), index=False, header=False)
-        return
-
-    raise RuntimeError("Failed to save partitions.")
 
 
 # endregion
 
 
 if __name__ == "__main__":  # pragma: no cover
-
+    # region: Argument Parsing
     parser = argparse.ArgumentParser(description="Intra-dataset near-deduplicating with PySpark")
     parser.add_argument("--input", "-i", type=str, required=True, help="GCS input directory of parquet files")
     parser.add_argument("--threshold", type=float, default=0.7, help="Similarity threshold")
@@ -429,71 +302,85 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument("--r", type=int, default=None, help="Number of rows per band")
     parser.add_argument("--column", "-c", type=str, default="content", help="Column to deduplicate on")
     parser.add_argument("--repo_column", type=str, required=True, help="Code repo column")
-    parser.add_argument("--index_column", type=str, default=None, help="Index column, will be assigned if not provided")
     parser.add_argument("--output", "-o", type=str, required=True, help="GCS output directory of parquet files")
     parser.add_argument("--output_index", "-oi", type=str, help="GCS output directory of index parquet files")
     parser.add_argument("--index_only", action="store_true", help="Only output the index, skip deduplication")
     parser.add_argument("--rank", action="store_true", help="Rank the duplicates by quality indicators")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--profile", action="store_true", help="Enable profiling")
+    parser.add_argument("--profile_dir", type=str, default="./profile", help="Checkpoint directory")
+    parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints", help="Checkpoint directory")
     args = parser.parse_args()
+    # endregion
 
-    conf = SparkConf()
-    conf.set("spark.app.name", "MinHashLSH")
-    conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
-    conf.set("spark.storage.memoryFraction", "1")
-    conf.set("spark.default.parallelism", "100")
-    spark = SparkSession.builder.config(conf=conf).getOrCreate()  # type: ignore
+    # region: Spark Configuration
+    conf = (
+        SparkConf()
+        .set("spark.app.name", "MinHashLSH")
+        .set("spark.sql.execution.arrow.pyspark.enabled", "true")
+        .set("spark.storage.memoryFraction", "1")
+        .set("spark.default.parallelism", "100")
+        .set("spark.python.profile", "true" if args.profile else "false")
+    )
+    spark = SparkSession.Builder().config(conf=conf).getOrCreate()
+    sc = spark.sparkContext
+    sc.setCheckpointDir(args.checkpoint_dir)
     log: Logger = spark.sparkContext._jvm.org.apache.log4j.LogManager.getLogger(__name__)  # type: ignore
+    # endregion
 
-    index_df: DataFrame = None  # type: ignore
-    kept_index: DataFrame = None  # type: ignore
-
-    start_time = time.time()
+    # region: Global Variables
+    index_df: DataFrame | None = None
+    kept_index: DataFrame | None = None
+    FINAL_SIZE: int = 0
+    MAX_WRITE_CHUNK_SIZE: int = 200_000
+    MAX_WRITE_PARTITIONS: int = 2048
 
     B, R = args.b, args.r
     if B is None or R is None:
         B, R = optimal_param(args.threshold, args.num_perm)
 
-    MAX_WRITE_CHUNK_SIZE: int = 80_000
-    MAX_WRITE_PARTITIONS: int = 2048
     HASH_RANGES: List[Tuple[int, int]] = [(i * R, (i + 1) * R) for i in range(B)]
-    PERMUTATIONS: Tuple[np.ndarray, np.ndarray] = (
+    PERMUTATIONS: Tuple[npt.NDArray[DTYPE], npt.NDArray[DTYPE]] = (
         RNG.randint(1, MOD_PRIME, size=(args.num_perm,), dtype=DTYPE),
         RNG.randint(0, MOD_PRIME, size=(args.num_perm,), dtype=DTYPE),
     )
-
-    # region: Data Loading
-    df: DataFrame = spark.read.option("mergeSchema", "true").parquet(args.input)
-    # df = df.filter(F.col("license_type") == "permissive").cache()
-    if args.index_column is None:
-        df = df.withColumn("__id__", F.monotonically_increasing_id()).cache()
-    else:
-        df = df.withColumn("__id__", F.col(args.index_column)).cache()
-
-    DATA_SIZE: int = df.count()
     # endregion
 
-    if args.debug:
+    start_time: float = time.time()
 
-        log.debug("-" * 120)
-        log.debug(f"Using {B=}, {R=}")
-        log.debug(f"{args.input=}")
-        log.debug(f"{args.output=}")
-        log.debug(f"{args.threshold=}")
-        log.debug(f"{args.ngram_size=}")
-        log.debug(f"{args.min_length=}")
-        log.debug(f"{args.num_perm=}")
-        log.debug(f"{args.column=}")
-        log.debug(f"{args.repo_column=}")
-        log.debug(f"{args.index_column=}")
-        for col, dtype in df.dtypes:
-            log.debug(f"{col:<64}: {dtype}")
-        log.debug("-" * 120)
+    # region: Data Loading
+    df: DataFrame = (
+        spark.read.option("mergeSchema", "true")
+        .parquet(args.input)
+        .filter(F.col("license_type") == "permissive")  # hard-coded for The Stack
+        .withColumn("__id__", F.monotonically_increasing_id())
+        .cache()  # justification: this data will be needed when removing low quality duplicates
+    )
+    DATA_SIZE: int = df.count()
+    log.debug("-" * 120)
+    log.debug(f"Using {B=}, {R=}")
+    log.debug(f"Loaded documents: {DATA_SIZE}")
+    log.debug(f"{args.input=}")
+    log.debug(f"{args.output=}")
+    log.debug(f"{args.threshold=}")
+    log.debug(f"{args.ngram_size=}")
+    log.debug(f"{args.min_length=}")
+    log.debug(f"{args.num_perm=}")
+    log.debug(f"{args.column=}")
+    log.debug(f"{args.repo_column=}")
+    for col, dtype in df.dtypes:
+        log.debug(f"{col:<64}: {dtype}")
+    log.debug("-" * 120)
+
+    if DATA_SIZE == 0:
+        log.debug("No data found.")
+        exit(0)
+    # endregion
 
     # region: MinHash
-    records: pyspark.RDD = df.select("__id__", args.column).rdd.cache()
     buckets: pyspark.RDD = (
-        records.flatMap(
+        df.select("__id__", args.column)
+        .rdd.flatMap(
             lambda x: generate_hash_values(
                 content=x[1],  # args.column
                 idx=x[0],  # __id__
@@ -506,8 +393,8 @@ if __name__ == "__main__":  # pragma: no cover
         )  # (band_idx, band hash value, idx)
         .groupBy(lambda x: (x[0], x[1]))  # group by (band_idx, band hash value)
         .mapValues(lambda x: [ele[2] for ele in x])  # ((band_idx, hash value), [idx, ...])
-    ).cache()
-    records.unpersist()
+    ).cache()  # justification: this is needed for storing the index and clustering
+    log.debug(f"Buckets: {buckets.count()}")
     # endregion
 
     if args.output_index:
@@ -516,23 +403,36 @@ if __name__ == "__main__":  # pragma: no cover
         ).persist(pyspark.StorageLevel.DISK_ONLY)
 
     if args.output_index and args.index_only and index_df is not None:
+        buckets.unpersist()
         partitioned_save(index_df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
+        index_df.unpersist()
         log.debug(f"Output:                                 {args.output_index}")
         log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
         sys.exit(0)
 
     # region: Connected Components
+    # justification: this is needed for the alternating algorithm
     edges: pyspark.RDD = buckets.flatMap(lambda x: generate_edges(x[1])).distinct().cache()
+    log.debug(f"Initial edges: {edges.count()}")
     buckets.unpersist()
-    duplicate_edges, converged, iteration = alternating_algo(edges, max_iteration=20)
-    duplicate_edges.cache()
-    edges.unpersist()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        edges_df: DataFrame = spark.createDataFrame(edges, schema=["src", "dst"]).cache()
+        vertices_df: DataFrame = (
+            edges_df.select(F.col("src").alias("id")).union(edges_df.select(F.col("dst").alias("id"))).distinct()
+        ).cache()
+        assignment = GraphFrame(vertices_df, edges_df).connectedComponents().cache()
+        edges_df.unpersist()
+        vertices_df.unpersist()
     # endregion
 
-    if duplicate_edges.isEmpty():
+    if edges.isEmpty():
         if args.output_index and index_df is not None:
             partitioned_save(index_df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
+            index_df.unpersist()
         partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
+        df.unpersist()
 
         log.debug("-" * 120)
         log.debug("No duplicates found.")
@@ -544,19 +444,15 @@ if __name__ == "__main__":  # pragma: no cover
         sys.exit(0)
 
     # region: Merge Results
-    self_edges: pyspark.RDD = duplicate_edges.values().distinct().map(lambda x: (x, x)).cache()
+    # justification: this is needed for the merging
     df = df.join(
-        spark.createDataFrame(duplicate_edges.union(self_edges), schema=["__id__", "__component__"]),
+        assignment.select(F.col("id").alias("__id__"), F.col("component").alias("__component__")),
         on="__id__",
         how="left",
-    ).cache()
-    duplicate_edges.unpersist()
+    ).cache()  # justification: this is needed for final output
+    df.count()
+    assignment.unpersist()
     # endregion
-
-    if args.debug:
-        NUM_CLUSTER = self_edges.count()
-
-    self_edges.unpersist()
 
     # region: Quality Control: This section is hard-coded for The Stack
     #
@@ -622,24 +518,22 @@ if __name__ == "__main__":  # pragma: no cover
         ]
     )
 
-    duplicates: pyspark.RDD = (df.filter(F.col("__component__").isNotNull()).select(*rank_columns).rdd).cache()
-
-    if args.debug:
-        NUM_DUPLICATE = duplicates.count()
-    cliques: pyspark.RDD = duplicates.groupBy(lambda x: x[1]).cache()
-    duplicates.unpersist()
-
+    # justification: this is needed for the ranking
+    cliques: pyspark.RDD = (
+        (df.filter(F.col("__component__").isNotNull()).select(*rank_columns).rdd).groupBy(lambda x: x[1]).cache()
+    )
+    log.debug(f"Clusters: {cliques.count()}")
     # endregion
 
     if args.debug:
         cluster_id, _ = cliques.first()
         rows: List[Row] = df.filter(F.col("__component__") == cluster_id).head(5)
-        log.debug("-" * 120)
+        log.debug("=" * 120)
         for i, record in enumerate(rows):
             content = "\n".join(record.content.split("\n")[:10])
             log.debug(f"{i}-th example repo name: {getattr(record, args.repo_column)}")
             log.debug(f"{i}-th example code:\n{content[:200]}\n")
-            log.debug("-" * 120)
+            log.debug("=" * 120)
 
     # region: Remove Low Quality Duplicates
     df = df.join(
@@ -651,32 +545,32 @@ if __name__ == "__main__":  # pragma: no cover
         ),
         on="__id__",
         how="left",
-    )
+    ).cache()
+    df.count()
     cliques.unpersist()
-    df = df.filter(F.col("__component__").isNull() | F.col("__keep__")).cache()
+    df = df.filter(F.col("__component__").isNull() | F.col("__keep__"))
     if args.output_index and index_df is not None:
         kept_index = index_df.join(df.select("__id__"), on="__id__", how="inner").persist(
             pyspark.StorageLevel.DISK_ONLY
         )
     df = df.drop("__component__", "__keep__").cache()
+    FINAL_SIZE = df.count()
     # endregion
 
-    FINAL_SIZE = df.count()
     if args.output_index and kept_index is not None:
         partitioned_save(kept_index, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
+        kept_index.unpersist()
     partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
-
-    if args.debug:
-        log.debug(f"CC converged:                  {converged}")
-        log.debug(f"CC iterations:                 {iteration}")
-        log.debug(f"Number of rows before:         {DATA_SIZE}")  # type: ignore
-        log.debug(f"Number of duplicate rows:      {NUM_DUPLICATE}")  # type: ignore
-        log.debug(f"Number of duplicate clusters:  {NUM_CLUSTER}")  # type: ignore
-        log.debug(f"Number of rows after:          {FINAL_SIZE}")
-        log.debug(f"Percentage of rows kept:       {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")  # type: ignore
+    df.unpersist()
 
     log.debug("-" * 120)
-    log.debug(f"Output:        {args.output}")
-    log.debug(f"Index Output:  {args.output_index}")
-    log.debug(f"Time:          {time.time() - start_time:.2f}s")
+    log.debug(f"Number of rows before:    {DATA_SIZE}")
+    log.debug(f"Number of rows after:     {FINAL_SIZE}")
+    log.debug(f"Percentage of rows kept:  {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")
+    log.debug(f"Output:                   {args.output}")
+    log.debug(f"Index Output:             {args.output_index}")
+    log.debug(f"Time:                     {time.time() - start_time:.2f}s")
     log.debug("-" * 120)
+
+    if args.profile:
+        sc.dump_profiles(args.profile_dir)

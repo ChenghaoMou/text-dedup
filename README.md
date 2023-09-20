@@ -228,3 +228,26 @@ Because the google repo is licensed under Apache 2.0, I have to update from MIT.
 ## License
 
 [Apache 2.0](https://duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.apache.org%2Flicenses%2FLICENSE%2D2.0.html&rut=617d395c7a807de85e5707aca1f765e5b69a1627ed84c0aefa950e54e00a3094)
+
+## Citations
+
+Generally, you can cite this repository as:
+
+```bibtex
+
+```
+
+The spark version was born from [BigCode (Apache 2.0)](https://github.com/bigcode-project) and [BigScience (Apache 2.0)](https://github.com/bigscience-workshop), and you can cite the original paper if you want:
+
+```bibtex
+@article{
+kocetkov2023the,
+title={The Stack: 3 {TB} of permissively licensed source code},
+author={Denis Kocetkov and Raymond Li and Loubna Ben allal and Jia LI and Chenghao Mou and Yacine Jernite and Margaret Mitchell and Carlos Mu{\~n}oz Ferrandis and Sean Hughes and Thomas Wolf and Dzmitry Bahdanau and Leandro Von Werra and Harm de Vries},
+journal={Transactions on Machine Learning Research},
+issn={2835-8856},
+year={2023},
+url={https://openreview.net/forum?id=pxpbTdUEpD},
+note={}
+}
+```
