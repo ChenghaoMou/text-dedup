@@ -154,3 +154,7 @@ visualize.py
 requirements.txt
 output
 *.arrow
+**/*pstats
+**/_SUCCESS
+**/*parquet
+**/checkpoints

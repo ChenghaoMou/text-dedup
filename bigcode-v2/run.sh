@@ -8,13 +8,14 @@ PROJECT_ID="huggingface-science-codeparrot"
 REGION="us-central1"
 CONTAINER="gs://the_stack_v2"
 DIRECTORY="licensed_files"
+CHECKPOINT_DIR="hdfs:///tmp/checkpoints"
 NUM_WORKERS=8
 MASTER_MACHINE_TYPE="c2-standard-16"
 MASTER_BOOT_DISK_SIZE=1024
 WORKER_MACHINE_TYPE="c2-standard-60"
 WORKER_BOOT_DISK_SIZE=1024
 IMAGE_VERSION="2.0-debian10"
-SPARK_JARS="gs://spark-lib/bigquery/spark-3.3-bigquery-0.32.2.jar"
+SPARK_JARS="gs://spark-lib/bigquery/spark-3.2-bigquery-0.32.2.jar"
 THRESHOLD=0.7
 REPO_COLUMN="repo_url"
 
@@ -36,7 +37,8 @@ if ! gcloud dataproc clusters list --region $REGION | grep -q $CLUSTER_NAME; the
         --worker-machine-type $WORKER_MACHINE_TYPE \
         --worker-boot-disk-size $WORKER_BOOT_DISK_SIZE \
         --image-version $IMAGE_VERSION \
-        --project $PROJECT_ID
+        --project $PROJECT_ID \
+        --properties=^#^dataproc:conda.packages='scipy==1.10.1'#dataproc:pip.packages='xxhash==3.3.0'
 fi
 
 # Start cluster if it's not running
@@ -78,10 +80,11 @@ for DIR in $DIRS; do
         --region $REGION \
         --jars $SPARK_JARS \
         --driver-log-levels root=FATAL,__main__=DEBUG \
-        --properties="spark.executor.memory=200g,spark.driver.memory=8g,spark.executor.cores=58" \
+        --properties="spark.executor.memory=200g,spark.driver.memory=8g,spark.executor.cores=58,spark.jars.packages=graphframes:graphframes:0.8.2-spark3.2-s_2.12" \
         intra_dedup.py -- \
         --input "$INPUT_GCS_PATH" \
         --output "$OUTPUT_GCS_PATH" \
+        --checkpoint_dir "$CHECKPOINT_DIR" \
         --threshold $THRESHOLD \
         --repo_column $REPO_COLUMN \
         --rank

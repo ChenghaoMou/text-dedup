@@ -18,7 +18,8 @@ REPO_COLUMN="repo_url"
     intra_dedup.py \
     --input "/Users/chenghao/Downloads/temp/input" \
     --output "/Users/chenghao/Downloads/temp/output" \
-    --output_index "/Users/chenghao/Downloads/temp/output_index" \
+    --checkpoint_dir "./checkpoints" \
     --threshold $THRESHOLD \
     --repo_column $REPO_COLUMN \
     --rank
+    # --output_index "/Users/chenghao/Downloads/temp/output_index"

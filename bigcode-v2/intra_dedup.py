@@ -12,6 +12,7 @@ import warnings
 from logging import Logger
 from typing import Any
 from typing import List
+from typing import Optional
 from typing import Set
 from typing import Tuple
 
@@ -329,8 +330,8 @@ if __name__ == "__main__":  # pragma: no cover
     # endregion
 
     # region: Global Variables
-    index_df: DataFrame | None = None
-    kept_index: DataFrame | None = None
+    index_df: Optional[DataFrame] = None
+    kept_index: Optional[DataFrame] = None
     FINAL_SIZE: int = 0
     MAX_WRITE_CHUNK_SIZE: int = 200_000
     MAX_WRITE_PARTITIONS: int = 2048
