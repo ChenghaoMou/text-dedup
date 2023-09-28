@@ -270,7 +270,7 @@ if __name__ == "__main__":  # pragma: no cover
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
                 num_proc=os.cpu_count(),
-                new_fingerprint=str(random.getrandbits(128)),
+                ## new_fingerprint=str(random.getrandbits(128)),
                 desc="Finding clusters...",
             )
             gc.enable()
