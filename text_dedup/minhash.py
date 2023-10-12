@@ -201,7 +201,7 @@ if __name__ == "__main__":  # pragma: no cover
                     split=args.split,
                     revision=args.revision,
                     cache_dir=args.cache_dir,
-                    num_proc=os.cpu_count(),
+                    num_proc=args.num_proc,
                     token=args.use_auth_token,
                 )
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":  # pragma: no cover
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_proc,
                 with_indices=True,
                 desc="Fingerprinting...",
             )
@@ -269,7 +269,7 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.map(
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_proc,
                 new_fingerprint=str(random.getrandbits(128)),
                 desc="Finding clusters...",
             )
@@ -281,7 +281,7 @@ if __name__ == "__main__":  # pragma: no cover
             final_data = ds.filter(
                 function=lambda record, idx: record["__cluster__"] == idx,
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_proc,
                 desc="Filtering clusters...",
             )
 

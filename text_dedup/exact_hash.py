@@ -31,7 +31,7 @@ if __name__ == "__main__":  # pragma: no cover
     parser = add_exact_hash_args(parser)
     args = parser.parse_args()
 
-    NUM_PROC = os.cpu_count()
+    NUM_PROC = args.num_proc
     timer = Timer()
 
     with timer("Total"):

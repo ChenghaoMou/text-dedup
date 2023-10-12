@@ -3,6 +3,7 @@
 # @Date    : 2022-11-05 09:16:34
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
+import os
 
 
 def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # pragma: no cover
@@ -36,6 +37,11 @@ def add_io_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
     )
     parser.add_argument(
         "--clean_cache", action=argparse.BooleanOptionalAction, help="Whether to remove all cache files", default=True
+    )
+    parser.add_argument(
+        "--num_proc", type=int,
+        help="Number of processes. Defaults to the system CPU count from os.cpu_count()",
+        default=os.cpu_count()
     )
     return parser
 
