@@ -46,7 +46,7 @@ if __name__ == "__main__":  # pragma: no cover
                 revision=args.revision,
                 cache_dir=args.cache_dir,
                 token=args.use_auth_token,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_proc,
             )
 
         hash_func: Callable = {
@@ -78,7 +78,7 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.filter(
                 lambda _, idx: not flags[idx],
                 with_indices=True,
-                num_proc=os.cpu_count(),
+                num_proc=args.num_proc,
                 desc="Filtering...",
             )
 
