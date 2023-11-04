@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2022-11-05 11:03:18
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
@@ -15,9 +14,6 @@ from collections import defaultdict
 from itertools import permutations
 from typing import Any
 from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 import datasets
 import numpy as np
@@ -67,7 +63,7 @@ def _hamming_distance(a: bitarray, b: bitarray) -> int:
 
 
 class Permutation:
-    def __init__(self, f: int, k: int, b: int, masks: List[Tuple[bitarray, int, int, int]]) -> None:
+    def __init__(self, f: int, k: int, b: int, masks: list[tuple[bitarray, int, int, int]]) -> None:
         """
         A permutation object for bit manipulation.
 
@@ -89,10 +85,10 @@ class Permutation:
         self.b = b
 
         width: int = 0
-        self.widths: List[int] = []  # block widths
-        self.offsets: List[int] = []  # block offsets
-        self.reverse_masks: List[int] = []  # block reverse masks
-        self.masks: List[bitarray] = []  # block masks
+        self.widths: list[int] = []  # block widths
+        self.offsets: list[int] = []  # block offsets
+        self.reverse_masks: list[int] = []  # block reverse masks
+        self.masks: list[bitarray] = []  # block masks
         for mask, mask_size, start, _ in masks:
             self.widths.append(mask_size)
             offset = start - width
@@ -163,7 +159,7 @@ class Permutation:
         return result
 
 
-def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
+def _create_permutations(f: int, k: int, b: int) -> list[Permutation]:
     """
     Create permutations for f bits and b blocks with k-bit difference allowed.
 
@@ -192,7 +188,7 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
     ...     assert perm.reverse(perm.permute(data)) == data, f"{perm.reverse(perm.permute(data))} != {data}"
     """
     block_size: int = math.ceil(f / b)
-    masks: List[Tuple[bitarray, int, int, int]] = []
+    masks: list[tuple[bitarray, int, int, int]] = []
 
     for i in range(b):
         start, end = i * block_size, min((i + 1) * block_size, f)
@@ -208,7 +204,7 @@ def _create_permutations(f: int, k: int, b: int) -> List[Permutation]:
             )
         )
 
-    results: List[Permutation] = []
+    results: list[Permutation] = []
     # b - k many blocks must be the same
     indices = set(range(len(masks)))
     for leading_idx in permutations(range(len(masks)), b - k):
@@ -249,7 +245,7 @@ def _unsigned_hash(obj: bytes, hash_func: Callable) -> bitarray:
     return result
 
 
-def compute(hashes: List[bitarray]) -> bitarray:
+def compute(hashes: list[bitarray]) -> bitarray:
     """
     Compute the Simhash of a list of hashes.
 
@@ -285,9 +281,9 @@ def embed_func(
     idx: int,
     *,
     ngram: int,
-    permutations: List[Permutation],
+    permutations: list[Permutation],
     hash_func: Callable,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate the simhash signature of a text.
 
@@ -317,7 +313,7 @@ def embed_func(
     """
     tokens = {bytes("".join(ng).lower(), "utf-8") for ng in ngrams(list(content), n=ngram)}
     sig = compute([_unsigned_hash(t, hash_func) for t in tokens])
-    keys: List[Tuple[bytes, bytes]] = []
+    keys: list[tuple[bytes, bytes]] = []
     if permutations:
         for permutation in permutations:
             keys.append(
@@ -346,7 +342,7 @@ if __name__ == "__main__":
 
     timer = Timer()
     PERMUTATIONS = _create_permutations(args.f, k=args.bit_diff, b=args.num_bucket)
-    BUCKETS: Dict[Any, List] = defaultdict(list)
+    BUCKETS: dict[Any, list] = defaultdict(list)
 
     # current code only supports 64 or 128 bit simhash sizes
     hash_func = {64: xxh3_64_digest, 128: xxh3_128_digest}.get(args.f, xxh3_64_digest)

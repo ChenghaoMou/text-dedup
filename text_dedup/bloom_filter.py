@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2022-11-05 09:44:48
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import argparse
-import os
 from typing import Callable
 
 import datasets

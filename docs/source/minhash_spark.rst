@@ -36,4 +36,3 @@ Quick Start
    :members:
    :undoc-members:
    :noindex:
-

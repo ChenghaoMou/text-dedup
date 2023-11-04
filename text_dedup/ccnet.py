@@ -1,12 +1,10 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date         : 2023-05-06 19:34:35
 # @Author       : Chenghao Mou (mouchenghao@gmail.com)
 # @Description  : Line-level deduplication based on Exact Hashing
 # @Reference    : https://github.com/facebookresearch/cc_net/blob/main/cc_net/dedup.py
 
 import argparse
-import os
 from typing import Any
 from typing import Callable
 from typing import Dict

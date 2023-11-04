@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2022-11-05 11:48:38
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
 import argparse
-import os
 import random
 import shutil
 import subprocess
@@ -14,10 +12,8 @@ from pathlib import Path
 from pathlib import PosixPath
 from typing import Deque
 from typing import Generator
-from typing import List
 from typing import Literal
 from typing import Sequence
-from typing import Tuple
 
 import datasets
 from datasets import Dataset
@@ -34,9 +30,9 @@ datasets.logging.set_verbosity_error()
 
 
 def merge_intervals(
-    intervals: List[slice],
+    intervals: list[slice],
     merge_strategy: Literal["longest", "overlapping"] = "longest",
-) -> List[slice]:
+) -> list[slice]:
     """
     Merge overlapping intervals.
 
@@ -86,7 +82,7 @@ def merge_intervals(
         )
     )
 
-    merged: List[slice] = []
+    merged: list[slice] = []
 
     while q:
         current = q.popleft()
@@ -191,7 +187,7 @@ def restore_and_merge(
     segments: str | Path | Sequence[slice],
     k: int,
     merge_strategy: Literal["longest", "overlapping"] = "longest",
-) -> Tuple[List[List[slice]], int]:
+) -> tuple[list[list[slice]], int]:
     """
     Restore the duplicate slices from seg_file to their original document boundaries and merge them.
 
@@ -225,7 +221,7 @@ def restore_and_merge(
     ([[slice(0, 10, None)], [slice(2, 9, None)]], 17)
     """
     duplicate_size = 0
-    results: List[List[slice]] = [[] for _ in boundaries]
+    results: list[list[slice]] = [[] for _ in boundaries]
     for idx, s in restore(boundaries, segments):
         if s.stop - s.start >= k:
             results[int(idx)].append(s)
@@ -246,7 +242,7 @@ def __run_command(cmd: str, cwd: str):
         raise RuntimeError(f"Command {cmd} failed with code {code}. CWD: {cwd}")
 
 
-def clean_up(text: str, slices: List[slice]) -> str:
+def clean_up(text: str, slices: list[slice]) -> str:
     """
     Remove duplicate substrings from the text.
 
@@ -314,7 +310,7 @@ if __name__ == "__main__":
             )
 
         with timer("Preprocessing"):
-            offsets: List[slice] = []
+            offsets: list[slice] = []
             start = 0
             with open(Path(args.google_repo_path) / temp_text, "wb") as f:
                 for doc in ds:

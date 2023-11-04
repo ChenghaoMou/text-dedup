@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2023-05-06 19:39:27
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 

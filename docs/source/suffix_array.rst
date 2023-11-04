@@ -4,7 +4,7 @@ Suffix Array Substring
 .. warning::
     Currently, there is an issue with merge command from the `original repo <https://github.com/google-research/deduplicate-text-datasets/issues/19>`_, which might cause the processing to be single-threaded. You can apply `this fix <https://github.com/google-research/deduplicate-text-datasets/pull/22>`_ to the original repo to fix the issue.
 
-This is a wrapper around `deduplicate-text-datasets <https://github.com/google-research/deduplicate-text-datasets>`_ to deduplicate text datasets using suffix array substring matching. Based on the recommendation from the original research, duplicated substrings will be removed from the dataset. 
+This is a wrapper around `deduplicate-text-datasets <https://github.com/google-research/deduplicate-text-datasets>`_ to deduplicate text datasets using suffix array substring matching. Based on the recommendation from the original research, duplicated substrings will be removed from the dataset.
 
     *"In our paper we suggest just taking all of these duplicate sequences that have been identified and completely striking them from the dataset. This somewhat breaks the flow of text, for example if previously had an example "Alice wanted to go to the store" and we deduplicated at the level of 10 characters, we might completely strike " to go to the " and be left with "Alice wantedstore". In practice we have found this doesn't break the language model because we remove relatively little text, and so these breaks don't cause harm."*
 

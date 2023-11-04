@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # author      : Chenghao Mou (mouchenghao@gmail.com)
 # created     : 10/4/22
 from __future__ import annotations
@@ -14,10 +13,6 @@ import re
 from collections import defaultdict
 from typing import Any
 from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Set
-from typing import Tuple
 
 import datasets
 import numpy as np
@@ -50,13 +45,13 @@ def embed_func(
     num_perm: int,
     ngram_size: int,
     min_length: int,
-    hashranges: List[Tuple[int, int]],
+    hashranges: list[tuple[int, int]],
     permutations: np.ndarray,
     hash_func: Callable,
     dtype: type,
     max_hash: np.uint,
     modulo_prime: np.uint,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate hash values for the content.
 
@@ -106,7 +101,7 @@ def embed_func(
     a, b = permutations
     # split content on whitespace (NON_ALPHA regex), tokenize with ngrams(), and join these n-grams into a single space separated string.
     # we then convert to lower case and then bytestrings which is then hashed. Only unique hashed n-grams are left.
-    tokens: Set[bytes] = {
+    tokens: set[bytes] = {
         bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
     }
 
@@ -122,7 +117,7 @@ def embed_func(
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
     # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
-    Hs: List[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    Hs: list[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
     return {"__signatures__": Hs, "__id__": idx}
 
 
@@ -143,7 +138,7 @@ if __name__ == "__main__":  # pragma: no cover
     # it uses 64 bit types but almost entirely 32bit data, except for one mersenne prime 2^61
     # why legacy implementations used mersenne primes for modulo:
     # https://en.wikipedia.org/wiki/Universal_hashing#Hashing_strings
-    HASH_CONFIG: Dict[int, Tuple[type, Any, Any]] = {
+    HASH_CONFIG: dict[int, tuple[type, Any, Any]] = {
         64: (np.uint64, np.uint32((1 << 32) - 1), np.uint64((1 << 61) - 1)),
         # 32, 16 bit config does not use a mersenne prime.
         # The original reason for using mersenne prime was speed.
@@ -186,7 +181,7 @@ if __name__ == "__main__":  # pragma: no cover
         B, R = optimal_param(args.threshold, args.num_perm, false_positive_weight=0.5, false_negative_weight=0.5)
 
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
-    HASH_TABLES: List[Dict[int, Set]] = [defaultdict(set) for _ in range(B)]
+    HASH_TABLES: list[dict[int, set]] = [defaultdict(set) for _ in range(B)]
 
     with timer("Total"):
         with timer("Loading"):
@@ -212,7 +207,7 @@ if __name__ == "__main__":  # pragma: no cover
         # There we start with a know good hash x (=hash_func) and permutate it as the following:
         # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
         # the following produces these a, b pairs
-        PERMUTATIONS: Tuple[np.ndarray, np.ndarray] = (
+        PERMUTATIONS: tuple[np.ndarray, np.ndarray] = (
             RNG.randint(1, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # a is a multiplier so should not be 0
             RNG.randint(0, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # b
         )

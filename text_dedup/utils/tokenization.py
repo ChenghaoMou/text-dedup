@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2022-12-26 15:59:42
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from itertools import tee
 from typing import List
-from typing import Text
 
 
-def ngrams(sequence: List[Text], n: int, min_length: int = 5):
+def ngrams(sequence: List[str], n: int, min_length: int = 5):
     """
     Return the ngrams generated from a sequence of items, as an iterator.
 

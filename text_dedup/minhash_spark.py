@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Date    : 2023-08-12 22:18:30
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 
@@ -15,7 +14,6 @@ from logging import Logger
 from operator import add
 from typing import Any
 from typing import List
-from typing import Text
 from typing import Tuple
 
 import numpy as np
@@ -75,8 +73,8 @@ def small_star(edges):
         node, neighbors = x
         nodes = neighbors + [node]
         min_node = min(nodes)
-        new_edges = set((neighbor, min_node) for neighbor in nodes if (neighbor <= node and neighbor != min_node))
-        change = len(new_edges.difference(set([(node, neighbor) for neighbor in neighbors])))
+        new_edges = {(neighbor, min_node) for neighbor in nodes if (neighbor <= node and neighbor != min_node)}
+        change = len(new_edges.difference({(node, neighbor) for neighbor in neighbors}))
         return (list(new_edges), change)
 
     neighbors = edges.map(small_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
@@ -98,8 +96,8 @@ def large_star(edges):
         node, neighbors = x
         nodes = neighbors + [node]
         min_node = min(nodes)
-        new_edges = set((neighbor, min_node) for neighbor in (neighbors + [node]) if (neighbor > node))
-        change = len(new_edges.difference(set([(node, neighbor) for neighbor in neighbors])))
+        new_edges = {(neighbor, min_node) for neighbor in (neighbors + [node]) if (neighbor > node)}
+        change = len(new_edges.difference({(node, neighbor) for neighbor in neighbors}))
         return list(new_edges), change
 
     neighbors = edges.flatMap(large_star_map).groupByKey().map(lambda x: (x[0], list(set(x[1]))))
@@ -111,13 +109,11 @@ def large_star(edges):
 
 
 def alternating_algo(edges, max_iteration: int) -> Tuple[Any, bool, int]:
-
     prev_lchanges: int = sys.maxsize
     prev_schanges: int = sys.maxsize
     curr_iteration: int = 0
 
     while max_iteration:
-
         edges, curr_lchanges = large_star(edges)
         edges, curr_schanges = small_star(edges)
 
@@ -136,8 +132,9 @@ def alternating_algo(edges, max_iteration: int) -> Tuple[Any, bool, int]:
 
 # endregion
 
+
 # region: Hashing
-def ngrams(sequence: List[Text], n: int, min_length: int = 5):
+def ngrams(sequence: List[str], n: int, min_length: int = 5):
     """
     Return the ngrams generated from a sequence of items, as an iterator.
 
@@ -264,6 +261,7 @@ def generate_hash_values(
 
 # endregion
 
+
 # region: MinHashLSH
 def optimal_param(
     threshold: float,
@@ -332,6 +330,7 @@ def optimal_param(
 
 # endregion
 
+
 # region: Quality Control
 def process_cluster(cluster: List[Any]) -> List[Any]:
     return cluster[:1]
@@ -343,7 +342,6 @@ def process_cluster(cluster: List[Any]) -> List[Any]:
 
 
 def partitioned_save(df, batch_size, max_batch, output):
-
     total_rows = df.count()
     partitions = max(1, min(math.ceil(total_rows / batch_size), max_batch))
 
@@ -359,7 +357,6 @@ def partitioned_save(df, batch_size, max_batch, output):
 
 
 if __name__ == "__main__":  # pragma: no cover
-
     parser = argparse.ArgumentParser(description="Intra-dataset near-deduplicating with PySpark")
     parser.add_argument("--input", "-i", type=str, required=True, help="GCS input directory of parquet files")
     parser.add_argument("--threshold", type=float, default=0.7, help="Similarity threshold")
@@ -410,7 +407,6 @@ if __name__ == "__main__":  # pragma: no cover
     # endregion
 
     if args.debug:
-
         log.debug("-" * 120)
         log.debug(f"Using {B=}, {R=}")
         log.debug(f"{args.input=}")
@@ -447,7 +443,8 @@ if __name__ == "__main__":  # pragma: no cover
 
     if args.output_index:
         index_df = spark.createDataFrame(
-            buckets.flatMapValues(lambda x: x), schema=["__key__", "__id__"]  # ((band_idx, hash value), idx)
+            buckets.flatMapValues(lambda x: x),
+            schema=["__key__", "__id__"],  # ((band_idx, hash value), idx)
         ).persist(pyspark.StorageLevel.DISK_ONLY)
 
     if args.output_index and args.index_only and index_df is not None:
