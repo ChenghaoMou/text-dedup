@@ -10,9 +10,7 @@ import sys
 import time
 import warnings
 from logging import Logger
-from typing import Any
 from typing import List
-from typing import Optional
 from typing import Set
 from typing import Tuple
 
@@ -25,7 +23,6 @@ with warnings.catch_warnings():
     from graphframes import GraphFrame  # type: ignore
     from pyspark import SparkConf
     from pyspark.sql import DataFrame
-    from pyspark.sql import Row
     from pyspark.sql import SparkSession
     from pyspark.sql import functions as F
     from scipy.integrate import quad as integrate
@@ -231,29 +228,6 @@ def optimal_param(
 # endregion
 
 
-# region: Quality Control
-def process_cluster(cluster: List[Any], enabled: bool = False) -> List[Any]:
-    if not enabled:
-        return cluster[:1]
-
-    cluster.sort(
-        key=lambda x: (
-            # license_type, the more permissive the better
-            ["permissive", "no_license", "non_permissive"].index(x[-1]) if x[-1] is not None else float("inf"),
-            # star_events_count, the more the better
-            -x[-2] if x[-2] is not None else 0.0,
-            # fork_events_count, the more the better
-            -x[-3] if x[-3] is not None else 0.0,
-            # visit_date, the earliest the better, tie breaker
-            np.datetime64(x[-4]).astype(np.uint64) if x[-4] is not None else float("inf"),
-        )
-    )
-    return cluster[:1]
-
-
-# endregion
-
-
 # region: IO
 def partitioned_save(df: DataFrame, chunk_size: int, max_partitions: int, output: str):
     """
@@ -304,8 +278,6 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument("--column", "-c", type=str, default="content", help="Column to deduplicate on")
     parser.add_argument("--repo_column", type=str, required=True, help="Code repo column")
     parser.add_argument("--output", "-o", type=str, required=True, help="GCS output directory of parquet files")
-    parser.add_argument("--output_index", "-oi", type=str, help="GCS output directory of index parquet files")
-    parser.add_argument("--index_only", action="store_true", help="Only output the index, skip deduplication")
     parser.add_argument("--rank", action="store_true", help="Rank the duplicates by quality indicators")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--profile", action="store_true", help="Enable profiling")
@@ -321,6 +293,9 @@ if __name__ == "__main__":  # pragma: no cover
         .set("spark.sql.execution.arrow.pyspark.enabled", "true")
         .set("spark.storage.memoryFraction", "1")
         .set("spark.default.parallelism", "100")
+        .set("spark.sql.autoBroadcastJoinThreshold", "20485760")
+        .set("spark.sql.broadcastTimeout", "3600")
+        .set("spark.sql.shuffle.partitions", "8192")
         .set("spark.python.profile", "true" if args.profile else "false")
     )
     spark = SparkSession.Builder().config(conf=conf).getOrCreate()
@@ -330,8 +305,6 @@ if __name__ == "__main__":  # pragma: no cover
     # endregion
 
     # region: Global Variables
-    index_df: Optional[DataFrame] = None
-    kept_index: Optional[DataFrame] = None
     FINAL_SIZE: int = 0
     MAX_WRITE_CHUNK_SIZE: int = 200_000
     MAX_WRITE_PARTITIONS: int = 2048
@@ -350,13 +323,14 @@ if __name__ == "__main__":  # pragma: no cover
     start_time: float = time.time()
 
     # region: Data Loading
+    # persist justification: this data will be needed when removing duplicates
     df: DataFrame = (
         spark.read.option("mergeSchema", "true")
         .parquet(args.input)
-        .filter(F.col("license_type") == "permissive")  # hard-coded for The Stack
         .withColumn("__id__", F.monotonically_increasing_id())
-        .cache()  # justification: this data will be needed when removing low quality duplicates
+        .persist(pyspark.StorageLevel.DISK_ONLY)
     )
+    # persist trigger
     DATA_SIZE: int = df.count()
     log.debug("-" * 120)
     log.debug(f"Using {B=}, {R=}")
@@ -379,7 +353,7 @@ if __name__ == "__main__":  # pragma: no cover
     # endregion
 
     # region: MinHash
-    buckets: pyspark.RDD = (
+    edges: pyspark.RDD = (
         df.select("__id__", args.column)
         .rdd.flatMap(
             lambda x: generate_hash_values(
@@ -392,70 +366,67 @@ if __name__ == "__main__":  # pragma: no cover
                 permutations=PERMUTATIONS,
             )
         )  # (band_idx, band hash value, idx)
-        .groupBy(lambda x: (x[0], x[1]))  # group by (band_idx, band hash value)
-        .mapValues(lambda x: [ele[2] for ele in x])  # ((band_idx, hash value), [idx, ...])
-    ).cache()  # justification: this is needed for storing the index and clustering
-    log.debug(f"Buckets: {buckets.count()}")
+        .groupBy(lambda x: (x[0], x[1]))  # group by (band_idx, band hash value), potential bottleneck
+        .flatMap(lambda x: generate_edges([ele[2] for ele in x[1]]))
+        .distinct()
+    ).persist(pyspark.StorageLevel.DISK_ONLY)
+    log.debug(f"Initial edges: {edges.count()}")
+
     # endregion
-
-    if args.output_index:
-        index_df = spark.createDataFrame(
-            buckets.flatMapValues(lambda x: x), schema=["__key__", "__id__"]  # ((band_idx, hash value), idx)
-        ).persist(pyspark.StorageLevel.DISK_ONLY)
-
-    if args.output_index and args.index_only and index_df is not None:
-        buckets.unpersist()
-        partitioned_save(index_df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
-        index_df.unpersist()
-        log.debug(f"Output:                                 {args.output_index}")
-        log.debug(f"Time:                                   {time.time() - start_time:.2f}s")
-        sys.exit(0)
 
     # region: Connected Components
-    # justification: this is needed for the alternating algorithm
-    edges: pyspark.RDD = buckets.flatMap(lambda x: generate_edges(x[1])).distinct().cache()
-    log.debug(f"Initial edges: {edges.count()}")
-    buckets.unpersist()
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        edges_df: DataFrame = spark.createDataFrame(edges, schema=["src", "dst"]).cache()
-        vertices_df: DataFrame = (
-            edges_df.select(F.col("src").alias("id")).union(edges_df.select(F.col("dst").alias("id"))).distinct()
-        ).cache()
-        assignment = GraphFrame(vertices_df, edges_df).connectedComponents().cache()
-        edges_df.unpersist()
-        vertices_df.unpersist()
-    # endregion
 
     if edges.isEmpty():
-        if args.output_index and index_df is not None:
-            partitioned_save(index_df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
-            index_df.unpersist()
         partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
         df.unpersist()
+        edges.unpersist()
 
         log.debug("-" * 120)
         log.debug("No duplicates found.")
         log.debug(f"Data Output:    {args.output}")
-        log.debug(f"Index Output:   {args.output_index}")
         log.debug(f"Time:           {time.time() - start_time:.2f}s")
         log.debug("-" * 120)
 
         sys.exit(0)
 
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        edges_df: DataFrame = (
+            spark.createDataFrame(edges, schema=["src", "dst"])
+            .repartition(4096)
+            .persist(pyspark.StorageLevel.DISK_ONLY)
+        )
+        log.debug(f"Edges DataFrame: {edges_df.count()}")
+        vertices_df: DataFrame = (
+            edges_df.select(F.col("src").alias("id"))
+            .union(edges_df.select(F.col("dst").alias("id")))
+            .distinct()
+            .repartition(4096)
+            .persist(pyspark.StorageLevel.DISK_ONLY)
+        )
+        log.debug(f"Vertices DataFrame: {vertices_df.count()}")
+        assignment: DataFrame = (
+            GraphFrame(vertices_df, edges_df).connectedComponents().persist(pyspark.StorageLevel.DISK_ONLY)
+        )
+        log.debug(f"Assignment DataFrame: {assignment.count()}")
+        edges_df.unpersist()
+        vertices_df.unpersist()
+    # endregion
+
     # region: Merge Results
-    # justification: this is needed for the merging
+    # justification: this is needed for final output
     df = df.join(
         assignment.select(F.col("id").alias("__id__"), F.col("component").alias("__component__")),
         on="__id__",
         how="left",
-    ).cache()  # justification: this is needed for final output
-    df.count()
+    ).persist(pyspark.StorageLevel.DISK_ONLY)
     assignment.unpersist()
+    log.debug(f"Merging records: {df.count()}")
     # endregion
 
-    # region: Quality Control: This section is hard-coded for The Stack
+    # region: Quality Control and Data Removal
+    #
+    # This section is hard-coded for The Stack
     #
     # A repo's quality is measured by, in order of importance:
     #  1. The number of stars (higher is better)
@@ -501,75 +472,80 @@ if __name__ == "__main__":  # pragma: no cover
     # detected_licenses                object
     # license_type                     object
 
-    rank_columns = (
-        [
-            "__id__",
+    if args.rank:
+        rank_columns = [
             "__component__",
+            "__id__",
             args.repo_column,
+            "revision_date",
             "visit_date",
             "fork_events_count",
             "star_events_count",
             "license_type",
         ]
-        if args.rank
-        else [
-            "__id__",
-            "__component__",
-            args.repo_column,
-        ]
-    )
-
-    # justification: this is needed for the ranking
-    cliques: pyspark.RDD = (
-        (df.filter(F.col("__component__").isNotNull()).select(*rank_columns).rdd).groupBy(lambda x: x[1]).cache()
-    )
-    log.debug(f"Clusters: {cliques.count()}")
-    # endregion
-
-    if args.debug:
-        cluster_id, _ = cliques.first()
-        rows: List[Row] = df.filter(F.col("__component__") == cluster_id).head(5)
-        log.debug("=" * 120)
-        for i, record in enumerate(rows):
-            content = "\n".join(record.content.split("\n")[:10])
-            log.debug(f"{i}-th example repo name: {getattr(record, args.repo_column)}")
-            log.debug(f"{i}-th example code:\n{content[:200]}\n")
-            log.debug("=" * 120)
-
-    # region: Remove Low Quality Duplicates
-    df = df.join(
-        spark.createDataFrame(
-            cliques.mapValues(lambda x: process_cluster(cluster=list(x), enabled=args.rank)).flatMap(
-                lambda x: [(ele[0], True) for ele in x[1]]
-            ),
-            schema=["__id__", "__keep__"],
-        ),
-        on="__id__",
-        how="left",
-    ).cache()
-    df.count()
-    cliques.unpersist()
-    df = df.filter(F.col("__component__").isNull() | F.col("__keep__"))
-    if args.output_index and index_df is not None:
-        kept_index = index_df.join(df.select("__id__"), on="__id__", how="inner").persist(
-            pyspark.StorageLevel.DISK_ONLY
+        # justification: this is needed for the ranking
+        duplicates: pyspark.RDD = (
+            df.filter(F.col("__component__").isNotNull())
+            .select(*rank_columns)
+            .rdd.map(lambda x: (x[0], x))
+            .persist(pyspark.StorageLevel.DISK_ONLY)
         )
-    df = df.drop("__component__", "__keep__").cache()
-    FINAL_SIZE = df.count()
+
+        def compare_records(a, b):
+            return sorted(
+                [a, b],
+                key=lambda x: (
+                    # license_type, the more permissive the better
+                    ["permissive", "no_license", "non_permissive"].index(x[-1]) if x[-1] is not None else float("inf"),
+                    # star_events_count, the more the better
+                    -x[-2] if x[-2] is not None else 0.0,
+                    # fork_events_count, the more the better
+                    -x[-3] if x[-3] is not None else 0.0,
+                    # revision_date, the latest the better
+                    -np.datetime64(x[-5]).astype(np.uint64).item() if x[-5] is not None else float("inf"),
+                    # visit_date, the latest the better
+                    -np.datetime64(x[-4]).astype(np.uint64).item() if x[-4] is not None else float("inf"),
+                ),
+            )[0]
+
+        log.debug(f"Ranking duplicates: {duplicates.count()}")
+        flags: pyspark.RDD = (
+            duplicates.reduceByKey(lambda x, y: compare_records(x, y))
+            .map(lambda x: (x[1][1], True))
+            .persist(pyspark.StorageLevel.DISK_ONLY)
+        )
+        log.debug(f"Keeping duplicates: {flags.count()}")
+        duplicates.unpersist()
+
+        df = (
+            df.join(spark.createDataFrame(flags, schema=["__id__", "__keep__"]), on="__id__", how="left")
+            .filter(F.col("__component__").isNull() | F.col("__keep__"))
+            .drop("__keep__", "__component__")
+            .persist(pyspark.StorageLevel.DISK_ONLY)
+        )
+        FINAL_SIZE = df.count()
+        flags.unpersist()
+    else:
+        df = (
+            df.filter(F.col("__component__").isNull() | (F.col("__component__") == F.col("__id__")))
+            .drop("__component__")
+            .persist(pyspark.StorageLevel.DISK_ONLY)
+        )
+        FINAL_SIZE = df.count()
+
     # endregion
 
-    if args.output_index and kept_index is not None:
-        partitioned_save(kept_index, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output_index)
-        kept_index.unpersist()
+    # region: Output
     partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
     df.unpersist()
+
+    # endregion
 
     log.debug("-" * 120)
     log.debug(f"Number of rows before:    {DATA_SIZE}")
     log.debug(f"Number of rows after:     {FINAL_SIZE}")
     log.debug(f"Percentage of rows kept:  {FINAL_SIZE / max(0, DATA_SIZE) * 100:.2f}%")
     log.debug(f"Output:                   {args.output}")
-    log.debug(f"Index Output:             {args.output_index}")
     log.debug(f"Time:                     {time.time() - start_time:.2f}s")
     log.debug("-" * 120)
 
