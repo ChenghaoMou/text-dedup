@@ -17,7 +17,7 @@ from typing import Sequence
 
 import datasets
 from datasets import Dataset
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 
 from text_dedup import logger
 from text_dedup.utils import add_io_args
