@@ -194,6 +194,7 @@ def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
         overlapping: Merge all overlapping duplicate substrings
         longest: Only keep the longest duplicate substring
     - google_repo_path: Path to google-research-deduplication codebase, required
+    - use_ulimit: Whether to use `ulimit -Sn 1000000`
 
     Parameters
     ----------
@@ -219,6 +220,12 @@ def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
         default="overlapping",
         help="Strategy when there are overlapping duplicate substrings",
         choices=["overlapping", "longest"],
+    )
+    parser.add_argument(
+        "--use_ulimit",
+        type=bool,
+        default=False,
+        help="Whether to use `ulimit -Sn 1000000`"
     )
     (
         parser.add_argument(
