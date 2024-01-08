@@ -325,9 +325,9 @@ if __name__ == "__main__":
 
         with timer("SuffixArray"):
             __run_command(
-                f"python scripts/make_suffix_array.py {temp_text}",
-                args.google_repo_path,
-                " ulimit -Sn 1000000" if args.use_ulimit else ""
+                f"python scripts/make_suffix_array.py {temp_text}"
+                " ulimit -Sn 1000000" if args.use_ulimit else "",
+                args.google_repo_path
             )
 
         with timer("SelfSimilar"):
