@@ -195,6 +195,7 @@ def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
         longest: Only keep the longest duplicate substring
     - google_repo_path: Path to google-research-deduplication codebase, required
     - use_ulimit: Whether to use `ulimit -Sn 1000000`
+    - use_tokenizer: Whether to use GPT2 tokenizer
 
     Parameters
     ----------
@@ -226,6 +227,12 @@ def add_sa_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:  # 
         type=bool,
         default=False,
         help="Whether to use `ulimit -Sn 1000000`"
+    )
+    parser.add_argument(
+        "--use_tokenizer",
+        type=bool,
+        default=False,
+        help="Whether to use GPT2 Tokenizer"
     )
     (
         parser.add_argument(
