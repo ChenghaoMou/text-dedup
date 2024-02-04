@@ -109,7 +109,7 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         "--min_length",
         type=int,
         default=5,
-        help="Minimum number of tokens to use in MinHash. Shorter documents will be filtered out.",
+        help="Minimum token length of document to be considered. All but one short documents will be removed.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Seed to use in MinHash")
     parser.add_argument("--num_perm", type=int, default=250, help="Number of permutations to use in MinHash")

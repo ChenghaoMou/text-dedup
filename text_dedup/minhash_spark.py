@@ -361,7 +361,12 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument("--input", "-i", type=str, required=True, help="GCS input directory of parquet files")
     parser.add_argument("--threshold", type=float, default=0.7, help="Similarity threshold")
     parser.add_argument("--ngram_size", type=int, default=5, help="N-gram size")
-    parser.add_argument("--min_length", type=int, default=5, help="Minimum token length of document to be considered")
+    parser.add_argument(
+        "--min_length",
+        type=int,
+        default=5,
+        help="Minimum token length of document to be considered. All but one short documents will be removed.",
+    )
     parser.add_argument("--num_perm", type=int, default=250, help="Number of permutations")
     parser.add_argument("--b", type=int, default=None, help="Number of bands")
     parser.add_argument("--r", type=int, default=None, help="Number of rows per band")
