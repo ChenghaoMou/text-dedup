@@ -37,43 +37,62 @@ This repository is inspired by the following projects, and is heavily influenced
 
 ## Quick Examples
 
-### PySpark with DataProc
-
-Not a lot of people have access to enough compute resources or the need to deduplicate TB-scale datasets, but if you do, this is a good example of how to use it with GCP DataProc.
+### Native PySpark
 
 *MODIFY `text_dedup/minhash_spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!*
 
+Assuming you have a downloaded dataset (in parquet files) under "./temp-data", you can process with file with your local compute by:
+
 ```bash
-export CLUSTER_NAME=chenghao-temp
-export PROJECT_ID=xx
-export REGION=us-central1
-export ZONE=us-central1-a
-export INPUT_GCS_PATH="gs://chenghao-temp-exp/data/ada"
-export OUTPUT_GCS_PATH="gs://chenghao-temp-exp/output/ada"
-
-gcloud dataproc clusters create $CLUSTER_NAME \
-    --enable-component-gateway \
-    --region $REGION \
-    --zone $ZONE \
-    --master-machine-type c2d-standard-16 \
-    --master-boot-disk-size 500 \
-    --num-workers 10 \
-    --worker-machine-type c2d-standard-16 \
-    --worker-boot-disk-size 500 \
-    --image-version 2.0-debian10 \
-    --project $PROJECT_ID
-
-gcloud dataproc jobs submit pyspark --cluster ${CLUSTER_NAME}\
-    --region $REGION \
-    --jars gs://spark-lib/bigquery/spark-3.3-bigquery-0.32.2.jar \
-    --driver-log-levels root=FATAL,__main__=DEBUG \
-    --properties="spark.executor.memory"="50g","spark.driver.memory"="8g","spark.executor.cores"="14" \
-    minhash_spark.py -- --input $INPUT_GCS_PATH --output $OUTPUT_GCS_PATH
+export PYSPARK_PYTHON="path to your python with scipy, xxhash, and numpy installed"
+spark-submit --executor-memory 16g \
+    --driver-memory 20g \
+    --executor-cores 3 \
+    --num-executors 2 \
+    --packages graphframes:graphframes:0.8.2-spark3.2-s_2.12 \
+    --conf "spark.executor.extraJavaOptions=-Dlog4j.configuration=./log4j.properties" \
+    --conf "spark.driver.extraJavaOptions=-Dlog4j.configuration=./log4j.properties" \
+    text_dedup/minhash_spark.py\
+    --input "./temp-data" \
+    --output "./temp-output" \
+    --column "text" \
+    --threshold 0.7 \
+    --debug
 ```
 
-For reference, the script finished deduplicating 42 million rows in less than 40 minutes with above settings (160 cores, 640GB memory in total), while the python version would take around 10 hours with a 80-core machine with 1.8TB memory.
+```
+DEBUG __main__ - ------------------------------------------------------------------------------------------------------------------------
+DEBUG __main__ - Using B=25, R=10
+DEBUG __main__ - Loaded documents: 88803
+DEBUG __main__ - args.input='./temp-data'
+DEBUG __main__ - args.output='./temp-output'
+DEBUG __main__ - args.threshold=0.7
+DEBUG __main__ - args.ngram_size=5
+DEBUG __main__ - args.min_length=5
+DEBUG __main__ - args.num_perm=250
+DEBUG __main__ - args.column='text'
+DEBUG __main__ - id                                                              : bigint
+DEBUG __main__ - text                                                            : string
+DEBUG __main__ - meta                                                            : struct<warc_headers:struct<warc-record-id:string,warc-date:string,content-type:string,content-length:int,warc-type:string,warc-identified-content-language:string,warc-refers-to:string,warc-target-uri:string,warc-block-digest:string>,identification:struct<label:string,prob:float>,annotations:array<string>,line_identifications:array<struct<label:string,prob:float>>>
+DEBUG __main__ - __id__                                                          : bigint
+DEBUG __main__ - ------------------------------------------------------------------------------------------------------------------------
+DEBUG __main__ - Initial edges: 52102
+DEBUG __main__ - Edges DataFrame: 52102
+DEBUG __main__ - Vertices DataFrame: 50206
+DEBUG __main__ - Assignment DataFrame: 50206
+DEBUG __main__ - Merging records: 88803
+INFO  __main__ - Saving with 1 partitions and 44092 rows each
+DEBUG __main__ - ------------------------------------------------------------------------------------------------------------------------
+DEBUG __main__ - Number of rows before:    88803
+DEBUG __main__ - Number of rows after:     44092
+DEBUG __main__ - Percentage of rows kept:  49.65%
+DEBUG __main__ - Output:                   ./temp-output
+DEBUG __main__ - Time:                     68.80s
+DEBUG __main__ - ------------------------------------------------------------------------------------------------------------------------
 
-In the following part, we are going to deduplicate one dataset: `gl` subset of `oscar-corpus/OSCAR-2201`.
+```
+
+Or take a look at `reference/bigcode-v2/run.sh` on how to run the job with GCP DataProc.
 
 ### Suffix Array Substring Exact Deduplication
 
