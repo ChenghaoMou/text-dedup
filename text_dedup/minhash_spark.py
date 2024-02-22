@@ -21,6 +21,8 @@ with warnings.catch_warnings():
     import xxhash
     from graphframes import GraphFrame  # type: ignore
     from pyspark import SparkConf
+    from pyspark.sql.functions import udf
+    from pyspark.sql.types import BooleanType
     from pyspark.sql import DataFrame
     from pyspark.sql import SparkSession
     from pyspark.sql import functions as F
@@ -97,6 +99,37 @@ def ngrams(content: str, n: int, min_length: int = 5) -> Set[int]:
         " ".join(tokens[i : i + n]) for i in range(0, max(1, len(tokens) - n + 1))
     }
     return {xxhash.xxh32_intdigest(n) for n in ng}
+
+
+def ngrams_length_check(content: str, n: int, min_length: int = 5) -> bool:
+    """
+    Return the ngrams in hash values. This function fuses few steps together for performance reasons.
+
+    Parameters
+    ----------
+    content : str
+        The content of the document.
+    n : int
+        The length of each ngram.
+    min_length : int, optional
+        The minimum length of each ngram, by default 5
+
+    Returns
+    -------
+        bool
+        True if at least one ngram meets the `min_length` requirement, otherwise False.
+
+    Examples
+    --------
+    >>> ngrams_length_check("a b c d", 2, min_length=1)
+    True
+    >>> ngrams_length_check("a b c d", 2, min_length=5)
+    False
+    >>> ngrams_length_check("a b", 3, min_length=1)
+    True
+    """
+    tokens: List[str] = NON_ALPHA.split(content.lower())
+    return len(tokens) >= min_length
 
 
 def generate_hash_values(
@@ -281,7 +314,7 @@ if __name__ == "__main__":  # pragma: no cover
         "-i",
         type=str,
         required=True,
-        help="GCS input directory of parquet files",
+        help="Input directory of parquet files",
     )
     parser.add_argument(
         "--threshold", type=float, default=0.7, help="Similarity threshold"
@@ -291,7 +324,7 @@ if __name__ == "__main__":  # pragma: no cover
         "--min_length",
         type=int,
         default=5,
-        help="Minimum token length of document to be considered",
+        help="Minimum token length of document to be considered. Short ones will be removed",
     )
     parser.add_argument(
         "--num_perm", type=int, default=250, help="Number of permutations"
@@ -302,22 +335,11 @@ if __name__ == "__main__":  # pragma: no cover
         "--column", "-c", type=str, default="content", help="Column to deduplicate on"
     )
     parser.add_argument(
-        "--repo_column", type=str, required=True, help="Code repo column"
-    )
-    parser.add_argument(
         "--output",
         "-o",
         type=str,
         required=True,
         help="GCS output directory of parquet files",
-    )
-    parser.add_argument(
-        "--rank", action="store_true", help="Rank the duplicates by quality indicators"
-    )
-    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("--profile", action="store_true", help="Enable profiling")
-    parser.add_argument(
-        "--profile_dir", type=str, default="./profile", help="Checkpoint directory"
     )
     parser.add_argument(
         "--checkpoint_dir",
@@ -338,7 +360,6 @@ if __name__ == "__main__":  # pragma: no cover
         .set("spark.sql.autoBroadcastJoinThreshold", "20485760")
         .set("spark.sql.broadcastTimeout", "3600")
         .set("spark.sql.shuffle.partitions", "8192")
-        .set("spark.python.profile", "true" if args.profile else "false")
     )
     spark = SparkSession.Builder().config(conf=conf).getOrCreate()
     sc = spark.sparkContext
@@ -371,6 +392,11 @@ if __name__ == "__main__":  # pragma: no cover
     df: DataFrame = (
         spark.read.option("mergeSchema", "true")
         .parquet(args.input)
+        .filter(
+            udf(ngrams_length_check, BooleanType())(
+                F.col(args.column), F.lit(args.ngram_size), F.lit(args.min_length)
+            )
+        )
         .withColumn("__id__", F.monotonically_increasing_id())
         .persist(pyspark.StorageLevel.DISK_ONLY)
     )
@@ -386,7 +412,6 @@ if __name__ == "__main__":  # pragma: no cover
     log.debug(f"{args.min_length=}")
     log.debug(f"{args.num_perm=}")
     log.debug(f"{args.column=}")
-    log.debug(f"{args.repo_column=}")
     for col, dtype in df.dtypes:
         log.debug(f"{col:<64}: {dtype}")
     log.debug("-" * 120)
@@ -474,129 +499,15 @@ if __name__ == "__main__":  # pragma: no cover
     log.debug(f"Merging records: {df.count()}")
     # endregion
 
-    # region: Quality Control and Data Removal
-    #
-    # This section is hard-coded for The Stack
-    #
-    # A repo's quality is measured by, in order of importance:
-    #  1. The number of stars (higher is better)
-    #  2. The number of forks (higher is better)
-    #
-    # A file's quality is therefore measured by the quality of its repo to prioritize
-    # the integrity of the repo so training context can be maximized at the repo level.
-    # directory_id                     object
-    # blob_id                          object
-    # content_id                       object
-    # path                             object
-    # length                            int64
-    # content                          object
-    # src_encoding                     object
-    # language                         object
-    # is_vendor                          bool
-    # is_generated                       bool
-    # blob_prefix                      object
-    # repo_name                        object
-    # repo_url                         object
-    # snapshot_id                      object
-    # revision_id                      object
-    # branch_name                      object
-    # visit_date               datetime64[ns]
-    # revision_date            datetime64[ns]
-    # committer_date           datetime64[ns]
-    # github_id                       float64
-    # star_events_count                 int64
-    # fork_events_count                 int64
-    # gha_license_id                   object
-    # gha_fork                         object
-    # gha_event_created_at     datetime64[ns]
-    # gha_created_at           datetime64[ns]
-    # gha_updated_at           datetime64[ns]
-    # gha_pushed_at            datetime64[ns]
-    # gha_size                        float64
-    # gha_stargazers_count            float64
-    # gha_forks_count                 float64
-    # gha_open_issues_count           float64
-    # gha_language                     object
-    # gha_archived                     object
-    # gha_disabled                     object
-    # detected_licenses                object
-    # license_type                     object
-
-    if args.rank:
-        rank_columns = [
-            "__component__",
-            "__id__",
-            args.repo_column,
-            "revision_date",
-            "visit_date",
-            "fork_events_count",
-            "star_events_count",
-            "license_type",
-        ]
-        # justification: this is needed for the ranking
-        duplicates: pyspark.RDD = (
-            df.filter(F.col("__component__").isNotNull())
-            .select(*rank_columns)
-            .rdd.map(lambda x: (x[0], x))
-            .persist(pyspark.StorageLevel.DISK_ONLY)
+    df = (
+        df.filter(
+            F.col("__component__").isNull()
+            | (F.col("__component__") == F.col("__id__"))
         )
-
-        def compare_records(a, b):
-            return sorted(
-                [a, b],
-                key=lambda x: (
-                    # license_type, the more permissive the better
-                    ["permissive", "no_license", "non_permissive"].index(x[-1])
-                    if x[-1] is not None
-                    else float("inf"),
-                    # star_events_count, the more the better
-                    -x[-2] if x[-2] is not None else 0.0,
-                    # fork_events_count, the more the better
-                    -x[-3] if x[-3] is not None else 0.0,
-                    # revision_date, the latest the better
-                    -np.datetime64(x[-5]).astype(np.uint64).item()
-                    if x[-5] is not None
-                    else float("inf"),
-                    # visit_date, the latest the better
-                    -np.datetime64(x[-4]).astype(np.uint64).item()
-                    if x[-4] is not None
-                    else float("inf"),
-                ),
-            )[0]
-
-        log.debug(f"Ranking duplicates: {duplicates.count()}")
-        flags: pyspark.RDD = (
-            duplicates.reduceByKey(lambda x, y: compare_records(x, y))
-            .map(lambda x: (x[1][1], True))
-            .persist(pyspark.StorageLevel.DISK_ONLY)
-        )
-        log.debug(f"Keeping duplicates: {flags.count()}")
-        duplicates.unpersist()
-
-        df = (
-            df.join(
-                spark.createDataFrame(flags, schema=["__id__", "__keep__"]),
-                on="__id__",
-                how="left",
-            )
-            .filter(F.col("__component__").isNull() | F.col("__keep__"))
-            .drop("__keep__", "__component__")
-            .persist(pyspark.StorageLevel.DISK_ONLY)
-        )
-        FINAL_SIZE = df.count()
-        flags.unpersist()
-    else:
-        df = (
-            df.filter(
-                F.col("__component__").isNull()
-                | (F.col("__component__") == F.col("__id__"))
-            )
-            .drop("__component__")
-            .persist(pyspark.StorageLevel.DISK_ONLY)
-        )
-        FINAL_SIZE = df.count()
-
-    # endregion
+        .drop("__component__")
+        .persist(pyspark.StorageLevel.DISK_ONLY)
+    )
+    FINAL_SIZE = df.count()
 
     # region: Output
     partitioned_save(df, MAX_WRITE_CHUNK_SIZE, MAX_WRITE_PARTITIONS, args.output)
@@ -611,6 +522,3 @@ if __name__ == "__main__":  # pragma: no cover
     log.debug(f"Output:                   {args.output}")
     log.debug(f"Time:                     {time.time() - start_time:.2f}s")
     log.debug("-" * 120)
-
-    if args.profile:
-        sc.dump_profiles(args.profile_dir)

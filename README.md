@@ -56,8 +56,7 @@ spark-submit --executor-memory 16g \
     --input "./temp-data" \
     --output "./temp-output" \
     --column "text" \
-    --threshold 0.7 \
-    --debug
+    --threshold 0.7
 ```
 
 ```
