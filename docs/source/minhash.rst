@@ -38,7 +38,7 @@ options:
                         Batch size to use for dataset iteration. Mainly for memory efficiency.
   --ngram NGRAM         Ngram size to use in MinHash.
   --min_length MIN_LENGTH
-                        Minimum number of tokens to use in MinHash. Shorter documents will be filtered out.
+                        Minimum number of tokens to use in MinHash. Shorter documents will be filtered out/removed.
   --seed SEED           Seed to use in MinHash
   --num_perm NUM_PERM   Number of permutations to use in MinHash
   --threshold THRESHOLD

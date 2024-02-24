@@ -102,10 +102,13 @@ def embed_func(
     # split content on whitespace (NON_ALPHA regex), tokenize with ngrams(), and join these n-grams into a single space separated string.
     # we then convert to lower case and then bytestrings which is then hashed. Only unique hashed n-grams are left.
     tokens: set[bytes] = {
-        bytes(" ".join(t).lower(), "utf-8") for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)
+        bytes(" ".join(t).lower(), "utf-8")
+        for t in ngrams(NON_ALPHA.split(content.lower()), ngram_size, min_length)
     }
 
-    hashvalues: np.ndarray = np.array([hash_func(token) for token in tokens], dtype=dtype).reshape(len(tokens), 1)
+    hashvalues: np.ndarray = np.array(
+        [hash_func(token) for token in tokens], dtype=dtype
+    ).reshape(len(tokens), 1)
     # Permute the hash values to produce new universal hashes
     # Element-wise multiplication with 'hashvalues' and a (non 0 random value) and then adding b
     # Then, take modulo 'MODULO_PRIME' and bitwise_and with 'MAX_HASH' to keep only the necessary bits.
@@ -117,7 +120,9 @@ def embed_func(
     # Originally, byteswap was done for speed. Testing show it has a negligible impact
     # keeping  for backward compatibility, even though theoretically and empirically
     # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
-    Hs: list[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
+    Hs: list[bytes] = [
+        bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges
+    ]
     return {"__signatures__": Hs, "__id__": idx}
 
 
@@ -178,7 +183,12 @@ if __name__ == "__main__":  # pragma: no cover
         # The following assumes a "perfect hash". using 16 bit hashes might challenge this assumption
         # lower precision dtype will cause more collisions, so higher false_positives and less false negatives.
         # Both effects move the result towards more documents being considered duplicates.
-        B, R = optimal_param(args.threshold, args.num_perm, false_positive_weight=0.5, false_negative_weight=0.5)
+        B, R = optimal_param(
+            args.threshold,
+            args.num_perm,
+            false_positive_weight=0.5,
+            false_negative_weight=0.5,
+        )
 
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
     HASH_TABLES: list[dict[int, set]] = [defaultdict(set) for _ in range(B)]
@@ -200,6 +210,12 @@ if __name__ == "__main__":  # pragma: no cover
                     token=args.use_auth_token,
                 )
 
+            ds = ds.filter(
+                lambda x: len(NON_ALPHA.split(x[args.column].lower()))
+                >= args.min_length,
+                num_proc=args.num_proc,
+            )
+
         LEN_DATASET = len(ds)
         # for minhash, we need to make a lot of hashes(=num_perms).
         # In many previous implementations, this is achieved through a method described in
@@ -208,7 +224,9 @@ if __name__ == "__main__":  # pragma: no cover
         # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
         # the following produces these a, b pairs
         PERMUTATIONS: tuple[np.ndarray, np.ndarray] = (
-            RNG.randint(1, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # a is a multiplier so should not be 0
+            RNG.randint(
+                1, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE
+            ),  # a is a multiplier so should not be 0
             RNG.randint(0, MODULO_PRIME, size=(args.num_perm,), dtype=DTYPE),  # b
         )
 
@@ -242,9 +260,14 @@ if __name__ == "__main__":  # pragma: no cover
                 desc="Iterating MinHashes...",  # noqa: E501
             ):
                 embedded_shard = embedded.shard(
-                    num_shards=NUM_SHARDS, index=i, contiguous=True, writer_batch_size=args.batch_size
+                    num_shards=NUM_SHARDS,
+                    index=i,
+                    contiguous=True,
+                    writer_batch_size=args.batch_size,
                 )
-                for key, Hs in zip(embedded_shard["__id__"], embedded_shard["__signatures__"]):
+                for key, Hs in zip(
+                    embedded_shard["__id__"], embedded_shard["__signatures__"]
+                ):
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 

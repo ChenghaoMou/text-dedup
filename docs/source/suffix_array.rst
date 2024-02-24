@@ -51,6 +51,7 @@ options:
   --google_repo_path GOOGLE_REPO_PATH
                         Path to google-research-deduplication codebase (default: None)
 
+
 Example
 -------
 .. code-block:: bash

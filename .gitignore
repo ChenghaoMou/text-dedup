@@ -158,3 +158,4 @@ output
 **/_SUCCESS
 **/*parquet
 **/checkpoints
+*code-workspace
