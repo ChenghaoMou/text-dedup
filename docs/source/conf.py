@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.abspath("../.."))
 
 project = "text-dedup"
-copyright = "2023, Chenghao Mou"
+copyright = "Apache 2.0"
 author = "Chenghao Mou"
 
 # -- General configuration ---------------------------------------------------

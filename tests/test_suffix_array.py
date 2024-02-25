@@ -31,3 +31,7 @@ def test_suffix_array():
         "180332342 bytes (88803)" in result.stdout
         and "51305898 bytes (29254)" in result.stdout
     ), f"Expected before and after are not present in the output: {result.stdout}"
+
+    # remove the output and input
+    subprocess.run(["rm", "-rf", ".cache"])
+    subprocess.run(["rm", "-rf", ".temp-output"])
