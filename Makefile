@@ -19,3 +19,7 @@ test:
 	coverage run -m pytest --doctest-modules . --ignore deduplicate-text-datasets --ignore docs --ignore text_dedup/minhash_spark.py --ignore reference
 	coverage report -m
 	coverage xml -o cobertura.xml
+
+clean:
+	rm -rf .mypy_cache .pytest_cache .ruff_cache cache checkpoints
+	rm -rf deduplicate-text-datasets/*cache
