@@ -1,47 +1,36 @@
-[project]
+[tool.poetry]
 name = "text-dedup"
 version = "0.3.1"
-description = "All-in-one text deduplication"
-license = "Apache-2.0"
-authors = [
-    { name = "Chenghao Mou", email = "mouchenghao@gmail.com" }
-]
-dependencies = [
-    "numpy>=1.26.4",
-    "tqdm>=4.64.1",
-    "datasets>=2.17.0",
-    "rich>=12.5.1",
-    "scipy>=1.10.1",
-    "xxhash>=3.0.0",
-    "pybloom-live>=4.0.0",
-    "bitarray>=2.6.2",
-    "pyspark>=3.3.1",
-    "regex>=2023.5.5",
-    "urllib3<=2.0",
-    "sphinxcontrib-bibtex>=2.5.0",
-    "zstandard>=0.21.0",
-    "ftfy>=6.1.1",
-    "setuptools>=69.1.0",
-    "psutil>=5.9.8",
-]
+description = ""
+authors = ["Chenghao Mou <mouchenghao@gmail.com>"]
+license = "Apache 2.0"
 readme = "README.md"
-requires-python = ">= 3.12"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = ">=1.26.4"
+tqdm = ">=4.64.1"
+datasets = ">=2.17.0"
+rich = ">=12.5.1"
+scipy = ">=1.10.1"
+xxhash = ">=3.0.0"
+pybloom-live = ">=4.0.0"
+bitarray = ">=2.6.2"
+pyspark = ">=3.3.1"
+regex = ">=2023.5.5"
+urllib3 = "<=2.0"
+sphinxcontrib-bibtex = ">=2.5.0"
+zstandard = ">=0.21.0"
+ftfy = ">=6.1.1"
+setuptools = ">=69.1.0"
+psutil = ">=5.9.8"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.2"
+insegel = "^1.3.1"
+pytest = "^8.0.2"
+coverage = "^7.4.3"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.rye]
-managed = true
-dev-dependencies = [
-    "pre-commit>=3.6.1",
-    "insegel>=1.3.1",
-    "pytest>=8.0.1",
-    "coverage>=7.4.3",
-]
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[tool.hatch.build.targets.wheel]
-packages = ["text_dedup"]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
