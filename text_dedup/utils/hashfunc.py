@@ -27,7 +27,7 @@ def md5_digest(data: bytes) -> bytes:
     Examples
     --------
     # raw byte strings cause problems on doctests
-    >>> int.from_bytes(md5_digest(b"hello world"),"little")
+    >>> int.from_bytes(md5_digest(b"hello world"), "little")
     260265716838465564751810390803223393886
     >>> len(md5_digest(b"hello world"))
     16
@@ -109,7 +109,7 @@ def sha256_digest(data: bytes) -> bytes:
     Examples
     --------
     # raw byte strings cause problems on doctests
-    >>> int.from_bytes(sha256_digest(b"hello world"),"little")
+    >>> int.from_bytes(sha256_digest(b"hello world"), "little")
     105752752996721010526070019734402373604975086831773275823333741804099920678329
     >>> len(sha256_digest(b"hello world"))
     32
@@ -164,9 +164,9 @@ def xxh3_16hash(data: bytes, seed: int = 0) -> int:
     --------
     >>> xxh3_16hash(b"hello world")
     39051
-    >>> xxh3_16hash(b"hello world",seed=42)
+    >>> xxh3_16hash(b"hello world", seed=42)
     13198
-    >>> xxh3_16hash(b"hello world",seed=-42)
+    >>> xxh3_16hash(b"hello world", seed=-42)
     34281
     """
     return xxhash.xxh3_64_intdigest(data, seed) & 0xFFFF
@@ -195,9 +195,9 @@ def xxh3_32hash(data: bytes, seed: int = 0) -> int:
     --------
     >>> xxh3_32hash(b"hello world")
     1088854155
-    >>> xxh3_32hash(b"hello world",seed=42)
+    >>> xxh3_32hash(b"hello world", seed=42)
     3913102222
-    >>> xxh3_32hash(b"hello world",seed=-42)
+    >>> xxh3_32hash(b"hello world", seed=-42)
     3721037289
     """
     return xxhash.xxh3_64_intdigest(data, seed) & 0xFFFFFFFF

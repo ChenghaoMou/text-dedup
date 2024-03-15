@@ -1,25 +1,26 @@
-# Minimal makefile for Sphinx documentation
-#
-
-# You can set these variables from the command line, and also
-# from the environment for the first two.
 SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = docs/source
 BUILDDIR      = docs/build
 
 build:
-	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	docker compose build
 
-serve:
-	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@cd docs/build && python3 -m http.server
+run:
+	docker compose up --detach
 
-test:
-	coverage run -m pytest --doctest-modules . --ignore deduplicate-text-datasets --ignore docs --ignore text_dedup/minhash_spark.py --ignore reference
-	coverage report -m
-	coverage xml -o cobertura.xml
+stop:
+	docker compose down
 
-clean:
-	rm -rf .mypy_cache .pytest_cache .ruff_cache cache checkpoints
-	rm -rf deduplicate-text-datasets/*cache
+build-doc:
+	docker compose run --rm local $(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+
+serve: run
+	docker compose exec local @$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	docker compose exec local -p 8000:8000 -v $(PWD)/docs/build/html:/app/docs/build "cd docs/build && python3 -m http.server"
+
+test: run
+	docker compose exec local poetry run coverage run -m pytest -vvv -s --doctest-modules . --ignore deduplicate-text-datasets --ignore docs --ignore text_dedup/minhash_spark.py --ignore reference
+	docker compose exec local poetry run coverage xml -o cobertura.xml
+	docker compose exec local poetry run coverage report -m
+	docker compose cp local:/app/cobertura.xml cobertura.xml

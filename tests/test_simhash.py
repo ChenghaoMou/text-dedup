@@ -8,9 +8,9 @@ def test_simhash():
             "-m",
             "text_dedup.simhash",
             "--path",
-            "oscar-corpus/OSCAR-2201",
+            "allenai/c4",
             "--name",
-            "gl",
+            "xh",
             "--split",
             "train",
             "--cache_dir",
@@ -28,7 +28,7 @@ def test_simhash():
 
     # check the output
     assert (
-        "88803" in result.stdout and "45589" in result.stdout
+        "69048" in result.stdout and "66756" in result.stdout
     ), f"Expected before and after are not present in the output: {result.stdout}"
 
     # remove the output and input

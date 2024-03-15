@@ -1,0 +1,12 @@
+services:
+  local:
+    image: local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    tty: true
+    volumes:
+      - ./docs:/app/docs
+      - ./reference:/app/reference
+      - ./tests:/app/tests
+      - ./text_dedup:/app/text_dedup

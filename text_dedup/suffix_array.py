@@ -3,7 +3,6 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
-import argparse
 import random
 import shutil
 import subprocess
@@ -15,14 +14,16 @@ from typing import Generator
 from typing import Literal
 from typing import Sequence
 
+import click
 import datasets
 from datasets import Dataset
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset
+from datasets import load_from_disk
 
 from text_dedup import logger
-from text_dedup.utils import add_io_args
-from text_dedup.utils import add_meta_args
-from text_dedup.utils import add_sa_args
+from text_dedup.utils import IOArgs
+from text_dedup.utils import MetaArgs
+from text_dedup.utils import SAArgs
 from text_dedup.utils.timer import Timer
 
 random.seed(42)
@@ -53,18 +54,41 @@ def merge_intervals(
 
     Examples
     --------
-    >>> merge_intervals([slice(0, 10, None), slice(1, 11, None), slice(2, 12, None), slice(3, 13, None),
-    ... slice(4, 14, None), slice(5, 15, None), slice(6, 16, None), slice(7, 21, None)], merge_strategy='overlapping')
+    >>> merge_intervals(
+    ...     [
+    ...         slice(0, 10, None),
+    ...         slice(1, 11, None),
+    ...         slice(2, 12, None),
+    ...         slice(3, 13, None),
+    ...         slice(4, 14, None),
+    ...         slice(5, 15, None),
+    ...         slice(6, 16, None),
+    ...         slice(7, 21, None),
+    ...     ],
+    ...     merge_strategy="overlapping",
+    ... )
     [slice(0, 21, None)]
-    >>> merge_intervals([slice(0, 10, None), slice(1, 11, None), slice(2, 12, None), slice(3, 13, None),
-    ... slice(4, 14, None), slice(5, 15, None), slice(6, 16, None), slice(7, 21, None)],
-    ... merge_strategy='longest') #doctest: +ELLIPSIS
+    >>> merge_intervals(
+    ...     [
+    ...         slice(0, 10, None),
+    ...         slice(1, 11, None),
+    ...         slice(2, 12, None),
+    ...         slice(3, 13, None),
+    ...         slice(4, 14, None),
+    ...         slice(5, 15, None),
+    ...         slice(6, 16, None),
+    ...         slice(7, 21, None),
+    ...     ],
+    ...     merge_strategy="longest",
+    ... )  # doctest: +ELLIPSIS
     [slice(0, 10, None), slice(1, 11, None), slice(2, 12, None), ... slice(7, 21, None)]
-    >>> merge_intervals([slice(0, 2), slice(2, 4), slice(4, 5)], 'overlapping')
+    >>> merge_intervals([slice(0, 2), slice(2, 4), slice(4, 5)], "overlapping")
     [slice(0, 5, None)]
-    >>> merge_intervals([slice(0, 4), slice(2, 4), slice(4, 5)], 'longest')
+    >>> merge_intervals([slice(0, 4), slice(2, 4), slice(4, 5)], "longest")
     [slice(0, 4, None), slice(4, 5, None)]
-    >>> merge_intervals([slice(0, 10, None), slice(0, 10, None), slice(0, 10, None), slice(0, 10, None), slice(0, 10, None)])
+    >>> merge_intervals(
+    ...     [slice(0, 10, None), slice(0, 10, None), slice(0, 10, None), slice(0, 10, None), slice(0, 10, None)]
+    ... )
     [slice(0, 10, None)]
     """
     if len(intervals) == 0:
@@ -127,13 +151,12 @@ def restore(
 
     Examples
     --------
-    >>> list(restore(
-    ... [slice(0, 10, None),
-    ... slice(10, 20, None)],
-    ... [slice(0, 5, None),
-    ... slice(5, 10, None),
-    ... slice(5, 15, None),
-    ... slice(5, 19, None)]))
+    >>> list(
+    ...     restore(
+    ...         [slice(0, 10, None), slice(10, 20, None)],
+    ...         [slice(0, 5, None), slice(5, 10, None), slice(5, 15, None), slice(5, 19, None)],
+    ...     )
+    ... )
     [(0, slice(0, 5, None)), (0, slice(5, 10, None)), (1, slice(0, 5, None)), (1, slice(0, 9, None))]
     """
     indices: Deque[slice] = deque([])
@@ -210,14 +233,18 @@ def restore_and_merge(
     Examples
     --------
     >>> restore_and_merge(
-    ... [slice(0, 10, None), slice(10, 20, None)],
-    ... [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
-    ... 5, 'longest')
+    ...     [slice(0, 10, None), slice(10, 20, None)],
+    ...     [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
+    ...     5,
+    ...     "longest",
+    ... )
     ([[slice(0, 5, None), slice(5, 10, None)], [slice(2, 9, None)]], 17)
     >>> restore_and_merge(
-    ... [slice(0, 10, None), slice(10, 20, None)],
-    ... [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
-    ... 5, 'overlapping')
+    ...     [slice(0, 10, None), slice(10, 20, None)],
+    ...     [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
+    ...     5,
+    ...     "overlapping",
+    ... )
     ([[slice(0, 10, None)], [slice(2, 9, None)]], 17)
     """
     duplicate_size = 0
@@ -274,22 +301,19 @@ def clean_up(text: str, slices: list[slice]) -> str:
     return result.decode("utf-8", errors="ignore")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog="text-dedup.suffixarray",
-        description="Deduplicate text using Suffix Array Deduplication",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser = add_io_args(parser)
-    parser = add_meta_args(parser)
-    parser = add_sa_args(parser)
+@click.command
+@IOArgs.option_group
+@MetaArgs.option_group
+@SAArgs.option_group
+def main(
+    io_args: IOArgs,
+    meta_args: MetaArgs,
+    sa_args: SAArgs,
+):
+    assert io_args.path is not None, "Please specify `path` for `load_dataset`."
 
-    args = parser.parse_args()
-
-    assert args.path is not None, "Please specify `path` for `load_dataset`."
-
-    temp_output_dir = Path(args.google_repo_path) / "output"
-    temp_dir = Path(args.google_repo_path) / "tmp"
+    temp_output_dir = Path(sa_args.google_repo_path) / "output"
+    temp_dir = Path(sa_args.google_repo_path) / "tmp"
     temp_output_dir.mkdir(exist_ok=True, parents=True)
     temp_dir.mkdir(exist_ok=True, parents=True)
     temp_text = "output/temp_text.txt"
@@ -298,26 +322,26 @@ if __name__ == "__main__":
 
     with timer("Total"):
         with timer("Loading"):
-            if args.local:
-                ds: Dataset = load_from_disk(args.path)
+            if io_args.local:
+                ds: Dataset = load_from_disk(io_args.path)
             else:
                 ds: Dataset = load_dataset(  # type: ignore
-                    path=args.path,
-                    name=args.name,
-                    data_dir=args.data_dir,
-                    data_files=args.data_files,
-                    split=args.split,
-                    revision=args.revision,
-                    cache_dir=args.cache_dir,
-                    token=args.use_auth_token,
+                    path=io_args.path,
+                    name=io_args.name,
+                    data_dir=io_args.data_dir,
+                    data_files=io_args.data_files,
+                    split=io_args.split,
+                    revision=io_args.revision,
+                    cache_dir=io_args.cache_dir,
+                    token=io_args.use_auth_token,
                 )
 
         with timer("Preprocessing"):
             offsets: list[slice] = []
             start = 0
-            with open(Path(args.google_repo_path) / temp_text, "wb") as f:
+            with open(Path(sa_args.google_repo_path) / temp_text, "wb") as f:
                 for doc in ds:
-                    doc_bytes = doc[args.column].encode("utf-8")
+                    doc_bytes = doc[meta_args.column].encode("utf-8")
                     end = start + len(doc_bytes)
                     offsets.append(slice(start, end))
                     start = end
@@ -326,53 +350,53 @@ if __name__ == "__main__":
         with timer("SuffixArray"):
             __run_command(
                 f"python scripts/make_suffix_array.py {temp_text}",
-                args.google_repo_path,
+                sa_args.google_repo_path,
             )
 
         with timer("SelfSimilar"):
             __run_command(
                 f"cargo run self-similar --data-file {temp_text}"
-                f" --length-threshold {args.k} --cache-dir {args.cache_dir} --num-threads {args.num_proc}",
-                args.google_repo_path,
+                f" --length-threshold {sa_args.k} --cache-dir {io_args.cache_dir} --num-threads {io_args.num_proc}",
+                sa_args.google_repo_path,
             )
             __run_command(
                 f"cargo run collect --data-file {temp_text}"
-                f" --length-threshold {args.k} --cache-dir {args.cache_dir} >"
+                f" --length-threshold {sa_args.k} --cache-dir {io_args.cache_dir} >"
                 f" {temp_output}",
-                args.google_repo_path,
+                sa_args.google_repo_path,
             )
 
         with timer("Restore"):
             duplicate_slices, duplicate_size = restore_and_merge(
                 offsets,
-                Path(args.google_repo_path) / temp_output,
-                args.k,
-                args.strategy,
+                Path(sa_args.google_repo_path) / temp_output,
+                sa_args.k,
+                sa_args.strategy,
             )
 
         with timer("Deduplicate"):
             ds = ds.map(
                 lambda content, idx: {
-                    args.column: clean_up(content, duplicate_slices[idx]),
+                    meta_args.column: clean_up(content, duplicate_slices[idx]),
                 },
                 with_indices=True,
-                input_columns=[args.column],
+                input_columns=[meta_args.column],
                 desc="Deduplicating",
             ).filter(
                 lambda content: len(content) > 0,
-                input_columns=[args.column],
+                input_columns=[meta_args.column],
                 desc="Filtering empty documents",
             )
 
         with timer("Saving"):
-            ds.save_to_disk(args.output)
+            ds.save_to_disk(io_args.output)
 
         with timer("Cleaning"):
-            if args.clean_cache:
+            if io_args.clean_cache:
                 ds.cleanup_cache_files()
                 shutil.rmtree(temp_output_dir)
                 shutil.rmtree(temp_dir)
-                shutil.rmtree(args.cache_dir)
+                shutil.rmtree(io_args.cache_dir)
 
     PAD = 30
     for k, v in timer.elapsed_times.items():
@@ -380,3 +404,7 @@ if __name__ == "__main__":
 
     logger.info(f"{'Before':<{PAD}}: {start} bytes ({len(offsets)})")
     logger.info(f"{'After':<{PAD}}: {start - duplicate_size} bytes ({len(ds)})")
+
+
+if __name__ == "__main__":
+    main()

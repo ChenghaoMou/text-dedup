@@ -1,49 +1,47 @@
 #!/usr/bin/env python
 # @Date    : 2022-11-05 09:44:48
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-import argparse
 from typing import Callable
 
+import click
 import numpy as np
 from datasets import Dataset
 from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
-from text_dedup.utils import add_exact_hash_args
-from text_dedup.utils import add_io_args
-from text_dedup.utils import add_meta_args
+from text_dedup.utils import ExactHashArgs
+from text_dedup.utils import IOArgs
+from text_dedup.utils import MetaArgs
 from text_dedup.utils.hashfunc import md5_hexdigest
 from text_dedup.utils.hashfunc import sha256_hexdigest
 from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
-if __name__ == "__main__":  # pragma: no cover
-    parser = argparse.ArgumentParser(
-        prog="text_dedup.exacthash",
-        description="Deduplicate text using exact hashing",
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    parser = add_io_args(parser)
-    parser = add_meta_args(parser)
-    parser = add_exact_hash_args(parser)
-    args = parser.parse_args()
 
-    NUM_PROC = args.num_proc
+@click.command
+@IOArgs.option_group
+@MetaArgs.option_group
+@ExactHashArgs.option_group
+def main(
+    io_args: IOArgs,
+    meta_args: MetaArgs,
+    exact_hash_args: ExactHashArgs,
+):
     timer = Timer()
 
     with timer("Total"):
         with timer("Loading"):
             ds: Dataset = load_dataset(  # type: ignore
-                path=args.path,
-                name=args.name,
-                data_dir=args.data_dir,
-                data_files=args.data_files,
-                split=args.split,
-                revision=args.revision,
-                cache_dir=args.cache_dir,
-                num_proc=NUM_PROC,
-                token=args.use_auth_token,
+                path=io_args.path,
+                name=io_args.name,
+                data_dir=io_args.data_dir,
+                data_files=io_args.data_files,
+                split=io_args.split,
+                revision=io_args.revision,
+                cache_dir=io_args.cache_dir,
+                num_proc=io_args.num_proc,
+                token=io_args.use_auth_token,
             )
 
         # we use the hex digests for md5 and sha256 for legacy compatibility reasons
@@ -52,7 +50,7 @@ if __name__ == "__main__":  # pragma: no cover
             "md5": md5_hexdigest,  # type: ignore
             "sha256": sha256_hexdigest,  # type: ignore
             "xxh3": xxh3_128_digest,  # type: ignore
-        }[args.hash_func]
+        }[exact_hash_args.hash_func]
 
         LEN_DATASET: int = len(ds)
         hashes = set()
@@ -63,13 +61,13 @@ if __name__ == "__main__":  # pragma: no cover
             # still, due to the nature of the calculations it is O(len(ds))
             # to make multithreaded, would have to handle shared data structs etc.
             # most approaches are not low hanging fruit.
-            NUM_SHARDS = int(np.ceil(LEN_DATASET / args.batch_size))
+            NUM_SHARDS = int(np.ceil(LEN_DATASET / meta_args.batch_size))
             for idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
                 ds_shard = (
                     ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
                     # TODO .map(either preprocessing like example.encode("utf-8") or multithreaded)
                 )
-                for example in tqdm(ds_shard[args.column], leave=False):
+                for example in tqdm(ds_shard[meta_args.column], leave=False):
                     # moving this byte conversion outside the loop saw no improvement <1 GiB datasets
                     # might not be worth the added overhead
                     h = hash_func(example.encode("utf-8"))
@@ -85,15 +83,15 @@ if __name__ == "__main__":  # pragma: no cover
             ds = ds.filter(
                 lambda _, idx: not flags[idx],
                 with_indices=True,
-                num_proc=NUM_PROC,
-                writer_batch_size=args.batch_size,
+                num_proc=io_args.num_proc,
+                writer_batch_size=meta_args.batch_size,
             )
 
         with timer("Saving"):
-            ds.save_to_disk(args.output)
+            ds.save_to_disk(io_args.output)
 
         with timer("Cleaning"):
-            if args.clean_cache:
+            if io_args.clean_cache:
                 ds.cleanup_cache_files()
 
     PAD = 32
@@ -102,3 +100,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     logger.info(f"{'Before':<{PAD}}: {len(flags)}")
     logger.info(f"{'After':<{PAD}}: {len(ds)}")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

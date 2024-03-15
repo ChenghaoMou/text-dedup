@@ -1,6 +1,7 @@
 import subprocess
 
 
+# @pytest.mark.skip(reason="This test is too slow")
 def test_suffix_array():
     result = subprocess.run(
         [
@@ -8,9 +9,9 @@ def test_suffix_array():
             "-m",
             "text_dedup.suffix_array",
             "--path",
-            "oscar-corpus/OSCAR-2201",
+            "allenai/c4",
             "--name",
-            "gl",
+            "yo",
             "--split",
             "train",
             "--cache_dir",
@@ -19,6 +20,8 @@ def test_suffix_array():
             ".temp-output",
             "--column",
             "text",
+            "--num_proc",
+            "7",
             "--google_repo_path",
             "./deduplicate-text-datasets",
         ],
@@ -28,8 +31,7 @@ def test_suffix_array():
 
     # check the output
     assert (
-        "180332342 bytes (88803)" in result.stdout
-        and "51305898 bytes (29254)" in result.stdout
+        "155279898 bytes (46214)" in result.stdout and "140874800 bytes (46149)" in result.stdout
     ), f"Expected before and after are not present in the output: {result.stdout}"
 
     # remove the output and input

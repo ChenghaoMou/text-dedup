@@ -8,9 +8,9 @@ def test_minhash():
             "-m",
             "text_dedup.minhash",
             "--path",
-            "oscar-corpus/OSCAR-2201",
+            "allenai/c4",
             "--name",
-            "gl",
+            "xh",
             "--split",
             "train",
             "--cache_dir",
@@ -28,7 +28,7 @@ def test_minhash():
 
     # check the output
     assert (
-        "88803" in result.stdout and "44092" in result.stdout
+        "68436" in result.stdout and "66564" in result.stdout
     ), f"Expected before and after are not present in the output: {result.stdout}"
 
     # remove the output and input

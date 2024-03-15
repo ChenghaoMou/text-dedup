@@ -8,9 +8,9 @@ def test_bloom_filter():
             "-m",
             "text_dedup.bloom_filter",
             "--path",
-            "oscar-corpus/OSCAR-2201",
+            "allenai/c4",
             "--name",
-            "gl",
+            "xh",
             "--split",
             "train",
             "--cache_dir",
@@ -28,7 +28,7 @@ def test_bloom_filter():
 
     # check the output
     assert (
-        "88803" in result.stdout and "47049" in result.stdout
+        "69048" in result.stdout and "69048" in result.stdout
     ), f"Expected before and after are not present in the output: {result.stdout}"
 
     # remove the output and input
