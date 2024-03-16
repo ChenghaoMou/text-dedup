@@ -52,7 +52,11 @@ class IOArgs:
         )
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            io_args = IOArgs(**{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in IOArgs.__annotations__})
+            if "io_args" not in kwargs:
+                io_args = IOArgs(**{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in IOArgs.__annotations__})
+            else:
+                io_args = kwargs.pop("io_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in IOArgs.__annotations__}
             return func(*args, **kwargs, io_args=io_args)
 
         return wrapper
@@ -70,7 +74,11 @@ class MetaArgs:
         @optgroup.option("--batch_size", type=int, help="Batch size for deduplication", default=10_000)
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            meta_args = MetaArgs(**{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in MetaArgs.__annotations__})
+            if "meta_args" not in kwargs:
+                meta_args = MetaArgs(**{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in MetaArgs.__annotations__})
+            else:
+                meta_args = kwargs.pop("meta_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in MetaArgs.__annotations__}
             return func(*args, **kwargs, meta_args=meta_args)
 
         return wrapper
@@ -119,13 +127,17 @@ class MinHashArgs:
         )
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            minhash_args = MinHashArgs(
-                **{
-                    k: (kwargs.pop(k) if k != "hash_bits" else int(kwargs.pop(k)))
-                    for k in list(kwargs.keys())
-                    if k in MinHashArgs.__annotations__
-                }
-            )
+            if "minhash_args" not in kwargs:
+                minhash_args = MinHashArgs(
+                    **{
+                        k: (kwargs.pop(k) if k != "hash_bits" else int(kwargs.pop(k)))
+                        for k in list(kwargs.keys())
+                        if k in MinHashArgs.__annotations__
+                    }
+                )
+            else:
+                minhash_args = kwargs.pop("minhash_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in MinHashArgs.__annotations__}
             return func(*args, **kwargs, minhash_args=minhash_args)
 
         return wrapper
@@ -154,13 +166,17 @@ class SimHashArgs:
         )
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            simhash_args = SimHashArgs(
-                **{
-                    k: (kwargs.pop(k) if k != "f" else int(kwargs.pop(k)))
-                    for k in list(kwargs.keys())
-                    if k in SimHashArgs.__annotations__
-                }
-            )
+            if "simhash_args" not in kwargs:
+                simhash_args = SimHashArgs(
+                    **{
+                        k: (kwargs.pop(k) if k != "f" else int(kwargs.pop(k)))
+                        for k in list(kwargs.keys())
+                        if k in SimHashArgs.__annotations__
+                    }
+                )
+            else:
+                simhash_args = kwargs.pop("simhash_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in SimHashArgs.__annotations__}
             return func(*args, **kwargs, simhash_args=simhash_args)
 
         return wrapper
@@ -192,7 +208,11 @@ class SAArgs:
         )
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            sa_args = SAArgs(**{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in SAArgs.__annotations__})
+            if "sa_args" not in kwargs:
+                sa_args = SAArgs(**{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in SAArgs.__annotations__})
+            else:
+                sa_args = kwargs.pop("sa_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in SAArgs.__annotations__}
             return func(*args, **kwargs, sa_args=sa_args)
 
         return wrapper
@@ -217,10 +237,14 @@ class BloomFilterArgs:
         @optgroup.option("--initial_capacity", type=int, help="Initial capacity of BloomFilter", default=100)
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            bloom_args = BloomFilterArgs(
-                **{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in BloomFilterArgs.__annotations__}
-            )
-            return func(*args, **kwargs, bloom_filter_args=bloom_args)
+            if "bloom_filter_args" not in kwargs:
+                bloom_filter_args = BloomFilterArgs(
+                    **{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in BloomFilterArgs.__annotations__}
+                )
+            else:
+                bloom_filter_args = kwargs.pop("bloom_filter_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in BloomFilterArgs.__annotations__}
+            return func(*args, **kwargs, bloom_filter_args=bloom_filter_args)
 
         return wrapper
 
@@ -240,9 +264,13 @@ class ExactHashArgs:
         )
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            exact_hash_args = ExactHashArgs(
-                **{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in ExactHashArgs.__annotations__}
-            )
+            if "exact_hash_args" not in kwargs:
+                exact_hash_args = ExactHashArgs(
+                    **{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in ExactHashArgs.__annotations__}
+                )
+            else:
+                exact_hash_args = kwargs.pop("exact_hash_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in ExactHashArgs.__annotations__}
             return func(*args, **kwargs, exact_hash_args=exact_hash_args)
 
         return wrapper

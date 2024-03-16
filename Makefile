@@ -28,3 +28,6 @@ test: run
 
 spark_test: run
 	docker compose exec spark poetry run pytest -vvv -s --doctest-modules tests/test_minhash_spark.py
+
+clean:
+	docker system prune -a
