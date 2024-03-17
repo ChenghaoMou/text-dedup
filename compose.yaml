@@ -9,3 +9,4 @@ services:
       - ./docs:/app/docs
       - ./tests:/app/tests
       - ./text_dedup:/app/text_dedup
+      - ./data:/app/data
