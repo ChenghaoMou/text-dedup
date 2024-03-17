@@ -24,6 +24,9 @@ test: up
 	docker compose exec local poetry run coverage report -m
 	docker compose cp local:/app/cobertura.xml cobertura.xml
 
+benchmark: up
+	docker compose exec local poetry run python tests/test_benchmark.py
+
 spark_test: up
 	docker compose exec local poetry run pytest -vvv -s --doctest-modules tests/test_minhash_spark.py
 

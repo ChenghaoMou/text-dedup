@@ -220,22 +220,25 @@ INFO     After                         : 47045
 
 ## Benchmarks
 
-A benchmark of different methods here can be found in `benchmarks/wiki40.ipynb`. A notebook in evaluating MinHash on `pinecone/core-2020-05-10-deduplication` can be found in `benchmarks/pinecone.ipynb`.
+A script is provided to benchmark some of the algorithms on `pinecone/core-2020-05-10-deduplication` can be found in `tests/test_benchmark.py`:
 
-For quick reference, here are the results:
+| Algorithm                    | Precision (Duplicates) | Recall (Duplicates) | Precision (Non Duplicates) | Recall (Non Duplicates) | Macro F1 score |   Accuracy | Time    |
+| :--------------------------- | ---------------------: | ------------------: | -------------------------: | ----------------------: | -------------: | ---------: | :------ |
+| MinHash Spark                |                  0.957 |              0.9445 |                     0.9471 |                   0.959 |      **0.952** | **0.9202** | 698.76s |
+| MinHash                      |                 0.9594 |              0.9445 |                     0.9474 |                  0.9616 |     **0.9534** |  **0.924** | 18.80s  |
+| SimHash                      |                 0.9007 |              0.6786 |                     0.7681 |                  0.9343 |         0.8344 |     0.8137 | 253.94s |
+| Exact Title                  |                 0.8302 |              0.5521 |                     0.7098 |                  0.9065 |           0.77 |     0.7456 | -       |
+| Exact Title Matching *       |                  0.830 |                0.50 |                      0.709 |                   0.992 |          0.757 |      0.746 | -       |
+| Simhash Matching *           |                  0.697 |               0.247 |                      0.598 |                   0.985 |          0.631 |      0.616 | -       |
+| Document Vector Similarity * |                  0.912 |               0.779 |                      0.861 |                   0.986 |          0.885 |      0.883 | -       |
+| Hybrid Method *              |                  0.908 |               0.828 |                      0.899 |                   0.979 |          0.904 |      0.903 | -       |
 
-| Method                                                                             | Precision  | Recall     | F1**         | Time   |
-| ---------------------------------------------------------------------------------- | ---------- | ---------- | ---------- | ------ |
-| MinHash (Spark)                                                                    | **0.9570** | **0.9445** | **0.9507** | 18.62s |
-| MinHash                                                                            | **0.9594** | **0.945**  | **0.9519** | 18s    |
-| SimHash\*                                                                          | 0.9007     | 0.6786     | 0.7740     | 210s   |
-| SimHash[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)     | 0.697      | 0.247      | 0.3647     | -      |
-| Exact Title (my implementation)                                                    | 0.8302     | 0.5521     | 0.6632     | -      |
-| Exact Title[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830      | 0.50       | 0.624      | -      |
+\* [(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)
 
-\*Best SimHash result from `benchmarks/hyperparameter.ipynb`.
+\*\* Best SimHash result from `benchmarks/hyperparameter.ipynb`
 
-\*\* F1 on duplicates as positives
+> [!note]
+> Spark implementation has some overhead for small datasets, so I recommend using the script only when you have a large dataset and enough compute resources.
 
 <!-- ## FAQ
 
