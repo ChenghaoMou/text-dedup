@@ -33,7 +33,9 @@ from text_dedup.utils.hashfunc import xxh3_64_digest
 from text_dedup.utils.hashfunc import xxh3_128_digest
 from text_dedup.utils.timer import Timer
 
+mp.set_start_method("fork", force=True)
 datasets.logging.set_verbosity_error()
+uf = UnionFind()
 
 
 def _hamming_distance(a: bitarray, b: bitarray) -> int:
@@ -458,6 +460,4 @@ def main(
 
 
 if __name__ == "__main__":
-    mp.set_start_method("fork", force=True)
-    uf = UnionFind()
     main()

@@ -224,13 +224,14 @@ A benchmark of different methods here can be found in `benchmarks/wiki40.ipynb`.
 
 For quick reference, here are the results:
 
-| Method                                                                          | Precision        | Recall           | F1               | Time |
-| ------------------------------------------------------------------------------- | ---------------- | ---------------- | ---------------- | ---- |
-| MinHash                                                                         | **0.9464** | **0.9446** | **0.9455** | 24s  |
-| SimHash\*                                                                       | 0.9011           | 0.6959           | 0.7853           | 210s |
-| SimHash[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)     | 0.697            | 0.247            | 0.3647           | -    |
-| Exact Title (my implementation)                                                 | 0.8302           | 0.5521           | 0.6632           | -    |
-| Exact Title[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830            | 0.50             | 0.624            | -    |
+| Method                                                                             | Precision  | Recall     | F1         | Time   |
+| ---------------------------------------------------------------------------------- | ---------- | ---------- | ---------- | ------ |
+| MinHash (Spark)                                                                    | **0.9570** | **0.9445** | **0.9507** | 18.62s |
+| MinHash                                                                            | **0.9594** | **0.945**  | **0.9519** | 18s    |
+| SimHash\*                                                                          | 0.9007     | 0.6786     | 0.7740     | 210s   |
+| SimHash[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113)     | 0.697      | 0.247      | 0.3647     | -      |
+| Exact Title (my implementation)                                                    | 0.8302     | 0.5521     | 0.6632     | -      |
+| Exact Title[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830      | 0.50       | 0.624      | -      |
 
 \*Best SimHash result from `benchmarks/hyperparameter.ipynb`.
 

@@ -9,4 +9,5 @@ COPY text_dedup /app/text_dedup
 COPY pyproject.toml /app
 COPY poetry.lock /app
 COPY log4j.properties /app
+COPY README.md /app/README.md
 RUN poetry install

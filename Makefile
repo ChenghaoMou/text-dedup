@@ -20,7 +20,7 @@ serve: up build-doc
 	cd "$(BUILDDIR)" && python3 -m http.server
 
 test: up
-	docker compose exec regular poetry run coverage run -m pytest -vvv -s --doctest-modules . --ignore deduplicate-text-datasets --ignore docs --ignore text_dedup/minhash_spark.py --ignore reference
+	docker compose exec regular poetry run coverage run -m pytest -vvv -s --doctest-modules . --ignore deduplicate-text-datasets --ignore docs --ignore text_dedup/minhash_spark.py --ignore reference --ignore tests/test_minhash_spark.py --ignore tests/test_benchmark.py
 	docker compose exec regular poetry run coverage xml -o cobertura.xml
 	docker compose exec regular poetry run coverage report -m
 	docker compose cp regular:/app/cobertura.xml cobertura.xml

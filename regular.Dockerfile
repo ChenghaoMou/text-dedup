@@ -14,4 +14,5 @@ WORKDIR /app
 COPY text_dedup /app/text_dedup
 COPY pyproject.toml /app
 COPY poetry.lock /app
+COPY README.md /app/README.md
 RUN poetry install

@@ -8,6 +8,7 @@ import re
 import sys
 import time
 import warnings
+from itertools import tee
 from logging import Logger
 from typing import List
 from typing import Set
@@ -64,7 +65,47 @@ def generate_edges(nodes: List[int]) -> List[Tuple[int, int]]:
 
 
 # region: Hashing
-def ngrams(content: str, n: int, min_length: int = 5) -> Set[int]:
+def ngrams(sequence: List[str], n: int, min_length: int = 5):
+    """
+    Return the ngrams generated from a sequence of items, as an iterator.
+
+    This is a modified version of nltk.util.ngrams.
+
+    Parameters
+    ----------
+    sequence : List[Text]
+        The sequence of items.
+    n : int
+        The length of each ngram.
+    min_length : int, optional
+        The minimum length of each ngram, by default 5
+
+    Returns
+    -------
+    iterator
+        The ngrams.
+
+    Examples
+    --------
+    >>> list(ngrams(["a", "b", "c", "d"], 2, min_length=1))
+    [('a', 'b'), ('b', 'c'), ('c', 'd')]
+    >>> list(ngrams(["a", "b", "c", "d"], 2, min_length=5))
+    []
+    >>> list(ngrams(["a", "b"], 3, min_length=1))
+    [('a', 'b')]
+    """
+    if len(sequence) < min_length:
+        return []
+    if len(sequence) < n:
+        return [tuple(sequence)]
+    iterables = tee(iter(sequence), n)
+    for i, sub_iterable in enumerate(iterables):
+        for _ in range(i):
+            next(sub_iterable, None)
+    return zip(*iterables)
+
+
+def ngram_hashes(content: str, n: int, min_length: int = 5) -> Set[int]:
     """
     Return the ngrams in hash values. This function fuses few steps together for performance reasons.
 
@@ -92,10 +133,7 @@ def ngrams(content: str, n: int, min_length: int = 5) -> Set[int]:
     [433422276]
     """
     tokens: List[str] = NON_ALPHA.split(content.lower())
-    if len(tokens) < min_length:
-        return set()
-
-    ng: Set[str] = {" ".join(tokens[i : i + n]) for i in range(0, max(1, len(tokens) - n + 1))}
+    ng: set[bytes] = {bytes(" ".join(t).lower(), "utf-8") for t in ngrams(tokens, n, min_length)}
     return {xxhash.xxh32_intdigest(n) for n in ng}
 
 
@@ -182,7 +220,7 @@ def generate_hash_values(
     True
     """
     a, b = permutations
-    hashes = np.array(list(ngrams(content, ngram_size, min_length)), dtype=DTYPE)
+    hashes = np.array(list(ngram_hashes(content, ngram_size, min_length)), dtype=DTYPE)
     p_hashes = ((np.outer(hashes, a) + b) % MOD_PRIME) & MAX_HASH
     min_hashes = np.vstack([p_hashes, np.full(num_perm, MAX_HASH, dtype=DTYPE)]).min(axis=0)
     return [(band_idx, min_hashes[start:end].data.tobytes(), idx) for band_idx, (start, end) in enumerate(hashranges)]
@@ -319,6 +357,7 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument("--b", type=int, default=None, help="Number of bands")
     parser.add_argument("--r", type=int, default=None, help="Number of rows per band")
     parser.add_argument("--column", "-c", type=str, default="content", help="Column to deduplicate on")
+    parser.add_argument("--index", type=str, default=None, help="Column to index on")
     parser.add_argument(
         "--output",
         "-o",
@@ -331,6 +370,11 @@ if __name__ == "__main__":  # pragma: no cover
         type=str,
         default="./checkpoints",
         help="Checkpoint directory",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode by saving cluster results",
     )
     args = parser.parse_args()
     # endregion
@@ -369,6 +413,7 @@ if __name__ == "__main__":  # pragma: no cover
     # endregion
 
     start_time: float = time.time()
+    index_column = args.index or "__id__"
 
     # region: Data Loading
     # persist justification: this data will be needed when removing duplicates
@@ -404,7 +449,7 @@ if __name__ == "__main__":  # pragma: no cover
 
     # region: MinHash
     edges: pyspark.RDD = (
-        df.select("__id__", args.column)
+        df.select(index_column, args.column)
         .rdd.flatMap(
             lambda x: generate_hash_values(
                 content=x[1],  # args.column
@@ -420,8 +465,6 @@ if __name__ == "__main__":  # pragma: no cover
         .flatMap(lambda x: generate_edges([ele[2] for ele in x[1]]))
         .distinct()
     ).persist(pyspark.StorageLevel.DISK_ONLY)
-    log.debug(f"Initial edges: {edges.count()}")
-
     # endregion
 
     # region: Connected Components
@@ -463,11 +506,15 @@ if __name__ == "__main__":  # pragma: no cover
         vertices_df.unpersist()
     # endregion
 
+    if args.debug:
+        # save assignment for debugging purposes
+        assignment.write.parquet(f"{args.output}-assignment/assignment.parquet", mode="overwrite")
+
     # region: Merge Results
     # justification: this is needed for final output
     df = df.join(
-        assignment.select(F.col("id").alias("__id__"), F.col("component").alias("__component__")),
-        on="__id__",
+        assignment.select(F.col("id").alias(index_column), F.col("component").alias("__component__")),
+        on=index_column,
         how="left",
     ).persist(pyspark.StorageLevel.DISK_ONLY)
     assignment.unpersist()
@@ -475,7 +522,7 @@ if __name__ == "__main__":  # pragma: no cover
     # endregion
 
     df = (
-        df.filter(F.col("__component__").isNull() | (F.col("__component__") == F.col("__id__")))
+        df.filter(F.col("__component__").isNull() | (F.col("__component__") == F.col(index_column)))
         .drop("__component__")
         .persist(pyspark.StorageLevel.DISK_ONLY)
     )

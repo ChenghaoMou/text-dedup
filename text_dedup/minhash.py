@@ -257,6 +257,7 @@ def main(
             NUM_SHARDS = np.ceil(LEN_EMBEDDED / meta_args.batch_size).astype(int)
 
         with timer("Clustering"):
+            edges = []
             for i in tqdm(
                 range(0, NUM_SHARDS),
                 dynamic_ncols=True,
@@ -272,6 +273,7 @@ def main(
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 
+            print("Number of clusters:", len(HASH_TABLES))
             for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
                 # cluster: Set[int]
                 for cluster in table.values():
@@ -279,8 +281,9 @@ def main(
                         continue
                     idx = min(cluster)
                     for x in cluster:
+                        edges.append((x, idx))
                         uf.union(x, idx)
-
+        print(f"Number of edges: {len(set(edges))}")
         with timer("Filtering"):
             # gc manipulations to ensure that uf object is not unneccessarily copied across processes
             gc.freeze()
