@@ -91,7 +91,7 @@ DEBUG __main__ - ---------------------------------------------------------------
 
 ```
 
-Or take a look at `reference/bigcode-v2/run.sh` on how to run the job with GCP DataProc.
+Or take a look at [bigcode-v2/run.sh](https://github.com/bigcode-project/bigcode-dataset/blob/main/near_deduplication/bigcode-v2/run.sh) on how to run the job with GCP DataProc.
 
 ### Suffix Array Substring Exact Deduplication
 
@@ -224,7 +224,7 @@ A benchmark of different methods here can be found in `benchmarks/wiki40.ipynb`.
 
 For quick reference, here are the results:
 
-| Method                                                                             | Precision  | Recall     | F1         | Time   |
+| Method                                                                             | Precision  | Recall     | F1**         | Time   |
 | ---------------------------------------------------------------------------------- | ---------- | ---------- | ---------- | ------ |
 | MinHash (Spark)                                                                    | **0.9570** | **0.9445** | **0.9507** | 18.62s |
 | MinHash                                                                            | **0.9594** | **0.945**  | **0.9519** | 18s    |
@@ -234,6 +234,8 @@ For quick reference, here are the results:
 | Exact Title[(Gyawali et al., LREC 2020)](https://aclanthology.org/2020.lrec-1.113) | 0.830      | 0.50       | 0.624      | -      |
 
 \*Best SimHash result from `benchmarks/hyperparameter.ipynb`.
+
+\*\* F1 on duplicates as positives
 
 <!-- ## FAQ
 

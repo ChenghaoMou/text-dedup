@@ -1,4 +1,4 @@
-import subprocess
+import subprocess  # nosec
 
 
 def test_simhash():
@@ -24,7 +24,7 @@ def test_simhash():
         ],
         capture_output=True,
         text=True,
-    )
+    )  # nosec
 
     # check the output
     assert (
@@ -32,5 +32,5 @@ def test_simhash():
     ), f"Expected before and after are not present in the output: {result.stdout}"
 
     # remove the output and input
-    subprocess.run(["rm", "-rf", ".cache"])
-    subprocess.run(["rm", "-rf", ".temp-output"])
+    subprocess.run(["rm", "-rf", ".cache"])  # nosec
+    subprocess.run(["rm", "-rf", ".temp-output"])  # nosec

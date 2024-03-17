@@ -7,7 +7,7 @@ import gc
 import math
 import multiprocessing as mp
 import os
-import pickle
+import pickle  # nosec
 import random
 from collections import defaultdict
 from itertools import permutations
@@ -460,4 +460,5 @@ def main(
 
 
 if __name__ == "__main__":
+    # pylint: disable=no-value-for-parameter
     main()

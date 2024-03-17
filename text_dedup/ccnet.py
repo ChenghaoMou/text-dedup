@@ -188,4 +188,5 @@ def main(
 
 
 if __name__ == "__main__":  # pragma: no cover
+    # pylint: disable=no-value-for-parameter
     main()

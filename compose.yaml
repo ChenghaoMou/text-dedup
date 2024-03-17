@@ -1,22 +1,11 @@
 services:
-  regular:
-    image: regular
+  local:
+    image: local
     build:
       context: .
-      dockerfile: regular.Dockerfile
+      dockerfile: Dockerfile
     tty: true
     volumes:
       - ./docs:/app/docs
-      - ./reference:/app/reference
-      - ./tests:/app/tests
-      - ./text_dedup:/app/text_dedup
-
-  spark:
-    image: spark
-    build:
-      context: .
-      dockerfile: spark.Dockerfile
-    tty: true
-    volumes:
       - ./tests:/app/tests
       - ./text_dedup:/app/text_dedup

@@ -1,6 +1,6 @@
 import os
-import pickle
-import subprocess
+import pickle  # nosec
+import subprocess  # nosec
 from collections import defaultdict
 from pprint import pprint
 
@@ -45,7 +45,7 @@ os.makedirs("temp_inp_paruqet", exist_ok=True)
 
 ds = datasets.load_from_disk("temp_inp_ds")
 truth = ds.map(
-    lambda x, id: {"core_id": x["core_id"], "id": id, "duplicates": x["labelled_duplicates"]},
+    lambda x, idx: {"core_id": x["core_id"], "id": idx, "duplicates": x["labelled_duplicates"]},
     remove_columns=ds.column_names,
     with_indices=True,
     num_proc=NUM_PROC,
@@ -92,11 +92,11 @@ def _precision(row):
 
 def uf2results(path: str):
     with open(path, "rb") as f:
-        uf = pickle.load(f)
+        uf = pickle.load(f)  # nosec
 
     id2cluster = defaultdict(set)
-    for id, cluster in uf.parent.items():
-        id2cluster[cluster].add(id)
+    for idx, cluster in uf.parent.items():
+        id2cluster[cluster].add(idx)
 
     predictions = {
         id2core_id[x["id"]]: {id2core_id[neighbor] for neighbor in id2cluster[uf.find(x["id"])] if neighbor != x["id"]}
@@ -111,12 +111,12 @@ def uf2results(path: str):
     df["Correct"] = df.apply(lambda row: set(row["duplicates"]) == set(row["predictions"]), axis=1).astype(int)
     prediction_summary = {"Correct": df["Correct"].sum(), "Incorrect": df.shape[0] - df["Correct"].sum()}
     prediction_summary["Accuracy"] = round(prediction_summary["Correct"] / df.shape[0], 4)
-    recalls = df.apply(lambda row: _recall(row), axis=1)
+    recalls = df.apply(_recall, axis=1)
     prediction_summary["Recall"] = round(recalls.mean(), 4)
-    precisions = df.apply(lambda row: _precision(row), axis=1)
+    precisions = df.apply(_precision, axis=1)
     prediction_summary["Precision"] = round(precisions.mean(), 4)
 
-    df["Class"] = df.apply(lambda row: classify_in_paper(row), axis=1)
+    df["Class"] = df.apply(classify_in_paper, axis=1)
     df["Class_"] = df.apply(lambda row: inverse(row["Class"]), axis=1)
 
     f1s = []
@@ -186,7 +186,7 @@ spark-submit --executor-memory 86g
 """.split("\n")
 subprocess.run(
     [part.strip() for line in spark_args for part in line.strip().split(" ") if part.strip()],
-)
+)  # nosec
 
 
 def spark_assignment_to_uf(path=f"{spark_output}-assignment/assignment.parquet"):

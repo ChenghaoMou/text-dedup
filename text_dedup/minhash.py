@@ -6,7 +6,7 @@ from __future__ import annotations
 import gc
 import multiprocessing as mp
 import os
-import pickle
+import pickle  # nosec
 import random
 import re
 from collections import defaultdict
@@ -328,4 +328,5 @@ def main(
 
 
 if __name__ == "__main__":  # pragma: no cover
+    # pylint: disable=no-value-for-parameter
     main()

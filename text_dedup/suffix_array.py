@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import random
 import shutil
-import subprocess
+import subprocess  # nosec
 from collections import deque
 from pathlib import Path
 from pathlib import PosixPath
@@ -263,7 +263,7 @@ def __run_command(cmd: str, cwd: str):
         cmd,
         shell=True,
         cwd=cwd,
-    )
+    )  # nosec
     code = p.wait()
     if code != 0:
         raise RuntimeError(f"Command {cmd} failed with code {code}. CWD: {cwd}")
@@ -407,4 +407,5 @@ def main(
 
 
 if __name__ == "__main__":
+    # pylint: disable=no-value-for-parameter
     main()

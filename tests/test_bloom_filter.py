@@ -1,5 +1,5 @@
 import io
-import subprocess
+import subprocess  # nosec
 from contextlib import redirect_stdout
 
 import click
@@ -30,5 +30,5 @@ def test_bloom_filter():
     assert "69048" in s and "69048" in s, f"Expected before and after are not present in the output: {s}"
 
     # remove the output and input
-    subprocess.run(["rm", "-rf", ".cache"])
-    subprocess.run(["rm", "-rf", ".temp-output"])
+    subprocess.run(["rm", "-rf", ".cache"])  # nosec
+    subprocess.run(["rm", "-rf", ".temp-output"])  # nosec
