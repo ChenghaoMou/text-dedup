@@ -191,12 +191,29 @@ def _create_permutations(f: int, k: int, b: int) -> list[Permutation]:
     >>> for perm in perms:
     ...     assert perm.reverse(perm.permute(data)) == data, f"{perm.reverse(perm.permute(data))} != {data}"
     """
-    block_size: int = math.ceil(f / b)
     masks: list[tuple[bitarray, int, int, int]] = []
-    b = min(b, math.ceil(f / block_size))
+
+    max_block_size: int = math.ceil(f / b)
+    min_block_size: int = math.floor(f / b)
+
+    # solve: max_block_size * x + min_block_size * y == f
+    x, y = 0, 0
+    while True:
+        x += 1
+        if (f - x * max_block_size) % min_block_size == 0:
+            y = (f - x * max_block_size) // min_block_size
+            break
+
+    print(f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size}")
+    assert (
+        x * max_block_size + y * min_block_size == f
+    ), f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size} are invalid"
+
+    start = end = 0
 
     for i in range(b):
-        start, end = i * block_size, min((i + 1) * block_size, f)
+        block_size = max_block_size if x > 0 else min_block_size
+        start, end = end, min(end + block_size, f)
         if start >= end:
             break
         mask: bitarray = bitarray(f)
@@ -342,6 +359,7 @@ def main(
     simhash_args: SimHashArgs,
 ):
     global uf
+    uf.reset()
     timer = Timer()
     PERMUTATIONS = _create_permutations(simhash_args.f, k=simhash_args.bit_diff, b=simhash_args.num_bucket)
     BUCKETS: dict[Any, list] = defaultdict(list)
@@ -376,10 +394,12 @@ def main(
                     "permutations": PERMUTATIONS,
                     "hash_func": hash_func,
                 },
-                input_columns=[meta_args.column],
+                input_columns=(
+                    [meta_args.column] if meta_args.idx_column is None else [meta_args.column, meta_args.idx_column]
+                ),
                 remove_columns=[meta_args.column],
                 num_proc=io_args.num_proc,  # type: ignore
-                with_indices=True,
+                with_indices=True if meta_args.idx_column is None else False,
                 desc="SimHashing...",  # type: ignore
             )
 

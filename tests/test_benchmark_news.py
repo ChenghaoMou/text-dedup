@@ -3,7 +3,6 @@ import pickle  # nosec
 
 import click
 import datasets
-import pandas as pd
 from sklearn.metrics import adjusted_rand_score
 
 from text_dedup.minhash import main as minhash_main
@@ -14,42 +13,19 @@ from text_dedup.utils import MinHashArgs
 from text_dedup.utils import SimHashArgs
 from text_dedup.utils.preprocessing import news_copy_preprocessing
 from text_dedup.utils.timer import Timer
-from text_dedup.utils.union_find import UnionFind
 
 NUM_PROC = os.cpu_count()
 
 
-def prepare_data(data_path, label_path, output_path_ds, output_path_spark):
-    df = pd.read_json(data_path).T.reset_index()
-    labels = pd.read_json(label_path)
-    id2data = []
-    filename2id = {}
-    uf = UnionFind()
-
-    for i, row in df.iterrows():
-        id2data.append(
-            {
-                "filename": str(row["id"]),
-                "headline": news_copy_preprocessing(str(row["headline"])),
-                "text": news_copy_preprocessing(str(row["headline"] + " " + row["article"])),
-                "article": news_copy_preprocessing(str(row["article"])),
-                "id": int(i),
-            }
-        )
-        filename2id[id2data[i]["filename"]] = i
-
-    for i, row in labels.iterrows():
-        uf.union(filename2id[row[0]], filename2id[row[1]])
-
-    clusters = [None for _ in range(len(df))]
-    for i in range(len(df)):
-        clusters[i] = uf.find(filename2id[id2data[i]["filename"]])
-
-    ds = datasets.Dataset.from_pandas(pd.DataFrame(id2data))
-    ds.save_to_disk(output_path_ds)
-
+def prepare_data(dataset, output_path_ds, output_path_spark):
+    clusters = dataset["cluster"]
+    dataset = dataset.map(
+        lambda x: {"text": news_copy_preprocessing(x["article"])},
+        num_proc=NUM_PROC,
+    )
+    dataset.save_to_disk(output_path_ds)
     os.makedirs(output_path_spark, exist_ok=True)
-    pd.DataFrame(id2data).to_parquet(output_path_spark + "/data.parquet")
+    dataset.to_pandas().to_parquet(output_path_spark + "/data.parquet")
 
     return clusters
 
@@ -68,9 +44,8 @@ if __name__ == "__main__":
     output_path_ds = "news_input_ds"
     output_path_spark = "news_input_spark"
 
-    test_data = ("./data/test_inf_data.json", "./data/full_test_gt.json")
-    val_data = ("./data/1955_inf_data.json", "./data/1955_gt.json")
-    labels = prepare_data(*test_data, output_path_ds, output_path_spark)
+    test_data = datasets.load_dataset("chenghao/NEWS-COPY-eval", split="test")
+    labels = prepare_data(test_data, output_path_ds, output_path_spark)
 
     io_args = IOArgs(
         path=output_path_ds,
@@ -81,7 +56,7 @@ if __name__ == "__main__":
         debug=True,
         clean_cache=True,
     )
-    meta_args = MetaArgs(column="article", batch_size=10000)
+    meta_args = MetaArgs(column="text", batch_size=10000, idx_column="idx")
 
     # TODO: hyperparameter tuning
     with t("MinHash"):

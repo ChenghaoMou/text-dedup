@@ -29,7 +29,9 @@ from text_dedup.utils.timer import Timer
 HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
 
 
-def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func: Callable) -> Dict[str, Any]:
+def compute_hashes(
+    batch: Dict[str, Any], idx: List[int] | None, column: str, hash_func: Callable, idx_column: str | None = None
+) -> Dict[str, Any]:
     """
     Compute a hash for each line in the document.
 
@@ -37,12 +39,14 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
     ----------
     batch : Dict[str, Any]
         A batch of one example.
-    idx : List[int]
+    idx : List[int] | None
         The index of the example in the dataset.
     column : str
         The column name of the text.
     hash_func : Callable
         The hash function to use.
+    idx_column : str | None
+        The column name of the index.
 
     Returns
     -------
@@ -50,16 +54,19 @@ def compute_hashes(batch: Dict[str, Any], idx: List[int], column: str, hash_func
         A dictionary containing the hashes, the index of the example, and the index of the lines.
     """
     lines = batch[column][0].split("\n")
+    idx = idx[0] if idx is not None else batch[idx_column][0]
     n = len(lines)
     hashes = [hash_func(bytes(normalize_for_dedup(line), encoding="utf-8")) for line in lines]
     return {
         "__hash__": hashes,
-        "__id__": [idx[0] for _ in range(n)],
+        "__id__": [idx for _ in range(n)],
         "__idx__": list(range(n)),
     }
 
 
-def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[str, Any]:
+def dedup(
+    record: Dict[str, Any], idx: int | None, column: str, lookup: Dict, idx_column: str | None = None
+) -> Dict[str, Any]:
     """
     Remove duplicated lines from the document.
 
@@ -67,12 +74,14 @@ def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[s
     ----------
     record : Dict[str, Any]
         A record of one example.
-    idx : int
+    idx : int | None
         The index of the example in the dataset.
     column : str
         The column name of the text.
     lookup : Dict
         A dictionary containing duplicated (example index, line index) pairs.
+    idx_column : str | None
+        The column name of the index.
 
     Returns
     -------
@@ -80,6 +89,7 @@ def dedup(record: Dict[str, Any], idx: int, column: str, lookup: Dict) -> Dict[s
         A dictionary containing the deduplicated record.
     """
     lines = record[column].split("\n")
+    idx = idx if idx is not None else record[idx_column]
     new_content = []
     for j, line in enumerate(lines):
         if (idx, j) in lookup:
@@ -139,9 +149,10 @@ def main(
                 compute_hashes,
                 batched=True,
                 batch_size=1,
-                with_indices=True,
+                with_indices=True if meta_args.idx_column is None else False,
                 num_proc=io_args.num_proc,
-                fn_kwargs={"column": meta_args.column, "hash_func": hash_func},
+                fn_kwargs={"column": meta_args.column, "hash_func": hash_func}
+                | ({"idx_column": meta_args.idx_column, "idx": None} if meta_args.idx_column is not None else {}),
                 remove_columns=ds.column_names,
                 desc="Computing hashes...",
             )

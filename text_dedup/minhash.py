@@ -36,6 +36,7 @@ SEED = 42
 RNG = np.random.RandomState(SEED)
 NON_ALPHA = re.compile(r"\W", re.UNICODE)
 datasets.logging.set_verbosity_error()
+uf = UnionFind()
 
 
 def embed_func(
@@ -141,6 +142,8 @@ def main(
     meta_args: MetaArgs,
     minhash_args: MinHashArgs,
 ):
+    global uf
+    uf.reset()
     HASH_BITS: int = minhash_args.hash_bits
 
     # 64 bit config is backwards compatibility mode.
@@ -175,7 +178,6 @@ def main(
     # is not copied to child processes as long as it is not modified.
     mp.set_start_method("fork", force=True)
 
-    uf = UnionFind()
     timer = Timer()
 
     if minhash_args.b is not None and minhash_args.r is not None:
@@ -247,10 +249,12 @@ def main(
                     "max_hash": MAX_HASH,
                     "modulo_prime": MODULO_PRIME,
                 },
-                input_columns=[meta_args.column],
+                input_columns=(
+                    [meta_args.column] if meta_args.idx_column is None else [meta_args.column, meta_args.idx_column]
+                ),
                 remove_columns=ds.column_names,
                 num_proc=io_args.num_proc,
-                with_indices=True,
+                with_indices=True if meta_args.idx_column is None else False,
                 desc="Fingerprinting...",
             )
             LEN_EMBEDDED = len(embedded)

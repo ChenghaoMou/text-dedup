@@ -270,7 +270,7 @@ if __name__ == "__main__":
 
     with t("SimHash"):
         ctx = click.Context(simhash_main)
-        simhash_args = SimHashArgs(bit_diff=6, num_bucket=7, ngram=3)
+        simhash_args = SimHashArgs(bit_diff=7, num_bucket=8, ngram=3)
         io_args.output = simhash_output = "./temp_output_simhash"
         ctx.invoke(
             simhash_main,

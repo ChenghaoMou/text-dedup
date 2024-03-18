@@ -66,11 +66,13 @@ class IOArgs:
 class MetaArgs:
     column: str
     batch_size: int = 10_000
+    idx_column: str | None = None
 
     @staticmethod
     def option_group(func):
         @optgroup.group("Meta Options", help="Meta options")
         @optgroup.option("--column", type=str, help="Column to deduplicate", required=True)
+        @optgroup.option("--idx_column", type=str, help="Column to index", required=False, default=None)
         @optgroup.option("--batch_size", type=int, help="Batch size for deduplication", default=10_000)
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

@@ -224,22 +224,22 @@ INFO     After                         : 47045
 
 See `tests/test_benchmark_core.py` for reproduction.
 
-| Algorithm                       | Precision (Duplicates) | Recall (Duplicates) | Precision (Non Duplicates) | Recall (Non Duplicates) | Macro F1 score |   Accuracy | Time    |
-| :------------------------------ | ---------------------: | ------------------: | -------------------------: | ----------------------: | -------------: | ---------: | :------ |
-| MinHash Spark                   |                  0.957 |              0.9445 |                     0.9471 |                   0.959 |      **0.952** | **0.9202** | 698.76s |
-| MinHash                         |                 0.9594 |              0.9445 |                     0.9474 |                  0.9616 |     **0.9534** |  **0.924** | 18.80s  |
-| SimHash**                       |                 0.9007 |              0.6786 |                     0.7681 |                  0.9343 |         0.8344 |     0.8137 | 253.94s |
-| Exact Title                     |                 0.8302 |              0.5521 |                     0.7098 |                  0.9065 |           0.77 |     0.7456 | -       |
-| Exact Title Matching [^1]       |                  0.830 |                0.50 |                      0.709 |                   0.992 |          0.757 |      0.746 | -       |
-| Simhash Matching [^1]           |                  0.697 |               0.247 |                      0.598 |                   0.985 |          0.631 |      0.616 | -       |
-| Document Vector Similarity [^1] |                  0.912 |               0.779 |                      0.861 |                   0.986 |          0.885 |      0.883 | -       |
-| Hybrid Method [^1]              |                  0.908 |               0.828 |                      0.899 |                   0.979 |          0.904 |      0.903 | -       |
-| LaBSE[^2]                       |                  0.937 |               0.923 |                      0.930 |                   0.943 |          0.933 |      0.919 | -       |
-| Multilingual USE[^2]            |                  0.917 |               0.907 |                      0.918 |                   0.927 |          0.917 |      0.909 | -       |
-| Multilingual E5-Base[^2]        |                  0.931 |               0.908 |                      0.919 |                   0.939 |          0.924 |      0.920 | -       |
-| MinHash + LSH[^2]               |                  0.929 |               0.902 |                      0.915 |                   0.938 |          0.921 |      0.918 | -       |
-| RETSimPartial-Dup[^2]           |                  0.945 |               0.941 |                      0.945 |                   0.949 |          0.945 |  **0.928** | -       |
-| RETSimNear-Dup[^2]              |                  0.928 |               0.937 |                      0.942 |                   0.934 |          0.935 |  **0.926** | -       |
+| Algorithm                       | Precision (Duplicates) | Recall (Duplicates) | Precision (Non Duplicates) | Recall (Non Duplicates) | Macro F1 score |  Accuracy | Time    |
+| :------------------------------ | ---------------------: | ------------------: | -------------------------: | ----------------------: | -------------: | --------: | :------ |
+| MinHash Spark                   |                  0.957 |               0.945 |                      0.947 |                   0.959 |      **0.952** |     0.920 | 698.76s |
+| MinHash                         |                  0.959 |               0.945 |                      0.947 |                   0.962 |      **0.953** |     0.924 | 18.80s  |
+| SimHash                         |                  0.904 |               0.721 |                      0.792 |                   0.933 |          0.848 |     0.832 | 660.73s |
+| Exact Title                     |                  0.830 |               0.552 |                      0.710 |                   0.907 |           0.77 |     0.746 | -       |
+| Exact Title Matching [^1]       |                  0.830 |                0.50 |                      0.709 |                   0.992 |          0.757 |     0.746 | -       |
+| Simhash Matching [^1]           |                  0.697 |               0.247 |                      0.598 |                   0.985 |          0.631 |     0.616 | -       |
+| Document Vector Similarity [^1] |                  0.912 |               0.779 |                      0.861 |                   0.986 |          0.885 |     0.883 | -       |
+| Hybrid Method [^1]              |                  0.908 |               0.828 |                      0.899 |                   0.979 |          0.904 |     0.903 | -       |
+| LaBSE[^2]                       |                  0.937 |               0.923 |                      0.930 |                   0.943 |          0.933 |     0.919 | -       |
+| Multilingual USE[^2]            |                  0.917 |               0.907 |                      0.918 |                   0.927 |          0.917 |     0.909 | -       |
+| Multilingual E5-Base[^2]        |                  0.931 |               0.908 |                      0.919 |                   0.939 |          0.924 |     0.920 | -       |
+| MinHash + LSH[^2]               |                  0.929 |               0.902 |                      0.915 |                   0.938 |          0.921 |     0.918 | -       |
+| RETSimPartial-Dup[^2]           |                  0.945 |               0.941 |                      0.945 |                   0.949 |          0.945 | **0.928** | -       |
+| RETSimNear-Dup[^2]              |                  0.928 |               0.937 |                      0.942 |                   0.934 |          0.935 | **0.926** | -       |
 
 
 ### NEWS-COPY
@@ -270,8 +270,7 @@ Adjusted Rand Index (ARI) on NEWS-COPY dataset:
 [^3]: [Noise-Robust De-Duplication at Scale](https://www.semanticscholar.org/paper/Noise-Robust-De-Duplication-at-Scale-Silcock-D'Amico-Wong/7ca41cc5fc364b713aba5b573ae4ada801fd788a)
 
 > [!note]
-> 1. Best SimHash result from `benchmarks/hyperparameter.ipynb`
-> 2. Spark implementation has some overhead for small datasets, so I recommend using the script only when you have a large dataset and enough compute resources.
+> Spark implementation has some overhead for small datasets, so I recommend using the script only when you have a large dataset and enough compute resources.
 
 
 <!-- ## FAQ

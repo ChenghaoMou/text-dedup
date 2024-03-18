@@ -79,3 +79,7 @@ class UnionFind:
             self.parent[py] = px
         else:
             self.parent[px] = py
+
+    def reset(self):
+        self.parent = {}
+        self.rank = Counter()
