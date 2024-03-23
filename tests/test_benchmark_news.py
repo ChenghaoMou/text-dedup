@@ -1,8 +1,10 @@
 import os
 import pickle  # nosec
+import subprocess  # nosec
 
 import click
 import datasets
+import pandas as pd
 from sklearn.metrics import adjusted_rand_score
 
 from text_dedup.minhash import main as minhash_main
@@ -13,6 +15,7 @@ from text_dedup.utils import MinHashArgs
 from text_dedup.utils import SimHashArgs
 from text_dedup.utils.preprocessing import news_copy_preprocessing
 from text_dedup.utils.timer import Timer
+from text_dedup.utils.union_find import UnionFind
 
 NUM_PROC = os.cpu_count()
 
@@ -36,6 +39,17 @@ def uf2results(labels, output_path):
 
     predictions = [uf.find(i) for i in range(len(labels))]
     return adjusted_rand_score(labels, predictions)
+
+
+def spark_assignment_to_uf(path: str):
+    df = pd.read_parquet(path)
+    uf = UnionFind()
+    for _, row in df.iterrows():
+        uf.union(row["id"], row["component"])
+
+    with open(f"{spark_output}/uf.pkl", "wb") as f:
+        pickle.dump(uf, f)
+    return uf
 
 
 if __name__ == "__main__":
@@ -70,6 +84,32 @@ if __name__ == "__main__":
             minhash_args=minhash_args,
         )
 
+    with t("MinHash Spark"):
+        spark_output = "./temp_output_spark"
+        spark_args = f"""
+        spark-submit --executor-memory 86g
+            --driver-memory 8g
+            --executor-cores 2
+            --num-executors 2
+            --packages graphframes:graphframes:0.8.2-spark3.2-s_2.12
+            --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=./log4j.properties
+            --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=./log4j.properties
+            text_dedup/minhash_spark.py
+            --input ./{output_path_spark}
+            --output {spark_output}
+            --column text
+            --index idx
+            --threshold 0.45
+            --min_length 0
+            --num_perm 256
+            --ngram 2
+            --debug
+        """.split("\n")
+        subprocess.run(
+            [part.strip() for line in spark_args for part in line.strip().split(" ") if part.strip()],
+        )  # nosec
+        spark_assignment_to_uf(f"{spark_output}-assignment/assignment.parquet")
+
     # TODO: hyperparameter tuning
     with t("SimHash"):
         ctx = click.Context(simhash_main)
@@ -82,5 +122,6 @@ if __name__ == "__main__":
             simhash_args=simhash_args,
         )
 
+    print(f"MinHash (Spark) ARI: {uf2results(labels, f'{spark_output}/uf.pkl')}")
     print(f"MinHash ARI: {uf2results(labels, f'{minhash_output}/uf.pkl')}")
     print(f"SimHash ARI: {uf2results(labels, f'{simhash_output}/uf.pkl')}")

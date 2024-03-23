@@ -37,7 +37,9 @@ This repository is inspired by the following projects, and is heavily influenced
 
 ## Quick Examples
 
-### Native PySpark
+<details>
+
+<summary>Native PySpark</summary>
 
 *MODIFY `text_dedup/minhash_spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!*
 
@@ -93,7 +95,11 @@ DEBUG __main__ - ---------------------------------------------------------------
 
 Or take a look at [bigcode-v2/run.sh](https://github.com/bigcode-project/bigcode-dataset/blob/main/near_deduplication/bigcode-v2/run.sh) on how to run the job with GCP DataProc.
 
-### Suffix Array Substring Exact Deduplication
+</details>
+
+<details>
+
+<summary>Suffix Array Substring Exact Deduplication</summary>
 
 ```bash
 # input
@@ -118,8 +124,10 @@ INFO     Total                         : 125.45 seconds
 INFO     Before                        : 180332342 bytes (88803)
 INFO     After                         : 97646271 bytes (40404)
 ```
+</details>
+<details>
 
-### MinHash Near Deduplication
+<summary>MinHash Near Deduplication</summary>
 
 ```bash
 # input
@@ -144,8 +152,9 @@ INFO     Data Number (after)             : 44124 (49.69%)
 INFO     Duplicate Number                : 44679 (50.31%)
 INFO     🤗 Happy Deduplicating 🤗
 ```
-
-### SimHash Near Deduplication
+</details>
+<details>
+<summary>SimHash Near Deduplication</summary>
 
 ```bash
 # input
@@ -170,8 +179,9 @@ INFO     Data Number (after)             : 46163 (51.98%)
 INFO     Duplicate Number                : 42640 (48.02%)
 INFO     🤗 Happy Deduplicating 🤗
 ```
-
-### Exact Hash Exact Deduplication
+</details>
+<details>
+<summary>Exact Hash Exact Deduplication</summary>
 
 ```bash
 # input
@@ -193,8 +203,9 @@ INFO     Total                         : 9.72s
 INFO     Before                        : 88803
 INFO     After                         : 47049
 ```
-
-### Bloom Filter Exact Deduplication
+</details>
+<details>
+<summary>Bloom Filter Exact Deduplication</summary>
 
 ```bash
 # input
@@ -217,16 +228,22 @@ INFO     Total                         : 10.54s
 INFO     Before                        : 88803
 INFO     After                         : 47045
 ```
+</details>
 
 ## Benchmarks
 
-### pinecone/core-2020-05-10-deduplication
+> [!note]
+> Spark implementation has some overhead for small datasets, so I recommend using the script only when you have a large dataset and enough compute resources.
+
+
+<details>
+<summary>pinecone/core-2020-05-10-deduplication</summary>
 
 See `tests/test_benchmark_core.py` for reproduction.
 
 | Algorithm                       | Precision (Duplicates) | Recall (Duplicates) | Precision (Non Duplicates) | Recall (Non Duplicates) | Macro F1 score |  Accuracy | Time    |
 | :------------------------------ | ---------------------: | ------------------: | -------------------------: | ----------------------: | -------------: | --------: | :------ |
-| MinHash Spark                   |                  0.957 |               0.945 |                      0.947 |                   0.959 |      **0.952** |     0.920 | 698.76s |
+| MinHash (Spark)                 |                  0.957 |               0.945 |                      0.947 |                   0.959 |      **0.952** |     0.920 | 698.76s |
 | MinHash                         |                  0.959 |               0.945 |                      0.947 |                   0.962 |      **0.953** |     0.924 | 18.80s  |
 | SimHash                         |                  0.904 |               0.721 |                      0.792 |                   0.933 |          0.848 |     0.832 | 660.73s |
 | Exact Title                     |                  0.830 |               0.552 |                      0.710 |                   0.907 |           0.77 |     0.746 | -       |
@@ -241,8 +258,9 @@ See `tests/test_benchmark_core.py` for reproduction.
 | RETSimPartial-Dup[^2]           |                  0.945 |               0.941 |                      0.945 |                   0.949 |          0.945 | **0.928** | -       |
 | RETSimNear-Dup[^2]              |                  0.928 |               0.937 |                      0.942 |                   0.934 |          0.935 | **0.926** | -       |
 
-
-### NEWS-COPY
+</details>
+<details>
+<summary>NEWS-COPY</summary>
 
 See `tests/test_benchmark_news.py` for reproduction.
 
@@ -253,6 +271,7 @@ Adjusted Rand Index (ARI) on NEWS-COPY dataset:
 | n-gram [^3]              | 0.440     |
 | SimHash                  | 0.612     |
 | SimHash[^2]              | 0.695     |
+| MinHash (Spark)          | 0.740     |
 | MinHash                  | 0.742     |
 | MinHash[^3]              | 0.737     |
 | MinHash[^2]              | 0.783     |
@@ -269,8 +288,9 @@ Adjusted Rand Index (ARI) on NEWS-COPY dataset:
 [^2]: [RETSim: Resilient and Efficient Text Similarity](https://arxiv.org/abs/2311.17264)
 [^3]: [Noise-Robust De-Duplication at Scale](https://www.semanticscholar.org/paper/Noise-Robust-De-Duplication-at-Scale-Silcock-D'Amico-Wong/7ca41cc5fc364b713aba5b573ae4ada801fd788a)
 
-> [!note]
-> Spark implementation has some overhead for small datasets, so I recommend using the script only when you have a large dataset and enough compute resources.
+</details>
+
+
 
 
 <!-- ## FAQ
