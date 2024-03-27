@@ -4,6 +4,7 @@
 # @Description  : Line-level deduplication based on Exact Hashing
 # @Reference    : https://github.com/facebookresearch/cc_net/blob/main/cc_net/dedup.py
 
+import multiprocessing as mp
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -12,7 +13,6 @@ from typing import List
 import click
 import numpy as np
 from datasets import Dataset
-from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
@@ -23,10 +23,13 @@ from text_dedup.utils.hashfunc import md5_digest
 from text_dedup.utils.hashfunc import sha256_digest
 from text_dedup.utils.hashfunc import xxh3_64_digest
 from text_dedup.utils.hashfunc import xxh3_128_digest
+from text_dedup.utils.load import load_hf_dataset
+from text_dedup.utils.memory import DisableReferenceCount
 from text_dedup.utils.preprocess import normalize as normalize_for_dedup
 from text_dedup.utils.timer import Timer
 
 HASH_SIZE = np.uint64(0).nbytes  # 8 bytes
+mp.set_start_method("fork", force=True)
 
 
 def compute_hashes(
@@ -110,35 +113,25 @@ def main(
 ):
     timer = Timer()
 
+    def md5_digest_sized(data: bytes) -> bytes:
+        return md5_digest(data)[:HASH_SIZE]
+
+    def sha256_digest_sized(data: bytes) -> bytes:
+        return sha256_digest(data)[:HASH_SIZE]
+
+    def xxh3_digest_sized(data: bytes) -> bytes:
+        return xxh3_128_digest(data)[:HASH_SIZE]
+
+    hash_func = {
+        "md5": md5_digest,
+        "sha256": sha256_digest,
+        # xxh3 is much faster when used raw
+        "xxh3": xxh3_64_digest if HASH_SIZE == 8 else xxh3_digest_sized,
+    }[exact_hash_args.hash_func]
+
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_dataset(  # type: ignore
-                path=io_args.path,
-                name=io_args.name,
-                data_dir=io_args.data_dir,
-                data_files=io_args.data_files,
-                split=io_args.split,
-                revision=io_args.revision,
-                cache_dir=io_args.cache_dir,
-                token=io_args.use_auth_token,
-                num_proc=io_args.num_proc,
-            )
-
-        def md5_digest_sized(data: bytes) -> bytes:
-            return md5_digest(data)[:HASH_SIZE]
-
-        def sha256_digest_sized(data: bytes) -> bytes:
-            return sha256_digest(data)[:HASH_SIZE]
-
-        def xxh3_digest_sized(data: bytes) -> bytes:
-            return xxh3_128_digest(data)[:HASH_SIZE]
-
-        hash_func = {
-            "md5": md5_digest,
-            "sha256": sha256_digest,
-            # xxh3 is much faster when used raw
-            "xxh3": xxh3_64_digest if HASH_SIZE == 8 else xxh3_digest_sized,
-        }[exact_hash_args.hash_func]
+            ds: Dataset = load_hf_dataset(io_args)
 
         LEN_DATASET = len(ds)
         hashes = set()
@@ -156,7 +149,6 @@ def main(
                 remove_columns=ds.column_names,
                 desc="Computing hashes...",
             )
-
             NUM_SHARDS = int(np.ceil(len(hashed) / meta_args.batch_size))
             for batch_idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
                 ds_shard = hashed.shard(NUM_SHARDS, batch_idx, contiguous=True)
@@ -169,8 +161,7 @@ def main(
                         continue
                     hashes.add(h)
 
-        with timer("Filtering"):
-            # TODO: remove might pose a memory bottleneck
+        with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
                 dedup,
                 with_indices=True,
@@ -190,9 +181,7 @@ def main(
                 ds.cleanup_cache_files()
 
     PAD = 32
-    for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<{PAD}}: {v:.2f}s")
-
+    timer.report(logger=logger, pad=PAD)
     logger.info(f"{'Before document count':<{PAD}}: {LEN_DATASET}")
     logger.info(f"{'Before line count':<{PAD}}: {len(hashed)}")
     logger.info(f"{'After document count':<{PAD}}: {len(ds)}")

@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # @Date    : 2022-11-05 09:44:48
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+import multiprocessing as mp
 from typing import Callable
 
 import click
 import numpy as np
 from datasets import Dataset
-from datasets import load_dataset
 from tqdm import tqdm
 
 from text_dedup import logger
@@ -16,7 +16,11 @@ from text_dedup.utils import MetaArgs
 from text_dedup.utils.hashfunc import md5_hexdigest
 from text_dedup.utils.hashfunc import sha256_hexdigest
 from text_dedup.utils.hashfunc import xxh3_128_digest
+from text_dedup.utils.load import load_hf_dataset
+from text_dedup.utils.memory import DisableReferenceCount
 from text_dedup.utils.timer import Timer
+
+mp.set_start_method("fork", force=True)
 
 
 @click.command
@@ -30,43 +34,30 @@ def main(
 ):
     timer = Timer()
 
+    # we use the hex digests for md5 and sha256 for legacy compatibility reasons
+    # we use the raw xxh3_128 byte digests for speed
+    hash_func: Callable = {
+        "md5": md5_hexdigest,  # type: ignore
+        "sha256": sha256_hexdigest,  # type: ignore
+        "xxh3": xxh3_128_digest,  # type: ignore
+    }[exact_hash_args.hash_func]
+    hashes = set()
+    flags = []
+
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_dataset(  # type: ignore
-                path=io_args.path,
-                name=io_args.name,
-                data_dir=io_args.data_dir,
-                data_files=io_args.data_files,
-                split=io_args.split,
-                revision=io_args.revision,
-                cache_dir=io_args.cache_dir,
-                num_proc=io_args.num_proc,
-                token=io_args.use_auth_token,
-            )
-
-        # we use the hex digests for md5 and sha256 for legacy compatibility reasons
-        # we use the raw xxh3_128 byte digests for speed
-        hash_func: Callable = {
-            "md5": md5_hexdigest,  # type: ignore
-            "sha256": sha256_hexdigest,  # type: ignore
-            "xxh3": xxh3_128_digest,  # type: ignore
-        }[exact_hash_args.hash_func]
+            ds: Dataset = load_hf_dataset(io_args)
 
         LEN_DATASET: int = len(ds)
-        hashes = set()
-        flags = []
+        NUM_SHARDS = int(np.ceil(LEN_DATASET / meta_args.batch_size))
 
         with timer("Processing"):
             # currently processing is done on a single thread.
             # still, due to the nature of the calculations it is O(len(ds))
             # to make multithreaded, would have to handle shared data structs etc.
             # most approaches are not low hanging fruit.
-            NUM_SHARDS = int(np.ceil(LEN_DATASET / meta_args.batch_size))
             for idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
-                ds_shard = (
-                    ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
-                    # TODO .map(either preprocessing like example.encode("utf-8") or multithreaded)
-                )
+                ds_shard = ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
                 for example in tqdm(ds_shard[meta_args.column], leave=False):
                     # moving this byte conversion outside the loop saw no improvement <1 GiB datasets
                     # might not be worth the added overhead
@@ -77,7 +68,7 @@ def main(
                         flags.append(False)
                         hashes.add(h)
 
-        with timer("Filtering"):
+        with timer("Filtering"), DisableReferenceCount():
             # batch size here would be a trade off between memory and speed
             # default is 1000
             ds = ds.filter(
@@ -95,9 +86,7 @@ def main(
                 ds.cleanup_cache_files()
 
     PAD = 32
-    for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<{PAD}}: {v:.2f}s")
-
+    timer.report(logger=logger, pad=PAD)
     logger.info(f"{'Before':<{PAD}}: {len(flags)}")
     logger.info(f"{'After':<{PAD}}: {len(ds)}")
 

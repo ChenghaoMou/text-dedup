@@ -3,6 +3,7 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 import functools
 import os
+from typing import Any
 
 import click
 from click_option_group import optgroup
@@ -274,5 +275,47 @@ class ExactHashArgs:
                 exact_hash_args = kwargs.pop("exact_hash_args")
                 {kwargs.pop(k) for k in list(kwargs.keys()) if k in ExactHashArgs.__annotations__}
             return func(*args, **kwargs, exact_hash_args=exact_hash_args)
+
+        return wrapper
+
+
+@dataclass
+class UniSimArgs:
+    store_data: bool = True
+    index_type: str = "exact"
+    return_embeddings: bool = True
+    batch_size: int = 128
+    use_accelerator: bool = True
+    model_id: str = "text/retsim/v1"
+    index_params: dict[str, Any] | None = None
+    similarity_threshold: float = 0.9
+    verbose: int = 0
+
+    @staticmethod
+    def option_group(func):
+        @optgroup.group("UniSim Options", help="UniSim options")
+        @optgroup.option("--store_data", help="Store data in cache", is_flag=True, default=False)
+        @optgroup.option("--index_type", help="Index type to use", default="approx")
+        @optgroup.option("--return_embeddings", help="Return embeddings instead of scores", is_flag=True, default=False)
+        @optgroup.option("--use_accelerator", help="Use accelerator for index creation", is_flag=True, default=False)
+        @optgroup.option("--model_id", help="Model id to use", default="text/retsim/v1")
+        @optgroup.option(
+            "--index_params",
+            type=dict,
+            help="Index params to pass to the index creator (e.g. {'ngram': 2})",
+            default=None,
+        )
+        @optgroup.option("--similarity_threshold", help="Similarity threshold to use", default=0.9)
+        @optgroup.option("--verbose", help="Verbose level for logging", is_flag=True, default=False)
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if "unisim_args" not in kwargs:
+                unisim_args = UniSimArgs(
+                    **{k: kwargs.pop(k) for k in list(kwargs.keys()) if k in UniSimArgs.__annotations__}
+                )
+            else:
+                unisim_args = kwargs.pop("unisim_args")
+                {kwargs.pop(k) for k in list(kwargs.keys()) if k in UniSimArgs.__annotations__}
+            return func(*args, **kwargs, unisim_args=unisim_args)
 
         return wrapper

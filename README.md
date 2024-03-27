@@ -11,6 +11,7 @@
 
 This repository contains a collection of text deduplication scripts that are ready to use, or modify based on your needs:
 
+- RETSim/UniSim, an embedding-based near deduplication (WIP)
 - MinHash + MinHashLSH, including a spark implementation suitable for large (TB) datasets
 - 64 or 128 bit SimHash
 - SuffixArray Substring
@@ -99,6 +100,33 @@ Or take a look at [bigcode-v2/run.sh](https://github.com/bigcode-project/bigcode
 
 <details>
 
+<summary>UniSim (WIP)</summary>
+
+Based on Google's RETSim model([Github](https://github.com/google/unisim), [Arxiv](https://arxiv.org/abs/2311.17264)), it is an embedding based on near-deduplication method.
+
+For a large dataset, it would require GPU(s) for fast inference.
+
+```bash
+python text_dedup/ann_unisim.py --path truthful_qa --name generation --split validation --output temp --column question
+```
+
+Output:
+```
+INFO     Load Dataset                    : 5.56s
+INFO     Index Dataset                   : 8.13s
+INFO     Clustering                      : 8.72s
+INFO     Filtering                       : 0.35s
+INFO     Saving                          : 0.01s
+INFO     Cleaning                        : 0.00s
+INFO     Total                           : 22.77s
+INFO     Before                          : 817
+INFO     After                           : 788
+```
+
+</details>
+
+<details>
+
 <summary>Suffix Array Substring Exact Deduplication</summary>
 
 ```bash
@@ -153,6 +181,7 @@ INFO     Duplicate Number                : 44679 (50.31%)
 INFO     🤗 Happy Deduplicating 🤗
 ```
 </details>
+
 <details>
 <summary>SimHash Near Deduplication</summary>
 
@@ -180,6 +209,7 @@ INFO     Duplicate Number                : 42640 (48.02%)
 INFO     🤗 Happy Deduplicating 🤗
 ```
 </details>
+
 <details>
 <summary>Exact Hash Exact Deduplication</summary>
 
@@ -204,6 +234,7 @@ INFO     Before                        : 88803
 INFO     After                         : 47049
 ```
 </details>
+
 <details>
 <summary>Bloom Filter Exact Deduplication</summary>
 

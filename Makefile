@@ -1,4 +1,4 @@
-DOCKER = podman
+DOCKER = docker
 SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = docs/source

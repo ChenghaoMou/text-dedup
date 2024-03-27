@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # @Date    : 2022-11-05 09:44:48
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
+import multiprocessing as mp
 from typing import Callable
 
 import click
-import datasets
 import numpy as np
-from datasets.load import load_dataset
+from datasets import Dataset
 from pybloom_live import ScalableBloomFilter
 from tqdm import tqdm
 
@@ -17,7 +17,11 @@ from text_dedup.utils import MetaArgs
 from text_dedup.utils.hashfunc import md5_digest
 from text_dedup.utils.hashfunc import sha256_digest
 from text_dedup.utils.hashfunc import xxh3_128_digest
+from text_dedup.utils.load import load_hf_dataset
+from text_dedup.utils.memory import DisableReferenceCount
 from text_dedup.utils.timer import Timer
+
+mp.set_start_method("fork", force=True)
 
 
 @click.command
@@ -32,46 +36,35 @@ def main(
     timer = Timer()
     flags = []
 
+    hash_func: Callable = {
+        "md5": md5_digest,  # type: ignore
+        "sha256": sha256_digest,  # type: ignore
+        "xxh3": xxh3_128_digest,  # type: ignore
+    }[bloom_filter_args.hash_func]
+
+    bf = ScalableBloomFilter(
+        initial_capacity=bloom_filter_args.initial_capacity,
+        mode=ScalableBloomFilter.SMALL_SET_GROWTH,
+        error_rate=bloom_filter_args.error_rate,
+    )
+
     with timer("Total"):
         with timer("Loading"):
-            ds: datasets.Dataset = load_dataset(  # type: ignore
-                path=io_args.path,
-                name=io_args.name,
-                data_dir=io_args.data_dir,
-                data_files=io_args.data_files,
-                split=io_args.split,
-                revision=io_args.revision,
-                cache_dir=io_args.cache_dir,
-                token=io_args.use_auth_token,
-                num_proc=io_args.num_proc,
-            )
-
-        hash_func: Callable = {
-            "md5": md5_digest,  # type: ignore
-            "sha256": sha256_digest,  # type: ignore
-            "xxh3": xxh3_128_digest,  # type: ignore
-        }[bloom_filter_args.hash_func]
+            ds: Dataset = load_hf_dataset(io_args)
 
         LEN_DATASET = len(ds)
+        NUM_SHARDS = int(np.ceil(LEN_DATASET / meta_args.batch_size))
 
-        bf = ScalableBloomFilter(
-            initial_capacity=bloom_filter_args.initial_capacity,
-            mode=ScalableBloomFilter.SMALL_SET_GROWTH,
-            error_rate=bloom_filter_args.error_rate,
-        )
         with timer("Processing"):
-            NUM_SHARDS = int(np.ceil(LEN_DATASET / meta_args.batch_size))
             for idx in tqdm(range(0, NUM_SHARDS), desc="Processing..."):
-                ds_shard = (
-                    ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
-                    # TODO .map(either preprocessing like example.encode("utf-8") or multithreaded)
-                )
+                # TODO .map(either preprocessing like example.encode("utf-8") or multithreaded)
+                ds_shard = ds.shard(num_shards=NUM_SHARDS, index=idx, contiguous=True)
                 for example in tqdm(ds_shard[meta_args.column], leave=False):
                     h = hash_func(example.encode("utf-8"))
                     # True if the element is seen, False otherwise
                     flags.append(bf.add(h))
 
-        with timer("Filtering"):
+        with timer("Filtering"), DisableReferenceCount():
             ds = ds.filter(
                 lambda _, idx: not flags[idx],
                 with_indices=True,
@@ -87,9 +80,7 @@ def main(
                 ds.cleanup_cache_files()
 
     PAD = 32
-    for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<{PAD}}: {v:.2f}s")
-
+    timer.report(logger=logger, pad=PAD)
     logger.info(f"{'Before':<{PAD}}: {len(flags)}")
     logger.info(f"{'After':<{PAD}}: {len(ds)}")
 

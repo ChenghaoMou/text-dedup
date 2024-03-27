@@ -17,13 +17,12 @@ from typing import Sequence
 import click
 import datasets
 from datasets import Dataset
-from datasets import load_dataset
-from datasets import load_from_disk
 
 from text_dedup import logger
 from text_dedup.utils import IOArgs
 from text_dedup.utils import MetaArgs
 from text_dedup.utils import SAArgs
+from text_dedup.utils.load import load_hf_dataset
 from text_dedup.utils.timer import Timer
 
 random.seed(42)
@@ -322,19 +321,7 @@ def main(
 
     with timer("Total"):
         with timer("Loading"):
-            if io_args.local:
-                ds: Dataset = load_from_disk(io_args.path)
-            else:
-                ds: Dataset = load_dataset(  # type: ignore
-                    path=io_args.path,
-                    name=io_args.name,
-                    data_dir=io_args.data_dir,
-                    data_files=io_args.data_files,
-                    split=io_args.split,
-                    revision=io_args.revision,
-                    cache_dir=io_args.cache_dir,
-                    token=io_args.use_auth_token,
-                )
+            ds: Dataset = load_hf_dataset(io_args)
 
         with timer("Preprocessing"):
             offsets: list[slice] = []
@@ -399,9 +386,7 @@ def main(
                 shutil.rmtree(io_args.cache_dir)
 
     PAD = 30
-    for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<{PAD}}: {v:.2f} seconds")
-
+    timer.report(logger=logger, pad=PAD)
     logger.info(f"{'Before':<{PAD}}: {start} bytes ({len(offsets)})")
     logger.info(f"{'After':<{PAD}}: {start - duplicate_size} bytes ({len(ds)})")
 

@@ -27,8 +27,9 @@ def test_bloom_filter():
         )
     s = f.getvalue()
     # check the output
+    print(f"Output:\n{s}")
     assert "69048" in s and "69048" in s, f"Expected before and after are not present in the output: {s}"
 
     # remove the output and input
-    subprocess.run(["rm", "-rf", ".cache"])  # nosec
+    # subprocess.run(["rm", "-rf", ".cache"])  # nosec
     subprocess.run(["rm", "-rf", ".temp-output"])  # nosec

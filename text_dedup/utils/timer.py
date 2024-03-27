@@ -59,3 +59,7 @@ class Timer:
         >>> assert int(t.elapsed_times.get("test2", 0)) == 2, "The elapsed time should be 2 seconds."
         """
         return TimerContext(self, name)
+
+    def report(self, logger, pad: int):
+        for k, v in self.elapsed_times.items():
+            logger.info(f"{k:<{pad}}: {v:.2f}s")

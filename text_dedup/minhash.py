@@ -3,7 +3,6 @@
 # created     : 10/4/22
 from __future__ import annotations
 
-import gc
 import multiprocessing as mp
 import os
 import pickle  # nosec
@@ -16,8 +15,7 @@ from typing import Callable
 import click
 import datasets
 import numpy as np
-from datasets import load_dataset
-from datasets import load_from_disk
+from datasets import Dataset
 from tqdm import tqdm
 
 from text_dedup import logger
@@ -30,12 +28,17 @@ from text_dedup.utils.args import MinHashArgs
 from text_dedup.utils.hashfunc import sha1_hash
 from text_dedup.utils.hashfunc import xxh3_16hash
 from text_dedup.utils.hashfunc import xxh3_32hash
+from text_dedup.utils.load import load_hf_dataset
+from text_dedup.utils.memory import DisableReferenceCount
 from text_dedup.utils.timer import Timer
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
 NON_ALPHA = re.compile(r"\W", re.UNICODE)
 datasets.logging.set_verbosity_error()
+# for is originally used to reduce memory usage in MacOS but also ensures that the Union Find data structure
+# is not copied to child processes as long as it is not modified.
+mp.set_start_method("fork", force=True)
 uf = UnionFind()
 
 
@@ -174,10 +177,6 @@ def main(
             else:
                 hash_func = xxh3_32hash
 
-    # for is originally used to reduce memory usage in MacOS but also ensures that the Union Find data structure
-    # is not copied to child processes as long as it is not modified.
-    mp.set_start_method("fork", force=True)
-
     timer = Timer()
 
     if minhash_args.b is not None and minhash_args.r is not None:
@@ -199,41 +198,28 @@ def main(
     HASH_RANGES = [(i * R, (i + 1) * R) for i in range(B)]
     HASH_TABLES: list[dict[int, set]] = [defaultdict(set) for _ in range(B)]
 
+    # for minhash, we need to make a lot of hashes(=num_perms).
+    # In many previous implementations, this is achieved through a method described in
+    # `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8
+    # There we start with a know good hash x (=hash_func) and permutate it as the following:
+    # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
+    # the following produces these a, b pairs
+    PERMUTATIONS: tuple[np.ndarray, np.ndarray] = (
+        RNG.randint(
+            1, MODULO_PRIME, size=(minhash_args.num_perm,), dtype=DTYPE
+        ),  # a is a multiplier so should not be 0
+        RNG.randint(0, MODULO_PRIME, size=(minhash_args.num_perm,), dtype=DTYPE),  # b
+    )
+
     with timer("Total"):
         with timer("Loading"):
-            if io_args.local:
-                ds = load_from_disk(io_args.path)
-            else:
-                ds = load_dataset(
-                    path=io_args.path,
-                    name=io_args.name,
-                    data_dir=io_args.data_dir,
-                    data_files=io_args.data_files,
-                    split=io_args.split,
-                    revision=io_args.revision,
-                    cache_dir=io_args.cache_dir,
-                    num_proc=io_args.num_proc,
-                    token=io_args.use_auth_token,
-                )
-
+            ds: Dataset = load_hf_dataset(io_args)
             ds = ds.filter(
                 lambda x: len(NON_ALPHA.split(x[meta_args.column].lower())) >= minhash_args.min_length,
                 num_proc=io_args.num_proc,
             )
 
         LEN_DATASET = len(ds)
-        # for minhash, we need to make a lot of hashes(=num_perms).
-        # In many previous implementations, this is achieved through a method described in
-        # `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8
-        # There we start with a know good hash x (=hash_func) and permutate it as the following:
-        # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
-        # the following produces these a, b pairs
-        PERMUTATIONS: tuple[np.ndarray, np.ndarray] = (
-            RNG.randint(
-                1, MODULO_PRIME, size=(minhash_args.num_perm,), dtype=DTYPE
-            ),  # a is a multiplier so should not be 0
-            RNG.randint(0, MODULO_PRIME, size=(minhash_args.num_perm,), dtype=DTYPE),  # b
-        )
 
         with timer("MinHashing"):
             embedded = ds.map(
@@ -277,7 +263,7 @@ def main(
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 
-            print("Number of clusters:", len(HASH_TABLES))
+            logger.info("Number of clusters:", len(HASH_TABLES))
             for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
                 # cluster: Set[int]
                 for cluster in table.values():
@@ -287,11 +273,9 @@ def main(
                     for x in cluster:
                         edges.append((x, idx))
                         uf.union(x, idx)
-        print(f"Number of edges: {len(set(edges))}")
-        with timer("Filtering"):
-            # gc manipulations to ensure that uf object is not unneccessarily copied across processes
-            gc.freeze()
-            gc.disable()
+            logger.info(f"Number of edges: {len(set(edges))}")
+
+        with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
@@ -299,8 +283,6 @@ def main(
                 new_fingerprint=str(random.getrandbits(128)),
                 desc="Finding clusters...",
             )
-            gc.enable()
-            gc.collect()
             # This is where the deduplication happens
             # Since there is no easy groupby in datasets
             # I will use this simple filter for now
@@ -324,9 +306,7 @@ def main(
                 final_data.cleanup_cache_files()
 
     PAD = 32
-    for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<{PAD}}: {v:.2f}s")
-
+    timer.report(logger=logger, pad=PAD)
     logger.info(f"{'Before':<{PAD}}: {LEN_DATASET}")
     logger.info(f"{'After':<{PAD}}: {len(final_data)}")
 

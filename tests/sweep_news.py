@@ -17,7 +17,7 @@ from text_dedup.simhash import main as simhash_main
 from text_dedup.utils import IOArgs
 from text_dedup.utils import MetaArgs
 from text_dedup.utils import SimHashArgs
-from text_dedup.utils.preprocessing import news_copy_preprocessing
+from text_dedup.utils.preprocess import news_copy_preprocessing
 from text_dedup.utils.timer import Timer
 
 NUM_PROC = os.cpu_count()

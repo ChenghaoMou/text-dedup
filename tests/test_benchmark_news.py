@@ -13,7 +13,7 @@ from text_dedup.utils import IOArgs
 from text_dedup.utils import MetaArgs
 from text_dedup.utils import MinHashArgs
 from text_dedup.utils import SimHashArgs
-from text_dedup.utils.preprocessing import news_copy_preprocessing
+from text_dedup.utils.preprocess import news_copy_preprocessing
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.union_find import UnionFind
 

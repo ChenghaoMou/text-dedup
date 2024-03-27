@@ -3,7 +3,6 @@
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
 from __future__ import annotations
 
-import gc
 import math
 import multiprocessing as mp
 import os
@@ -19,8 +18,7 @@ import datasets
 import numpy as np
 from bitarray import bitarray
 from bitarray import frozenbitarray
-from datasets import load_dataset
-from datasets import load_from_disk
+from datasets import Dataset
 from tqdm import tqdm
 
 from text_dedup import logger
@@ -31,6 +29,8 @@ from text_dedup.utils import UnionFind
 from text_dedup.utils import ngrams
 from text_dedup.utils.hashfunc import xxh3_64_digest
 from text_dedup.utils.hashfunc import xxh3_128_digest
+from text_dedup.utils.load import load_hf_dataset
+from text_dedup.utils.memory import DisableReferenceCount
 from text_dedup.utils.timer import Timer
 
 mp.set_start_method("fork", force=True)
@@ -204,7 +204,7 @@ def _create_permutations(f: int, k: int, b: int) -> list[Permutation]:
             y = (f - x * max_block_size) // min_block_size
             break
 
-    print(f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size}")
+    logger.info(f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size}")
     assert (
         x * max_block_size + y * min_block_size == f
     ), f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size} are invalid"
@@ -369,20 +369,7 @@ def main(
 
     with timer("Total"):
         with timer("Loading"):
-            if io_args.local:
-                ds = load_from_disk(io_args.path)
-            else:
-                ds = load_dataset(
-                    path=io_args.path,
-                    name=io_args.name,
-                    data_dir=io_args.data_dir,
-                    data_files=io_args.data_files,
-                    split=io_args.split,
-                    revision=io_args.revision,
-                    cache_dir=io_args.cache_dir,
-                    num_proc=io_args.num_proc,
-                    token=io_args.use_auth_token,
-                )
+            ds: Dataset = load_hf_dataset(io_args)
 
         LEN_DATASET = len(ds)  # type: ignore
 
@@ -436,15 +423,11 @@ def main(
                             if idy in neighbors:
                                 continue
                             if _hamming_distance(sig, other_fingerprint) <= simhash_args.bit_diff:
+                                uf.union(idx, idy)
                                 neighbors.add(idy)
                         BUCKETS[key].append((idx, sig))
 
-                    for idy in neighbors:
-                        uf.union(idx, idy)
-
-        with timer("Filtering"):
-            gc.freeze()
-            gc.disable()
+        with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
                 function=lambda _, idx: {"__cluster__": uf.find(idx)},
                 with_indices=True,
@@ -452,8 +435,6 @@ def main(
                 new_fingerprint=str(random.getrandbits(128)),  # type: ignore
                 desc="Finding clusters...",  # type: ignore
             )
-            gc.enable()
-            gc.collect()
             # This is where the deduplication happens
             # Since there is no easy groupby in datasets
             # I will use this simple filter for now
@@ -477,9 +458,7 @@ def main(
                 final_data.cleanup_cache_files()
 
     PAD = 32
-    for k, v in timer.elapsed_times.items():
-        logger.info(f"{k:<{PAD}}: {v:.2f}s")
-
+    timer.report(logger=logger, pad=PAD)
     logger.info(f"{'Before':<{PAD}}: {LEN_DATASET}")
     logger.info(f"{'After':<{PAD}}: {len(final_data)}")
 

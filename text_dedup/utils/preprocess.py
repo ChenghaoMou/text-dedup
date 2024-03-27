@@ -36,3 +36,24 @@ def normalize(line: str) -> str:
     line = DIGIT_RE.sub("0", line)
     line = PUNCT_OR_NON_PRINTING_CHARS_RE.sub("", line)
     return line
+
+
+def news_copy_preprocessing(text: str) -> str:
+    """
+    This is the same preprocessing code used NEWS-COPY benchmark.
+
+    Prameters
+    ---------
+    text : str
+        The input text to be processed.
+
+    Returns
+    -------
+    str
+        The processed text.
+    """
+    chars_to_remove = r'"#$%&\()*+/:;<=>@[\\]^_`{|}~.?,!\''
+    text = text.replace("-\n", "").replace("\n", " ")
+    text = text.translate(str.maketrans("", "", chars_to_remove))
+    text = text.encode("ascii", "ignore").decode()
+    return text
