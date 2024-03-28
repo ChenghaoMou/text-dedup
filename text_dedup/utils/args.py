@@ -281,11 +281,11 @@ class ExactHashArgs:
 
 @dataclass
 class UniSimArgs:
-    store_data: bool = True
-    index_type: str = "exact"
-    return_embeddings: bool = True
-    batch_size: int = 128
-    use_accelerator: bool = True
+    store_data: bool = False
+    index_type: str = "approx"
+    return_embeddings: bool = False
+    batch_size: int = 24
+    use_accelerator: bool = False
     model_id: str = "text/retsim/v1"
     index_params: dict[str, Any] | None = None
     similarity_threshold: float = 0.9

@@ -263,7 +263,7 @@ def main(
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 
-            logger.info("Number of clusters:", len(HASH_TABLES))
+            logger.info(f"Number of clusters: {len(HASH_TABLES)}")
             for table in tqdm(HASH_TABLES, dynamic_ncols=True, desc="Clustering..."):
                 # cluster: Set[int]
                 for cluster in table.values():

@@ -1,11 +1,15 @@
+import inspect
 import os
 import pickle  # nosec
 import random
+from pathlib import Path
 
 import click
 import numpy as np
+from onnxruntime import InferenceSession
 from tqdm import tqdm
 from unisim import TextSim
+from unisim.embedder import Embedder
 
 from text_dedup import logger
 from text_dedup.utils.args import IOArgs
@@ -16,6 +20,24 @@ from text_dedup.utils.load import load_hf_dataset
 from text_dedup.utils.memory import DisableReferenceCount
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.union_find import UnionFind
+
+
+class WrapInferenceSession:
+    def __init__(self, *args, **kwargs):
+        self.sess = InferenceSession(*args, **kwargs)
+        self.args = args
+        self.kwargs = kwargs
+
+    def run(self, *args):
+        return self.sess.run(*args)
+
+    def __getstate__(self):
+        return {"args": self.args, "kwargs": self.kwargs}
+
+    def __setstate__(self, values):
+        self.args = values["args"]
+        self.kwargs = values["kwargs"]
+        self.sess = InferenceSession(*self.args, **self.kwargs)
 
 
 @click.command
@@ -36,48 +58,105 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
         use_accelerator=unisim_args.use_accelerator,
     )
 
+    # A workaround to enable multiprocessing for the inference session
+    fpath = Path(inspect.getfile(Embedder))
+    mpath = fpath.parent / "models" / unisim_args.model_id
+    providers = ["CPUExecutionProvider"] if not unisim_args.use_accelerator else ["CUDAExecutionProvider"]
+    sess = WrapInferenceSession(str(mpath.with_suffix(".onnx")), providers=providers)
+    text_sim.embedder.model["sess"] = sess
+
     with timer("Total"):
-        with timer("Load Dataset"):
+        with timer("Loading"):
             ds = load_hf_dataset(io_args)
+            if meta_args.idx_column is not None:
+                original_idx = ds[meta_args.idx_column]
+            else:
+                original_idx = list(range(len(ds)))
+
             ds = ds.map(lambda x, i: {"__idx__": i}, with_indices=True, num_proc=io_args.num_proc)
+            meta_args.idx_column = "__idx__"
+            id2id = {new: old for new, old in zip(ds["__idx__"], original_idx)}
+
+        with timer("Embedding"):
+            ds = ds.map(
+                lambda batch: {
+                    "__embeddings__": text_sim.embedder.embed(batch[meta_args.column]),
+                },
+                num_proc=io_args.num_proc,
+                batched=True,
+                batch_size=meta_args.batch_size,
+                new_fingerprint="Thisisatestb",
+                cache_file_name="Thisisatestb.b",
+                load_from_cache_file=True,
+            )
 
         LEN_DATASET = len(ds)
         NUM_SHARDS = np.ceil(LEN_DATASET / meta_args.batch_size).astype(int)
+        text_sim._lazy_init()
 
-        with timer("Index Dataset"):
+        with timer("Indexing"):
             for batch_idx in tqdm(
                 range(0, NUM_SHARDS),
                 dynamic_ncols=True,
-                desc="Iterating Embeddings...",
+                desc="Indexing embeddings...",
             ):
-                # Iterate over each batch dataset from the total hash embedded dataset
                 shard = ds.shard(
                     num_shards=NUM_SHARDS, index=batch_idx, contiguous=True, writer_batch_size=meta_args.batch_size
                 )
-                text_sim.add(shard[meta_args.column])
+                batch_indices = shard[meta_args.idx_column]
+                batch_embedds = shard["__embeddings__"]
+                text_sim.indexer.add(batch_embedds, batch_indices)
+                if unisim_args.store_data:
+                    text_sim.indexed_data.extend(shard[meta_args.column])
+
+        with timer("Querying"):
+            results = []
+
+            for batch_idx in tqdm(
+                range(0, NUM_SHARDS),
+                dynamic_ncols=True,
+                desc="Querying embeddings...",
+            ):
+                shard = ds.shard(
+                    num_shards=NUM_SHARDS, index=batch_idx, contiguous=True, writer_batch_size=meta_args.batch_size
+                )
+
+                remain_embedds = shard["__embeddings__"]
+                remain_indices = shard[meta_args.idx_column]
+                shard_results = [[] for _ in remain_indices]
+                k = 20
+                while remain_embedds and remain_indices:
+                    res = text_sim.indexer.search(
+                        queries=[_ for _ in remain_indices],
+                        query_embeddings=np.asarray(remain_embedds),
+                        similarity_threshold=unisim_args.similarity_threshold,
+                        k=k,
+                        drop_closest_match=True,
+                        return_data=unisim_args.store_data,
+                        return_embeddings=unisim_args.return_embeddings,
+                        data=text_sim.indexed_data,
+                    )
+                    res = [
+                        [m for m in r.matches if m.similarity >= unisim_args.similarity_threshold] for r in res.results
+                    ]
+                    unfinished = []
+                    for i, r in enumerate(res):
+                        if r and len(r) == k:
+                            unfinished.append(i)
+                        else:
+                            shard_results[i].extend(r)
+
+                    remain_indices = [remain_indices[i] for i in unfinished]
+                    remain_embedds = [remain_embedds[i] for i in unfinished]
+
+                    k *= 2
+
+                results.extend(zip(shard[meta_args.idx_column], shard_results))
 
         with timer("Clustering"):
-            for idx in tqdm(range(len(ds))):
-                # ! Since there is no easy way to exhaustively search all candidates with a given similarity_threshold,
-                # ! we use a simple heuristic to find the all the cnadidates with a back-off strategy.
-                # TODO: this could be a bottlebeck for large datasets.
-                results = []
-                k = 20
-                while True:
-                    res = text_sim.search(
-                        [ds[idx][meta_args.column]],
-                        similarity_threshold=unisim_args.similarity_threshold,
-                        drop_closest_match=True,
-                        k=k,
-                    )
-                    curr_res = [m for m in res.results[0].matches if m.similarity >= unisim_args.similarity_threshold]
-                    if curr_res and len(curr_res) == k:
-                        k *= 2
-                        continue
-                    results = curr_res
-                    break
-                for match in results:
-                    uf.union(match.idx, idx)
+            for idx, matches in tqdm(results):
+                for match in matches:
+                    uf.union(idx, match.idx)
 
         with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
@@ -102,7 +181,11 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
             final_data.save_to_disk(io_args.output)
             if io_args.debug:
                 with open(os.path.join(io_args.output, "uf.pkl"), "wb") as f:
-                    pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
+                    # use the original index instead of the new one
+                    new_uf = UnionFind()
+                    for key in uf.parent:
+                        new_uf.union(id2id[key], id2id[uf.find(key)])
+                    pickle.dump(new_uf, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         with timer("Cleaning"):
             if io_args.clean_cache:

@@ -10,14 +10,16 @@ from datasets import Features
 from datasets import Sequence
 from datasets import Value
 
+from text_dedup.ann_unisim import main as unisim_main
 from text_dedup.minhash import main as minhash_main
 from text_dedup.simhash import main as simhash_main
 from text_dedup.utils import IOArgs
 from text_dedup.utils import MetaArgs
 from text_dedup.utils import MinHashArgs
 from text_dedup.utils import SimHashArgs
-from text_dedup.utils.timer import Timer
-from text_dedup.utils.union_find import UnionFind
+from text_dedup.utils import Timer
+from text_dedup.utils import UnionFind
+from text_dedup.utils import UniSimArgs
 
 NUM_PROC = os.cpu_count()
 
@@ -290,6 +292,23 @@ if __name__ == "__main__":
             minhash_args=minhash_args,
         )
 
+    with t("UniSim"):
+        ctx = click.Context(unisim_main)
+        unisim_args = UniSimArgs(
+            store_data=False,
+            index_type="approx",
+            similarity_threshold=0.86,
+        )
+        io_args.output = unisim_output = "./temp_output_unisim"
+        meta_args.batch_size = 48
+        ctx.invoke(
+            unisim_main,
+            io_args=io_args,
+            meta_args=meta_args,
+            unisim_args=unisim_args,
+        )
+
+    uf2results(f"{unisim_output}/uf.pkl", "UniSim", t.elapsed_times.get("UniSim"))
     uf2results(f"{spark_output}/uf.pkl", "MinHash Spark", t.elapsed_times.get("MinHash Spark"))
     uf2results(f"{minhash_output}/uf.pkl", "MinHash", t.elapsed_times.get("MinHash"))
     uf2results(f"{simhash_output}/uf.pkl", "SimHash", t.elapsed_times.get("SimHash"))

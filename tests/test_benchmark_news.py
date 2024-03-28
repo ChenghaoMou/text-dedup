@@ -7,12 +7,14 @@ import datasets
 import pandas as pd
 from sklearn.metrics import adjusted_rand_score
 
+from text_dedup.ann_unisim import main as unisim_main
 from text_dedup.minhash import main as minhash_main
 from text_dedup.simhash import main as simhash_main
 from text_dedup.utils import IOArgs
 from text_dedup.utils import MetaArgs
 from text_dedup.utils import MinHashArgs
 from text_dedup.utils import SimHashArgs
+from text_dedup.utils import UniSimArgs
 from text_dedup.utils.preprocess import news_copy_preprocessing
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.union_find import UnionFind
@@ -21,7 +23,6 @@ NUM_PROC = os.cpu_count()
 
 
 def prepare_data(dataset, output_path_ds, output_path_spark):
-    clusters = dataset["cluster"]
     dataset = dataset.map(
         lambda x: {"text": news_copy_preprocessing(x["article"])},
         num_proc=NUM_PROC,
@@ -30,7 +31,7 @@ def prepare_data(dataset, output_path_ds, output_path_spark):
     os.makedirs(output_path_spark, exist_ok=True)
     dataset.to_pandas().to_parquet(output_path_spark + "/data.parquet")
 
-    return clusters
+    return dataset["cluster"]
 
 
 def uf2results(labels, output_path):
@@ -122,6 +123,23 @@ if __name__ == "__main__":
             simhash_args=simhash_args,
         )
 
+    with t("UniSim"):
+        ctx = click.Context(unisim_main)
+        unisim_args = UniSimArgs(
+            store_data=False,
+            index_type="approx",
+            similarity_threshold=0.89,
+        )
+        io_args.output = unisim_output = "./temp_output_unisim"
+        meta_args.batch_size = 24
+        ctx.invoke(
+            unisim_main,
+            io_args=io_args,
+            meta_args=meta_args,
+            unisim_args=unisim_args,
+        )
+
     print(f"MinHash (Spark) ARI: {uf2results(labels, f'{spark_output}/uf.pkl')}")
     print(f"MinHash ARI: {uf2results(labels, f'{minhash_output}/uf.pkl')}")
     print(f"SimHash ARI: {uf2results(labels, f'{simhash_output}/uf.pkl')}")
+    print(f"UniSim ARI: {uf2results(labels, f'{unisim_output}/uf.pkl')}")

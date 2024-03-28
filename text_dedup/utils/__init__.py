@@ -9,6 +9,7 @@ from text_dedup.utils.args import MetaArgs
 from text_dedup.utils.args import MinHashArgs
 from text_dedup.utils.args import SAArgs
 from text_dedup.utils.args import SimHashArgs
+from text_dedup.utils.args import UniSimArgs
 from text_dedup.utils.hashfunc import sha1_hash
 from text_dedup.utils.hashfunc import xxh3_hash
 from text_dedup.utils.timer import Timer
@@ -22,6 +23,7 @@ __all__ = [
     "ExactHashArgs",
     "MinHashArgs",
     "SimHashArgs",
+    "UniSimArgs",
     "SAArgs",
     "Timer",
     "ngrams",
