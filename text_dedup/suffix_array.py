@@ -16,7 +16,6 @@ from typing import Sequence
 
 import click
 import datasets
-from datasets import Dataset
 
 from text_dedup import logger
 from text_dedup.utils import IOArgs
@@ -321,7 +320,7 @@ def main(
 
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_hf_dataset(io_args)
+            ds, _ = load_hf_dataset(io_args=io_args, meta_args=meta_args)
 
         with timer("Preprocessing"):
             offsets: list[slice] = []

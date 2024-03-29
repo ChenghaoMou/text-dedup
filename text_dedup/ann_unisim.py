@@ -1,6 +1,5 @@
 import inspect
 import os
-import pickle  # nosec
 import random
 from pathlib import Path
 
@@ -12,14 +11,18 @@ from unisim import TextSim
 from unisim.embedder import Embedder
 
 from text_dedup import logger
-from text_dedup.utils.args import IOArgs
-from text_dedup.utils.args import MetaArgs
-from text_dedup.utils.args import UniSimArgs
-from text_dedup.utils.inspect import random_samples
-from text_dedup.utils.load import load_hf_dataset
-from text_dedup.utils.memory import DisableReferenceCount
-from text_dedup.utils.timer import Timer
-from text_dedup.utils.union_find import UnionFind
+from text_dedup.utils import CLUSTER_COLUMN
+from text_dedup.utils import INDEX_COLUMN
+from text_dedup.utils import DisableReferenceCount
+from text_dedup.utils import IOArgs
+from text_dedup.utils import MetaArgs
+from text_dedup.utils import Timer
+from text_dedup.utils import UnionFind
+from text_dedup.utils import UniSimArgs
+from text_dedup.utils import load_hf_dataset
+from text_dedup.utils import random_samples
+
+EMBEDDING_COLUMN = "__embeddings__"
 
 
 class WrapInferenceSession:
@@ -67,26 +70,16 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
 
     with timer("Total"):
         with timer("Loading"):
-            ds = load_hf_dataset(io_args)
-            if meta_args.idx_column is not None:
-                original_idx = ds[meta_args.idx_column]
-            else:
-                original_idx = list(range(len(ds)))
-
-            ds = ds.map(lambda x, i: {"__idx__": i}, with_indices=True, num_proc=io_args.num_proc)
-            meta_args.idx_column = "__idx__"
-            id2id = {new: old for new, old in zip(ds["__idx__"], original_idx)}
+            ds, id2id = load_hf_dataset(io_args=io_args, meta_args=meta_args)
 
         with timer("Embedding"):
             ds = ds.map(
                 lambda batch: {
-                    "__embeddings__": text_sim.embedder.embed(batch[meta_args.column]),
+                    EMBEDDING_COLUMN: text_sim.embedder.embed(batch[meta_args.column]),
                 },
                 num_proc=io_args.num_proc,
                 batched=True,
                 batch_size=meta_args.batch_size,
-                new_fingerprint="Thisisatestb",
-                cache_file_name="Thisisatestb.b",
                 load_from_cache_file=True,
             )
 
@@ -103,8 +96,8 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
                 shard = ds.shard(
                     num_shards=NUM_SHARDS, index=batch_idx, contiguous=True, writer_batch_size=meta_args.batch_size
                 )
-                batch_indices = shard[meta_args.idx_column]
-                batch_embedds = shard["__embeddings__"]
+                batch_indices = shard[INDEX_COLUMN]
+                batch_embedds = shard[EMBEDDING_COLUMN]
                 text_sim.indexer.add(batch_embedds, batch_indices)
                 if unisim_args.store_data:
                     text_sim.indexed_data.extend(shard[meta_args.column])
@@ -121,8 +114,8 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
                     num_shards=NUM_SHARDS, index=batch_idx, contiguous=True, writer_batch_size=meta_args.batch_size
                 )
 
-                remain_embedds = shard["__embeddings__"]
-                remain_indices = shard[meta_args.idx_column]
+                remain_embedds = shard[EMBEDDING_COLUMN]
+                remain_indices = shard[INDEX_COLUMN]
                 shard_results = [[] for _ in remain_indices]
                 k = 20
                 while remain_embedds and remain_indices:
@@ -151,7 +144,7 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
 
                     k *= 2
 
-                results.extend(zip(shard[meta_args.idx_column], shard_results))
+                results.extend(zip(shard[INDEX_COLUMN], shard_results))
 
         with timer("Clustering"):
             for idx, matches in tqdm(results):
@@ -160,15 +153,15 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
 
         with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
-                function=lambda _, idx: {"__cluster__": uf.find(idx)},
-                with_indices=True,
+                function=lambda record: {CLUSTER_COLUMN: uf.find(record[INDEX_COLUMN])},
+                with_indices=False,
                 num_proc=io_args.num_proc,  # type: ignore
                 new_fingerprint=str(random.getrandbits(128)),  # type: ignore
                 desc="Finding clusters...",  # type: ignore
             )
             final_data = ds.filter(
-                function=lambda record, idx: record["__cluster__"] == idx,
-                with_indices=True,
+                function=lambda record: record[CLUSTER_COLUMN] == record[INDEX_COLUMN],
+                with_indices=False,
                 num_proc=io_args.num_proc,
                 desc="Filtering clusters...",
             )
@@ -180,12 +173,7 @@ def main(io_args: IOArgs, meta_args: MetaArgs, unisim_args: UniSimArgs):
             final_data = final_data.remove_columns(["__cluster__"])
             final_data.save_to_disk(io_args.output)
             if io_args.debug:
-                with open(os.path.join(io_args.output, "uf.pkl"), "wb") as f:
-                    # use the original index instead of the new one
-                    new_uf = UnionFind()
-                    for key in uf.parent:
-                        new_uf.union(id2id[key], id2id[uf.find(key)])
-                    pickle.dump(new_uf, f, protocol=pickle.HIGHEST_PROTOCOL)
+                uf.dump(os.path.join(io_args.output, "uf.pkl"), id2id=id2id)
 
         with timer("Cleaning"):
             if io_args.clean_cache:

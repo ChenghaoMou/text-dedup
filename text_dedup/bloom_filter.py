@@ -6,7 +6,6 @@ from typing import Callable
 
 import click
 import numpy as np
-from datasets import Dataset
 from pybloom_live import ScalableBloomFilter
 from tqdm import tqdm
 
@@ -50,7 +49,7 @@ def main(
 
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_hf_dataset(io_args)
+            ds, _ = load_hf_dataset(io_args=io_args, meta_args=meta_args)
 
         LEN_DATASET = len(ds)
         NUM_SHARDS = int(np.ceil(LEN_DATASET / meta_args.batch_size))

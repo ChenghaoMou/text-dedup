@@ -270,15 +270,15 @@ INFO     After                         : 47045
 <details>
 <summary>pinecone/core-2020-05-10-deduplication</summary>
 
-See `tests/test_benchmark_core.py` for reproduction.
+See `tests/benchmark_core.py` for reproduction.
 
 | Algorithm                       | Precision (Duplicates) | Recall (Duplicates) | Precision (Non Duplicates) | Recall (Non Duplicates) | Macro F1 score |  Accuracy | Time     |
 | :------------------------------ | ---------------------: | ------------------: | -------------------------: | ----------------------: | -------------: | --------: | :------- |
-| MinHash (Spark)                 |                  0.957 |               0.945 |                      0.947 |                   0.959 |      **0.952** |     0.920 | 698.76s  |
-| MinHash                         |                  0.959 |               0.945 |                      0.947 |                   0.962 |      **0.953** |     0.924 | 18.80s   |
-| SimHash                         |                  0.904 |               0.721 |                      0.792 |                   0.933 |          0.848 |     0.832 | 660.73s  |
-| UniSim/RETSimNear-Dup + ANN     |                  0.931 |               0.892 |                      0.905 |                   0.939 |          0.918 |     0.905 | 1222.87s |
-| Exact Title                     |                  0.830 |               0.552 |                      0.710 |                   0.907 |           0.77 |     0.746 | -        |
+| UniSim                          |                 0.9307 |              0.8924 |                     0.9055 |                  0.9394 |         0.9181 |    0.9054 | 1305.79s |
+| MinHash Spark                   |                  0.957 |              0.9445 |                     0.9471 |                   0.959 |          0.952 |    0.9202 | 691.77s  |
+| MinHash                         |                 0.9594 |              0.9445 |                     0.9474 |                  0.9616 |     **0.9534** |     0.924 | 18.88s   |
+| SimHash                         |                 0.9042 |               0.721 |                      0.792 |                  0.9329 |         0.8481 |    0.8321 | 644.36s  |
+| Exact Title                     |                 0.8302 |              0.5521 |                     0.7098 |                  0.9065 |           0.77 |    0.7456 | -        |
 | Exact Title Matching [^1]       |                  0.830 |                0.50 |                      0.709 |                   0.992 |          0.757 |     0.746 | -        |
 | Simhash Matching [^1]           |                  0.697 |               0.247 |                      0.598 |                   0.985 |          0.631 |     0.616 | -        |
 | Document Vector Similarity [^1] |                  0.912 |               0.779 |                      0.861 |                   0.986 |          0.885 |     0.883 | -        |
@@ -294,29 +294,29 @@ See `tests/test_benchmark_core.py` for reproduction.
 <details>
 <summary>NEWS-COPY</summary>
 
-See `tests/test_benchmark_news.py` for reproduction.
+See `tests/benchmark_news.py` for reproduction.
 
 Adjusted Rand Index (ARI) on NEWS-COPY dataset:
 
 | Model/Algorithm          | ARI       |
 | :----------------------- | :-------- |
-| n-gram [^3]              | 0.440     |
 | SimHash                  | 0.612     |
-| SimHash[^2]              | 0.695     |
 | MinHash (Spark)          | 0.740     |
 | MinHash                  | 0.742     |
+| RETSim Near-Dup + ANN*   | _0.051_   |
+| n-gram [^3]              | 0.440     |
+| SimHash[^2]              | 0.695     |
 | MinHash[^3]              | 0.737     |
 | MinHash[^2]              | 0.783     |
 | Multilingual USE[^2]     | 0.730     |
 | Multilingual E5-Base[^2] | 0.742     |
 | S-BERT[^3]               | 0.700     |
-| RETSim Near-Dup + ANN*   | _0.051_ |
 | RETSim Partial-Dup[^2]   | 0.831     |
 | RETSim Near-Dup[^2]      | 0.704     |
 | Re-ranking [^3]          | **0.937** |
 | Bi-encoder [^3]          | 0.915     |
 
-\*: I can't seem to reproduce the results in the paper.
+\*: I can't seem to reproduce the results from the paper.
 
 [^1]: [Deduplication of Scholarly Documents using Locality Sensitive Hashing and Word Embeddings](https://aclanthology.org/2020.lrec-1.113)
 [^2]: [RETSim: Resilient and Efficient Text Similarity](https://arxiv.org/abs/2311.17264)

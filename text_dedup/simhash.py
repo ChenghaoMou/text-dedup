@@ -6,7 +6,6 @@ from __future__ import annotations
 import math
 import multiprocessing as mp
 import os
-import pickle  # nosec
 import random
 from collections import defaultdict
 from itertools import permutations
@@ -18,24 +17,27 @@ import datasets
 import numpy as np
 from bitarray import bitarray
 from bitarray import frozenbitarray
-from datasets import Dataset
 from tqdm import tqdm
 
 from text_dedup import logger
+from text_dedup.utils import CLUSTER_COLUMN
+from text_dedup.utils import INDEX_COLUMN
+from text_dedup.utils import DisableReferenceCount
 from text_dedup.utils import IOArgs
 from text_dedup.utils import MetaArgs
 from text_dedup.utils import SimHashArgs
+from text_dedup.utils import Timer
 from text_dedup.utils import UnionFind
+from text_dedup.utils import load_hf_dataset
 from text_dedup.utils import ngrams
-from text_dedup.utils.hashfunc import xxh3_64_digest
-from text_dedup.utils.hashfunc import xxh3_128_digest
-from text_dedup.utils.load import load_hf_dataset
-from text_dedup.utils.memory import DisableReferenceCount
-from text_dedup.utils.timer import Timer
+from text_dedup.utils import xxh3_64_digest
+from text_dedup.utils import xxh3_128_digest
 
 mp.set_start_method("fork", force=True)
 datasets.logging.set_verbosity_error()
 uf = UnionFind()
+KEY_COLUMN = "__keys__"
+SIGNATURE_COLUMN = "__signature__"
 
 
 def _hamming_distance(a: bitarray, b: bitarray) -> int:
@@ -204,7 +206,6 @@ def _create_permutations(f: int, k: int, b: int) -> list[Permutation]:
             y = (f - x * max_block_size) // min_block_size
             break
 
-    logger.info(f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size}")
     assert (
         x * max_block_size + y * min_block_size == f
     ), f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size} are invalid"
@@ -330,9 +331,9 @@ def embed_func(
     Examples
     --------
     >>> res = embed_func("hello world", 0, ngram=3, permutations=None, hash_func=xxh3_64_digest)
-    >>> res["__id__"]
+    >>> res[INDEX_COLUMN]
     0
-    >>> len(res["__signature__"])
+    >>> len(res[SIGNATURE_COLUMN])
     8
     """
     tokens = {bytes("".join(ng).lower(), "utf-8") for ng in ngrams(list(content), n=ngram)}
@@ -346,7 +347,7 @@ def embed_func(
                     (permutation.permute(sig) & permutation.search_mask).tobytes(),
                 )
             )
-    return {"__id__": idx, "__keys__": keys, "__signature__": sig.tobytes()}
+    return {INDEX_COLUMN: idx, KEY_COLUMN: keys, SIGNATURE_COLUMN: sig.tobytes()}
 
 
 @click.command
@@ -369,7 +370,7 @@ def main(
 
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_hf_dataset(io_args)
+            ds, id2id = load_hf_dataset(io_args=io_args, meta_args=meta_args)
 
         LEN_DATASET = len(ds)  # type: ignore
 
@@ -381,12 +382,10 @@ def main(
                     "permutations": PERMUTATIONS,
                     "hash_func": hash_func,
                 },
-                input_columns=(
-                    [meta_args.column] if meta_args.idx_column is None else [meta_args.column, meta_args.idx_column]
-                ),
+                input_columns=[meta_args.column, INDEX_COLUMN],
                 remove_columns=[meta_args.column],
                 num_proc=io_args.num_proc,  # type: ignore
-                with_indices=True if meta_args.idx_column is None else False,
+                with_indices=False,
                 desc="SimHashing...",  # type: ignore
             )
 
@@ -404,7 +403,7 @@ def main(
                     num_shards=NUM_SHARDS, index=batch_idx, contiguous=True, writer_batch_size=meta_args.batch_size
                 )
                 for idx, keys, sig in tqdm(
-                    zip(embedded_shard["__id__"], embedded_shard["__keys__"], embedded_shard["__signature__"]),
+                    zip(embedded_shard[INDEX_COLUMN], embedded_shard[KEY_COLUMN], embedded_shard[SIGNATURE_COLUMN]),
                     desc="Indexing...",
                     leave=False,
                     total=len(embedded_shard),
@@ -429,8 +428,8 @@ def main(
 
         with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
-                function=lambda _, idx: {"__cluster__": uf.find(idx)},
-                with_indices=True,
+                function=lambda record: {CLUSTER_COLUMN: uf.find(record[INDEX_COLUMN])},
+                with_indices=False,
                 num_proc=io_args.num_proc,  # type: ignore
                 new_fingerprint=str(random.getrandbits(128)),  # type: ignore
                 desc="Finding clusters...",  # type: ignore
@@ -439,18 +438,17 @@ def main(
             # Since there is no easy groupby in datasets
             # I will use this simple filter for now
             final_data = ds.filter(
-                function=lambda record, idx: record["__cluster__"] == idx,
-                with_indices=True,
+                function=lambda record: record[CLUSTER_COLUMN] == record[INDEX_COLUMN],
+                with_indices=False,
                 num_proc=io_args.num_proc,
                 desc="Filtering clusters...",
             )
 
         with timer("Saving"):
-            final_data = final_data.remove_columns(["__cluster__"])
+            final_data = final_data.remove_columns([CLUSTER_COLUMN, INDEX_COLUMN])
             final_data.save_to_disk(io_args.output)
             if io_args.debug:
-                with open(os.path.join(io_args.output, "uf.pkl"), "wb") as f:
-                    pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
+                uf.dump(path=os.path.join(io_args.output, "uf.pkl"), id2id=id2id)
 
         with timer("Cleaning"):
             if io_args.clean_cache:

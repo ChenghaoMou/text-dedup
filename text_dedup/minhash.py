@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
-import pickle  # nosec
 import random
 import re
 from collections import defaultdict
@@ -15,22 +14,23 @@ from typing import Callable
 import click
 import datasets
 import numpy as np
-from datasets import Dataset
 from tqdm import tqdm
 
 from text_dedup import logger
+from text_dedup.utils import CLUSTER_COLUMN
+from text_dedup.utils import INDEX_COLUMN
+from text_dedup.utils import DisableReferenceCount
+from text_dedup.utils import IOArgs
+from text_dedup.utils import MetaArgs
+from text_dedup.utils import MinHashArgs
+from text_dedup.utils import Timer
 from text_dedup.utils import UnionFind
+from text_dedup.utils import load_hf_dataset
 from text_dedup.utils import ngrams
-from text_dedup.utils.analysis import optimal_param
-from text_dedup.utils.args import IOArgs
-from text_dedup.utils.args import MetaArgs
-from text_dedup.utils.args import MinHashArgs
-from text_dedup.utils.hashfunc import sha1_hash
-from text_dedup.utils.hashfunc import xxh3_16hash
-from text_dedup.utils.hashfunc import xxh3_32hash
-from text_dedup.utils.load import load_hf_dataset
-from text_dedup.utils.memory import DisableReferenceCount
-from text_dedup.utils.timer import Timer
+from text_dedup.utils import optimal_param
+from text_dedup.utils import sha1_hash
+from text_dedup.utils import xxh3_16hash
+from text_dedup.utils import xxh3_32hash
 
 SEED = 42
 RNG = np.random.RandomState(SEED)
@@ -40,6 +40,7 @@ datasets.logging.set_verbosity_error()
 # is not copied to child processes as long as it is not modified.
 mp.set_start_method("fork", force=True)
 uf = UnionFind()
+SIGNATURE_COLUMN = "__signatures__"
 
 
 def embed_func(
@@ -106,9 +107,9 @@ def embed_func(
     ...     max_hash=max_hash,
     ...     modulo_prime=modulo_prime,
     ... )
-    >>> len(res["__signatures__"])
+    >>> len(res[SIGNATURE_COLUMN])
     10
-    >>> res["__id__"]
+    >>> res[INDEX_COLUMN]
     0
     """
     # a, b are each np.ndarray arrays containing {num_perm} pairs of random numbers used for building new hashes
@@ -133,7 +134,7 @@ def embed_func(
     # keeping  for backward compatibility, even though theoretically and empirically
     # it doesnt matter if it is there or not. github.com/ekzhu/datasketch/issues/114
     Hs: list[bytes] = [bytes(hashvalues[start:end].byteswap().data) for start, end in hashranges]
-    return {"__signatures__": Hs, "__id__": idx}
+    return {SIGNATURE_COLUMN: Hs, INDEX_COLUMN: idx}
 
 
 @click.command
@@ -213,7 +214,7 @@ def main(
 
     with timer("Total"):
         with timer("Loading"):
-            ds: Dataset = load_hf_dataset(io_args)
+            ds, id2id = load_hf_dataset(io_args=io_args, meta_args=meta_args)
             ds = ds.filter(
                 lambda x: len(NON_ALPHA.split(x[meta_args.column].lower())) >= minhash_args.min_length,
                 num_proc=io_args.num_proc,
@@ -235,12 +236,10 @@ def main(
                     "max_hash": MAX_HASH,
                     "modulo_prime": MODULO_PRIME,
                 },
-                input_columns=(
-                    [meta_args.column] if meta_args.idx_column is None else [meta_args.column, meta_args.idx_column]
-                ),
-                remove_columns=ds.column_names,
+                input_columns=[meta_args.column, INDEX_COLUMN],
+                remove_columns=[col for col in ds.column_names if col != INDEX_COLUMN],
                 num_proc=io_args.num_proc,
-                with_indices=True if meta_args.idx_column is None else False,
+                with_indices=False,
                 desc="Fingerprinting...",
             )
             LEN_EMBEDDED = len(embedded)
@@ -259,7 +258,7 @@ def main(
                     contiguous=True,
                     writer_batch_size=meta_args.batch_size,
                 )
-                for key, Hs in zip(embedded_shard["__id__"], embedded_shard["__signatures__"]):
+                for key, Hs in zip(embedded_shard[INDEX_COLUMN], embedded_shard[SIGNATURE_COLUMN]):
                     for i, H in enumerate(Hs):
                         HASH_TABLES[i][H].add(key)
 
@@ -277,8 +276,8 @@ def main(
 
         with timer("Filtering"), DisableReferenceCount():
             ds = ds.map(
-                function=lambda _, idx: {"__cluster__": uf.find(idx)},
-                with_indices=True,
+                function=lambda record: {CLUSTER_COLUMN: uf.find(record[INDEX_COLUMN])},
+                with_indices=False,
                 num_proc=io_args.num_proc,
                 new_fingerprint=str(random.getrandbits(128)),
                 desc="Finding clusters...",
@@ -287,18 +286,17 @@ def main(
             # Since there is no easy groupby in datasets
             # I will use this simple filter for now
             final_data = ds.filter(
-                function=lambda record, idx: record["__cluster__"] == idx,
-                with_indices=True,
+                function=lambda record: record[CLUSTER_COLUMN] == record[INDEX_COLUMN],
+                with_indices=False,
                 num_proc=io_args.num_proc,
                 desc="Filtering clusters...",
             )
 
         with timer("Saving"):
-            final_data = final_data.remove_columns(["__cluster__"])
+            final_data = final_data.remove_columns([CLUSTER_COLUMN, INDEX_COLUMN])
             final_data.save_to_disk(io_args.output)
             if io_args.debug:
-                with open(os.path.join(io_args.output, "uf.pkl"), "wb") as f:
-                    pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)
+                uf.dump(os.path.join(io_args.output, "uf.pkl"), id2id=id2id)
 
         with timer("Cleaning"):
             if io_args.clean_cache:

@@ -255,4 +255,8 @@ __all__ = [
     "xxh3_hash",
     "xxh3_16hash",
     "xxh3_32hash",
+    "md5_digest",
+    "md5_hexdigest",
+    "sha256_digest",
+    "sha256_hexdigest",
 ]
