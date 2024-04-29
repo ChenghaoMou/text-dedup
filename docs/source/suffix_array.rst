@@ -60,7 +60,7 @@ Example
     --path "oscar-corpus/OSCAR-2201" \
     --name "gl" \
     --split "train" \
-    --cache_dir "./cache" \
+    --use_auth_token true    --cache_dir "./cache" \
     --output "output" \
     --column "text" \
     --google_repo_path "deduplicate-text-datasets"

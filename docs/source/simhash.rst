@@ -53,7 +53,8 @@ Example
   --cache_dir "./cache" \
   --output "output/simhash/oscar_gl_dedup" \
   --column "text" \
-  --batch_size 10000
+  --batch_size 10000 \
+  --use_auth_token true
 
 API Reference
 -------------

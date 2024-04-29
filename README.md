@@ -7,7 +7,9 @@
 ```bash
 pip install text-dedup
 ```
+
 or
+
 ```bash
 pip install git+https://github.com/ChenghaoMou/text-dedup
 ```
@@ -51,7 +53,7 @@ This repository is inspired by the following projects, and is heavily influenced
 
 <summary>Native PySpark</summary>
 
-*MODIFY `text_dedup/minhash_spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!*
+_MODIFY `text_dedup/minhash_spark.py` FOR YOUR OWN PROJECT AND DATASET FIRST!_
 
 Assuming you have a downloaded dataset (in parquet files) under "./temp-data", you can process with file with your local compute by:
 
@@ -120,6 +122,7 @@ python text_dedup/ann_unisim.py --path truthful_qa --name generation --split val
 ```
 
 Output:
+
 ```
 INFO     Load Dataset                    : 5.56s
 INFO     Index Dataset                   : 8.13s
@@ -147,7 +150,8 @@ python -m text_dedup.suffix_array \
     --cache_dir "./cache" \
     --output "output/suffix_array/oscar_gl_dedup" \
     --column "text" \
-    --google_repo_path "/Users/chenghao/Downloads/Projects/text-dedup/deduplicate-text-datasets"
+    --google_repo_path "/Users/chenghao/Downloads/Projects/text-dedup/deduplicate-text-datasets" \
+    --use_auth_token true
 
 # output
 INFO     Loading                       : 2.75 seconds
@@ -161,6 +165,7 @@ INFO     Total                         : 125.45 seconds
 INFO     Before                        : 180332342 bytes (88803)
 INFO     After                         : 97646271 bytes (40404)
 ```
+
 </details>
 <details>
 
@@ -175,7 +180,8 @@ python -m text_dedup.minhash \
   --cache_dir "./cache" \
   --output "output/minhash/oscar_gl_dedup" \
   --column "text" \
-  --batch_size 10000
+  --batch_size 10000 \
+  --use_auth_token true
 
 # output
 INFO     Loading                         : 2.62 seconds
@@ -189,6 +195,7 @@ INFO     Data Number (after)             : 44124 (49.69%)
 INFO     Duplicate Number                : 44679 (50.31%)
 INFO     🤗 Happy Deduplicating 🤗
 ```
+
 </details>
 
 <details>
@@ -203,7 +210,8 @@ python -m text_dedup.simhash \
   --cache_dir "./cache" \
   --output "output/simhash/oscar_gl_dedup" \
   --column "text" \
-  --batch_size 10000
+  --batch_size 10000 \
+  --use_auth_token true
 
 # output
 INFO     Loading                         : 2.60 seconds
@@ -217,6 +225,7 @@ INFO     Data Number (after)             : 46163 (51.98%)
 INFO     Duplicate Number                : 42640 (48.02%)
 INFO     🤗 Happy Deduplicating 🤗
 ```
+
 </details>
 
 <details>
@@ -231,7 +240,8 @@ python -m text_dedup.exact_hash \
     --cache_dir "./cache" \
     --output "output/exact_hash/oscar_gl_dedup" \
     --column "text" \
-    --batch_size 1000
+    --batch_size 1000 \
+    --use_auth_token true
 
 # output
 INFO     Loading                       : 2.95s
@@ -242,6 +252,7 @@ INFO     Total                         : 9.72s
 INFO     Before                        : 88803
 INFO     After                         : 47049
 ```
+
 </details>
 
 <details>
@@ -257,7 +268,7 @@ python -m text_dedup.bloom_filter \
     --output "output/bloom_filter/oscar_gl_dedup" \
     --error_rate 1e-5 \
     --column "text" \
-    --batch_size 1000
+    --use_auth_token true    --batch_size 1000
 
 # output
 INFO     Loading                       : 2.72s
@@ -268,13 +279,13 @@ INFO     Total                         : 10.54s
 INFO     Before                        : 88803
 INFO     After                         : 47045
 ```
+
 </details>
 
 ## Benchmarks
 
 > [!note]
 > Spark implementation has some overhead for small datasets, so I recommend using the script only when you have a large dataset and enough compute resources.
-
 
 <details>
 <summary>pinecone/core-2020-05-10-deduplication</summary>
@@ -312,7 +323,7 @@ Adjusted Rand Index (ARI) on NEWS-COPY dataset:
 | SimHash                  | 0.612     |
 | MinHash (Spark)          | 0.740     |
 | MinHash                  | 0.742     |
-| RETSim Near-Dup + ANN*   | _0.051_   |
+| RETSim Near-Dup + ANN\*  | _0.051_   |
 | n-gram [^3]              | 0.440     |
 | SimHash[^2]              | 0.695     |
 | MinHash[^3]              | 0.737     |
@@ -332,9 +343,6 @@ Adjusted Rand Index (ARI) on NEWS-COPY dataset:
 [^3]: [Noise-Robust De-Duplication at Scale](https://www.semanticscholar.org/paper/Noise-Robust-De-Duplication-at-Scale-Silcock-D'Amico-Wong/7ca41cc5fc364b713aba5b573ae4ada801fd788a)
 
 </details>
-
-
-
 
 <!-- ## FAQ
 
