@@ -4,6 +4,8 @@
 
 ## Installation
 
+Only tested with Python 3.10 so far.
+
 ```bash
 pip install text-dedup
 ```
