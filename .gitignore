@@ -1,9 +1,6 @@
-.vscode
-.benchmarks
-docs/build
-*json
-temp.ipynb
-hyperparameter.sh
+docs/source
+
+# From https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -15,7 +12,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-# build/
+build/
 develop-eggs/
 dist/
 downloads/
@@ -27,7 +24,6 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -57,6 +53,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+cover/
 
 # Translations
 *.mo
@@ -79,6 +76,7 @@ instance/
 docs/_build/
 
 # PyBuilder
+.pybuilder/
 target/
 
 # Jupyter Notebook
@@ -88,17 +86,7 @@ target/
 profile_default/
 ipython_config.py
 
-# pyenv
-.python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
 # Celery stuff
@@ -135,28 +123,18 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-.DS_Store
-.idea
-.storage
-.shared
-.lightning*
-return_values
-cache
-results*
-outputs
-*rdb
-*jsonl
-app.py
-temp.py
-outputs.json
-benchmark.py
-visualize.py
-requirements.txt
-output
-*.arrow
-**/*pstats
-**/_SUCCESS
-**/*parquet
-**/checkpoints
-*code-workspace
-.ruff_cache
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Vscode config files
+.vscode/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
