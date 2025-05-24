@@ -17,11 +17,26 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+dependencies = [
+    "cloudpickle>=3.1.1",
+    "ftfy>=6.3.1",
+    "loguru>=0.7.3",
+    "pydantic-settings>=2.9.1",
+    "regex>=2024.11.6",
+    "scipy>=1.13.1",
+    "tqdm>=4.67.1",
+    "xxhash>=3.5.0",
+]
 
 [project.urls]
 Homepage = "https://ChenghaoMou.github.io/text-dedup/"
 Repository = "https://github.com/ChenghaoMou/text-dedup"
 Documentation = "https://ChenghaoMou.github.io/text-dedup/"
+
+[project.optional-dependencies]
+datasets = [
+    "datasets>=3.6.0",
+]
 
 [dependency-groups]
 dev = [
@@ -32,6 +47,8 @@ dev = [
     "mypy>=0.991",
     "pytest-cov>=4.0.0",
     "ruff>=0.11.5",
+    "types-tqdm>=4.67.0.20250516",
+    "types-regex>=2024.11.6.20250403",
 ]
 
 [build-system]
@@ -43,7 +60,7 @@ build-backend = "hatchling.build"
 [tool.mypy]
 files = ["src"]
 disallow_untyped_defs = true
-disallow_any_unimported = true
+disallow_any_unimported = false
 no_implicit_optional = true
 check_untyped_defs = true
 warn_return_any = true
@@ -101,6 +118,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
 
+[tool.ruff.lint.isort]
+force-single-line = true
+
 [tool.ruff.format]
 preview = true
 
@@ -110,3 +130,6 @@ skip_empty = true
 [tool.coverage.run]
 branch = true
 source = ["src"]
+
+[tool.bandit]
+exclude = ["tests/*"]
