@@ -1,12 +1,12 @@
 import subprocess  # nosec
 
 
-def test_simhash():
+def test_exact_hash():
     result = subprocess.run(
         [
             "python",
             "-m",
-            "text_dedup.simhash",
+            "text_dedup.exact_hash",
             "--path",
             "allenai/c4",
             "--name",
@@ -28,9 +28,9 @@ def test_simhash():
 
     # check the output
     print(f"Output:\n{result.stdout}")
-    assert (
-        "69048" in result.stdout and "66756" in result.stdout
-    ), f"Expected before and after are not present in the output: {result.stdout}"
+    assert "69048" in result.stdout and "69048" in result.stdout, (
+        f"Expected before and after are not present in the output: {result.stdout}"
+    )
 
     # remove the output and input
     # subprocess.run(["rm", "-rf", ".cache"])  # nosec

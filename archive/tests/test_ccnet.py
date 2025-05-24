@@ -1,35 +1,36 @@
 import subprocess  # nosec
 
 
-def test_minhash():
+def test_exact_hash():
     result = subprocess.run(
         [
             "python",
             "-m",
-            "text_dedup.ann_unisim",
+            "text_dedup.ccnet",
             "--path",
-            "truthful_qa",
+            "allenai/c4",
             "--name",
-            "generation",
+            "xh",
             "--split",
-            "validation",
+            "train",
             "--cache_dir",
             ".cache",
             "--output",
             ".temp-output",
             "--column",
-            "question",
+            "text",
             "--batch_size",
-            "24",
+            "10000",
         ],
         capture_output=True,
         text=True,
     )  # nosec
 
     # check the output
-    assert (
-        "817" in result.stdout and "788" in result.stdout
-    ), f"Expected before and after are not present in the output: {result.stdout}"
+    print(f"Output:\n{result.stdout}")
+    assert "69048" in result.stdout and "68221" in result.stdout, (
+        f"Expected before and after are not present in the output: {result.stdout}"
+    )
 
     # remove the output and input
     # subprocess.run(["rm", "-rf", ".cache"])  # nosec

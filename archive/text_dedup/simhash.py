@@ -105,9 +105,9 @@ class Permutation:
 
             self.masks.append(mask)
 
-        assert (
-            sum(self.widths) == f
-        ), f"The sum of block widths {sum(self.widths)} must be equal to the fingerprint size {f}"
+        assert sum(self.widths) == f, (
+            f"The sum of block widths {sum(self.widths)} must be equal to the fingerprint size {f}"
+        )
 
         prefix_width = sum(self.widths[: b - k])
         self.search_mask: bitarray = bitarray(f)
@@ -206,9 +206,9 @@ def _create_permutations(f: int, k: int, b: int) -> list[Permutation]:
             y = (f - x * max_block_size) // min_block_size
             break
 
-    assert (
-        x * max_block_size + y * min_block_size == f
-    ), f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size} are invalid"
+    assert x * max_block_size + y * min_block_size == f, (
+        f"{x=} w/ {max_block_size}, {y=} w/ {min_block_size} are invalid"
+    )
 
     start = end = 0
 

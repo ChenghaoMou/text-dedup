@@ -31,9 +31,9 @@ def test_suffix_array():
 
     # check the output
     print(f"Output:\n{result.stdout}")
-    assert (
-        "155279898 bytes (46214)" in result.stdout and "140874800 bytes (46149)" in result.stdout
-    ), f"Expected before and after are not present in the output: {result.stdout}"
+    assert "155279898 bytes (46214)" in result.stdout and "140874800 bytes (46149)" in result.stdout, (
+        f"Expected before and after are not present in the output: {result.stdout}"
+    )
 
     # remove the output and input
     # subprocess.run(["rm", "-rf", ".cache"])  # nosec

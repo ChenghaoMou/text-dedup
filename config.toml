@@ -1,0 +1,27 @@
+[input]
+input_type = "hf"
+path = "oscar-corpus/OSCAR-2201"
+name = "gl"
+split = "train"
+cache_dir = ".cache"
+trust_remote_code = true
+
+[algorithm]
+algorithm_name = "minhash"
+text_column = "text"
+seed = 42
+batch_size = 1000
+num_perm = 250
+threshold = 0.7
+false_positive_weight = 0.5
+false_negative_weight = 0.5
+hash_bits = 64
+
+[output]
+
+output_dir = "output"
+clean_cache = false
+save_clusters = true
+keep_index_column = true
+keep_cluster_column = true
+skip_filtering = true
