@@ -20,6 +20,11 @@ test: ## Test the code with pytest
 	@echo "🚀 Testing code: Running pytest"
 	@uv run python -m pytest --cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing
 
+.PHONY: report
+report: ## Run the gradio app for report
+	@echo "🚀 Running gradio"
+	@uv run python -m text_dedup.utils.gradio.run
+
 .PHONY: build
 build: clean-build ## Build wheel file
 	@echo "🚀 Creating wheel file"

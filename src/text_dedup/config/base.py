@@ -17,7 +17,7 @@ from text_dedup.utils.tokenization import ngrams
 
 
 class InputConfig(BaseSettings):
-    input_type: Literal["hf"]
+    input_type: Literal["hf", "local_jsonl"]
 
 
 class HFInputConfig(InputConfig):
@@ -101,12 +101,12 @@ class MinHashAlgorithmConfig(AlgorithmConfig):
                 false_negative_weight=self.false_negative_weight,
             )
 
-        DTYPE, MAX_HASH, MODULO_PRIME = self.get_config()
+        DTYPE, MAX_HASH, MODULO_PRIME = self.get_hash_config()
         self._dtype = DTYPE
         self._modulo_prime = MODULO_PRIME
         self._max_hash = MAX_HASH
 
-    def get_config(self) -> tuple[type, Any, Any]:
+    def get_hash_config(self) -> tuple[type, Any, Any]:
         return self._hash_config[self.hash_bits]
 
     @property
@@ -128,27 +128,27 @@ class MinHashAlgorithmConfig(AlgorithmConfig):
         rows = self.rows or 0
         return [(i * rows, (i + 1) * rows) for i in range(bands)]
 
-    @property
-    def hash_tables(self) -> list[dict[int, set]]:
+    def create_hash_tables(self) -> list[dict[int, set]]:
         return [defaultdict(set) for _ in range(self.bands or 0)]
 
     @property
     def permutations(self) -> tuple[np.ndarray, np.ndarray]:
-        # for minhash, we need to make a lot of hashes(=num_perms).
-        # In many previous implementations, this is achieved through a method described in
-        # `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8
-        # There we start with a know good hash x (=hash_func) and permutate it as the following:
-        # `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
-        # the following produces these a, b pairs
+        """
+        for minhash, we need to make a lot of hashes(=num_perms).
+        In many previous implementations, this is achieved through a method described in
+        `Universal classes of hash functions` https://doi.org/10.1016/0022-0000(79)90044-8
+        There we start with a know good hash x (=hash_func) and permutate it as the following:
+        `new_hash = (a * x + b) mod prime mod max_hash` we need one a (!=0), b pair per new hash
+        the following produces these a, b pairs
+        """
         if self._rng is None:
             raise ValueError("RNG is not materialized")  # noqa: TRY003
 
-        return (
-            self._rng.randint(
-                1, self._modulo_prime, size=(self.num_perm,), dtype=self._dtype
-            ),  # a is a multiplier so should not be 0
-            self._rng.randint(0, self._modulo_prime, size=(self.num_perm,), dtype=self._dtype),  # b
-        )
+        # a is a multiplier so should not be 0
+        a = self._rng.randint(1, self._modulo_prime, size=(self.num_perm,), dtype=self._dtype)
+        b = self._rng.randint(0, self._modulo_prime, size=(self.num_perm,), dtype=self._dtype)
+
+        return a, b
 
     def get_filtering_func(self) -> Callable[[dict[str, Any]], bool]:
         tokenize_func = self._get_tokenize_func()

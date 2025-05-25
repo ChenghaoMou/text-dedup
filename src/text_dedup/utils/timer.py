@@ -38,12 +38,18 @@ class Timer:
         self._pad = max(self._pad, len(name))
         return TimerContext(self, name)
 
+    def _is_total(self, name: str) -> bool:
+        return name.lower() in {"total", "total time"}
+
     def report(self, additional_info: dict[str, Any] | None = None) -> None:
         if additional_info:
             self._pad = max(self._pad, max(len(key) for key in additional_info))
 
+        total_time = sum(v for k, v in self.elapsed_times.items() if not self._is_total(k))
+
         for name, elapsed_time in self.elapsed_times.items():
-            logger.info(f"{name:>{self._pad + 2}}: {elapsed_time:.2f}s")
+            percentage = "" if self._is_total(name) else f"({elapsed_time / total_time * 100:>5.2f}%)"
+            logger.info(f"{name:>{self._pad + 2}}: {elapsed_time:.2f}s {percentage}")
 
         if additional_info is not None:
             for key, value in additional_info.items():

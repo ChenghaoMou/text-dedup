@@ -37,6 +37,11 @@ Documentation = "https://ChenghaoMou.github.io/text-dedup/"
 datasets = [
     "datasets>=3.6.0",
 ]
+report = [
+    "gradio>=4.44.1",
+    "gradio-rangeslider>=0.0.8",
+    "plotly>=6.1.1",
+]
 
 [dependency-groups]
 dev = [
@@ -61,6 +66,8 @@ build-backend = "hatchling.build"
 files = ["src"]
 disallow_untyped_defs = true
 disallow_any_unimported = false
+ignore_missing_imports = true
+follow_untyped_imports = true
 no_implicit_optional = true
 check_untyped_defs = true
 warn_return_any = true

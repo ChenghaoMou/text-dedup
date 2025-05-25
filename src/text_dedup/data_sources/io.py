@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 from datasets import Dataset
+from datasets import load_dataset as load_dataset_hf
 
 from text_dedup.config.base import Config
 from text_dedup.config.base import HFInputConfig
@@ -12,14 +13,17 @@ from text_dedup.utils.union_find import UnionFind
 def load_dataset(config: Config) -> Dataset:
     match config.input:
         case HFInputConfig():
-            from datasets import load_dataset as load_dataset_hf
-
             _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
-            ds: Dataset = load_dataset_hf(**config.input.model_dump(exclude={"input_type"}))
-            ds = ds.map(lambda _, i: {_INTERNAL_INDEX_COLUMN: i}, with_indices=True, num_proc=config.algorithm.num_proc)
-            return ds
+            result = load_dataset_hf(**config.input.model_dump(exclude={"input_type"}))
         case _:
             raise ValueError(f"Unsupported input type: {config.input}")  # noqa: TRY003
+
+    if not isinstance(result, Dataset):
+        raise TypeError(f"Expected Dataset, got {type(result)}")  # noqa: TRY003
+
+    ds: Dataset = result
+    ds = ds.map(lambda _, i: {_INTERNAL_INDEX_COLUMN: i}, with_indices=True, num_proc=config.algorithm.num_proc)
+    return ds
 
 
 def save_dataset(config: Config, *, final_data: Dataset, uf: UnionFind[Any] | None = None, **kwargs: Any) -> None:

@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# author      : Chenghao Mou (mouchenghao@gmail.com)
-# created     : 10/4/22
-from __future__ import annotations
-
-import multiprocessing as mp
 import random
 from typing import cast
 
@@ -19,34 +13,25 @@ from text_dedup.utils.memory import disable_reference_count
 from text_dedup.utils.timer import Timer
 from text_dedup.utils.union_find import UnionFind
 
-# for is originally used to reduce memory usage in MacOS but also ensures that the Union Find data structure
-# is not copied to child processes as long as it is not modified.
-mp.set_start_method("fork", force=True)
-
 
 def main(config: Config) -> None:
     uf: UnionFind[int] = UnionFind[int]()
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    HASH_TABLES: list[dict[int, set]] = minhash_args.hash_tables
+    HASH_TABLES: list[dict[int, set]] = minhash_args.create_hash_tables()
     timer = Timer()
 
     with timer("Total"):
-        with timer("Loading and preprocessing data"):
-            ds = load_dataset(config)
-            ds = ds.filter(
-                minhash_args.get_filtering_func(),
-                num_proc=config.algorithm.num_proc,
-            )
+        with timer("Preprocessing"):
+            ds = load_dataset(config).filter(minhash_args.get_filtering_func(), num_proc=config.algorithm.num_proc)
 
         LEN_DATASET = len(ds)
 
-        with timer("MinHashing text"):
+        with timer("MinHashing"):
             embedded = ds.map(
                 function=minhash_args.get_embed_func(),
                 input_columns=[minhash_args.text_column, minhash_args.internal_index_column],
                 remove_columns=[col for col in ds.column_names if col != minhash_args.internal_index_column],
                 num_proc=config.algorithm.num_proc,
-                with_indices=False,
                 desc="Fingerprinting...",
             )
             LEN_EMBEDDED = len(embedded)
@@ -83,7 +68,7 @@ def main(config: Config) -> None:
 
             logger.info(f"Number of edges: {len(set(edges))}")
 
-        with timer("Filtering clusters"), disable_reference_count():
+        with timer("Filtering"), disable_reference_count():
             ds = ds.map(
                 function=lambda record: {
                     minhash_args.cluster_column: uf.find(record[minhash_args.internal_index_column])
@@ -107,10 +92,10 @@ def main(config: Config) -> None:
             else:
                 final_data = ds
 
-        with timer("Saving data"):
+        with timer("Saving"):
             save_dataset(config, final_data=final_data, uf=uf)
 
-        with timer("Cleaning cache"):
+        with timer("Cleaning"):
             if config.output.clean_cache:
                 ds.cleanup_cache_files()
                 final_data.cleanup_cache_files()
@@ -119,9 +104,13 @@ def main(config: Config) -> None:
 
 
 if __name__ == "__main__":
+    import multiprocessing as mp
+
     from pydantic_settings import CliApp
 
     from text_dedup.config.base import Config
 
-    s = CliApp.run(Config)
-    main(s)
+    # combined with reference counting disabled, this makes sure
+    # the Union Find data structure is only copy-on-write
+    mp.set_start_method("fork", force=True)
+    main(CliApp.run(Config))
