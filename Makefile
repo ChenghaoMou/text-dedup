@@ -1,39 +1,51 @@
-DOCKER = docker
-SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = docs/source
-BUILDDIR      = docs/build
+.PHONY: install
+install: ## Install the virtual environment and install the pre-commit hooks
+	@echo "🚀 Creating virtual environment using uv"
+	@uv sync
+	@uv run pre-commit install
 
-build:
-	${DOCKER} compose build
+.PHONY: check
+check: ## Run code quality tools.
+	@echo "🚀 Checking lock file consistency with 'pyproject.toml'"
+	@uv lock --locked
+	@echo "🚀 Linting code: Running pre-commit"
+	@uv run pre-commit run -a
+	@echo "🚀 Static type checking: Running mypy"
+	@uv run mypy
+	@echo "🚀 Checking for obsolete dependencies: Running deptry"
+	@uv run deptry src
 
-up:
-	${DOCKER} compose up --detach
+.PHONY: test
+test: ## Test the code with pytest
+	@echo "🚀 Testing code: Running pytest"
+	@uv run python -m pytest --cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing
 
-down:
-	${DOCKER} compose down
+.PHONY: report
+report: ## Run the gradio app for report
+	@echo "🚀 Running gradio"
+	@uv run python -m text_dedup.utils.gradio.run
 
-build-doc: up
-	${DOCKER} compose run $(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+.PHONY: build
+build: clean-build ## Build wheel file
+	@echo "🚀 Creating wheel file"
+	@uvx --from build pyproject-build --installer uv
 
-serve: up build-doc
-	cd "$(BUILDDIR)" && python3 -m http.server
+.PHONY: clean-build
+clean-build: ## Clean build artifacts
+	@echo "🚀 Removing build artifacts"
+	@uv run python -c "import shutil; import os; shutil.rmtree('dist') if os.path.exists('dist') else None"
 
-test: up
-	${DOCKER} compose exec local poetry run coverage run -m pytest --doctest-modules . --ignore deduplicate-text-datasets --ignore docs --ignore text_dedup/minhash_spark.py --ignore tests/benchmark_core.py \
-	--ignore tests/benchmark_news.py \
-	--ignore tests/sweep_core.py \
-	--ignore tests/sweep_news.py
-	${DOCKER} compose exec local poetry run coverage xml -o cobertura.xml
-	${DOCKER} compose exec local poetry run coverage report -m
-	${DOCKER} compose cp local:/app/cobertura.xml cobertura.xml
+.PHONY: publish
+publish: ## Publish a release to PyPI.
+	@echo "🚀 Publishing."
+	@uvx twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
 
-benchmark: up
-	${DOCKER} compose exec local poetry run python tests/benchmark_core.py
-	${DOCKER} compose exec local poetry run python tests/benchmark_news.py
+.PHONY: build-and-publish
+build-and-publish: build publish ## Build and publish.
 
-spark_test: up
-	${DOCKER} compose exec local poetry run pytest -vvv -s --doctest-modules tests/test_minhash_spark.py
+.PHONY: help
+help:
+	@uv run python -c "import re; \
+	[[print(f'\033[36m{m[0]:<20}\033[0m {m[1]}') for m in re.findall(r'^([a-zA-Z_-]+):.*?## (.*)$$', open(makefile).read(), re.M)] for makefile in ('$(MAKEFILE_LIST)').strip().split()]"
 
-clean:
-	${DOCKER} system prune -a
+.DEFAULT_GOAL := help
