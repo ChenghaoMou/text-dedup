@@ -4,9 +4,10 @@ from typing import Any
 from datasets import Dataset
 from datasets import load_dataset as load_dataset_hf
 
-from text_dedup.config.base import Config
-from text_dedup.config.base import HFInputConfig
-from text_dedup.config.base import HFOutputConfig
+from text_dedup.config import Config
+from text_dedup.config import HFInputConfig
+from text_dedup.config import HFOutputConfig
+from text_dedup.config import JSONLInputConfig
 from text_dedup.utils.union_find import UnionFind
 
 
@@ -15,6 +16,9 @@ def load_dataset(config: Config) -> Dataset:
         case HFInputConfig():
             _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
             result = load_dataset_hf(**config.input.model_dump(exclude={"input_type"}))
+        case JSONLInputConfig():
+            _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
+            result = load_dataset_hf("json", data_files=config.input.path)
         case _:
             raise ValueError(f"Unsupported input type: {config.input}")  # noqa: TRY003
 

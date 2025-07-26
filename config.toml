@@ -1,21 +1,23 @@
 [input]
 input_type = "hf"
-path = "oscar-corpus/OSCAR-2201"
-name = "gl"
+path = "HuggingFaceFW/fineweb-2"
+#name = "lit_Latn"
+name = "bel_Cyrl"
 split = "train"
 cache_dir = ".cache"
-trust_remote_code = true
 
 [algorithm]
 algorithm_name = "minhash"
 text_column = "text"
 seed = 42
 batch_size = 10000
-num_perm = 250
+num_perm = 112
 threshold = 0.7
 false_positive_weight = 0.5
 false_negative_weight = 0.5
 hash_bits = 64
+ngram_size = 5
+check_false_positive = true
 
 [output]
 
