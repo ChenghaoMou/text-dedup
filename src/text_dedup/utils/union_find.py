@@ -4,14 +4,15 @@
 import pickle
 from collections import Counter
 from pathlib import Path
-from typing import TypeVar
+from typing import Generic
 
-import cloudpickle as cp  # type: ignore[import-untyped]
+import cloudpickle as cp
+from typing_extensions import TypeVar
 
 T = TypeVar("T")
 
 
-class UnionFind[T]:
+class UnionFind(Generic[T]):
     """
     A data structure for maintaining disjoint sets. This helps build connected components for given duplicate pairs.
     This version uses both rank structure (Union by Rank) and path compression.

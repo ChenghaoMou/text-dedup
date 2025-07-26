@@ -19,12 +19,14 @@ classifiers = [
 ]
 dependencies = [
     "cloudpickle>=3.1.1",
+    "datasets>=3.6.0",
     "ftfy>=6.3.1",
     "loguru>=0.7.3",
     "pydantic-settings>=2.9.1",
     "regex>=2024.11.6",
     "scipy>=1.13.1",
     "tqdm>=4.67.1",
+    "typing-extensions>=4.13.2",
     "xxhash>=3.5.0",
 ]
 
@@ -140,3 +142,6 @@ source = ["src"]
 
 [tool.bandit]
 exclude = ["tests/*"]
+
+[tool.uv.workspace]
+members = ["extensions/rust"]

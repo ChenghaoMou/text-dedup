@@ -5,7 +5,7 @@
 # description : Compute the optimal parameters for MinHashLSH.
 #
 
-from scipy.integrate import quad as integrate  # type: ignore[import-untyped]
+from scipy.integrate import quad as integrate
 
 
 def optimal_param(

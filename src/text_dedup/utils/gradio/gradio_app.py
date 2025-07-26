@@ -5,6 +5,7 @@ from typing import Any
 from typing import Optional
 
 import gradio as gr
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from datasets import Dataset
@@ -12,7 +13,10 @@ from datasets import load_from_disk
 from gradio_rangeslider import RangeSlider
 from plotly.subplots import make_subplots
 
+from text_dedup.config import MinHashAlgorithmConfig
 from text_dedup.config.base import Config
+from text_dedup.utils.analysis import optimal_param
+from text_dedup.utils.jaccard import cluster_jaccard_similarity
 from text_dedup.utils.union_find import UnionFind
 
 
@@ -36,6 +40,11 @@ class ClusterVisualizer:
             output_path = Path(output_dir)
             if not output_path.exists():
                 return None, "Directory does not exist", gr.update()
+
+            if not (output_path.parent / "config.toml").exists():
+                return None, "Config file not found", gr.update()
+
+            self.config = Config()
 
             ds = load_from_disk(output_path)
             if not isinstance(ds, Dataset):
@@ -354,6 +363,24 @@ class ClusterVisualizer:
         df = pd.DataFrame(samples)
         info = f"Cluster {cluster_id}: {cluster_size:,} records total (showing {len(samples)} samples)"
 
+        if self.config and isinstance(self.config.algorithm, MinHashAlgorithmConfig):
+            b, r = optimal_param(
+                threshold=self.config.algorithm.threshold,
+                num_perm=self.config.algorithm.num_perm,
+            )
+            fpr = float(1 - (1 - self.config.algorithm.threshold ** float(r)) ** float(b))
+            tokenize = self.config.algorithm.get_ngrams_func()
+            docs = self.dataset.select(sample_ids)[self.text_column]
+            similarities, fp_rate = cluster_jaccard_similarity(
+                cluster=[tokenize(doc.lower()) for doc in docs], threshold=self.config.algorithm.threshold
+            )
+            info += "\n\n##Sample jaccard similarity\n\n"
+            info += f"- Max: {max(similarities):.4f}\n"
+            info += f"- Mean: {np.mean(similarities):.4f}\n"
+            info += f"- Min: {min(similarities):.4f}\n"
+            info += f"- 90 Percentile: {np.percentile(similarities, 0.9):.4f}\n"
+            info += f"- FP Rate: {fp_rate:.4f} vs {fpr:.4f}"
+
         return df, info
 
     def search_text(self, query: str, max_results: int = 20) -> tuple[Optional[pd.DataFrame], str]:
@@ -498,12 +525,12 @@ def create_gradio_app() -> gr.Blocks:
                 with gr.Column():
                     cluster_id_input = gr.Number(label="Cluster ID", precision=0)
                     max_samples_slider = gr.Slider(
-                        minimum=1, maximum=50, value=10, step=1, label="Maximum Samples to Show"
+                        minimum=1, maximum=500, value=10, step=1, label="Maximum Samples to Show"
                     )
                     explore_btn = gr.Button("Explore Cluster", variant="primary")
 
                 with gr.Column():
-                    cluster_info = gr.Textbox(label="Cluster Information", interactive=False)
+                    cluster_info = gr.Markdown(label="Cluster Information")
 
             cluster_samples = gr.Dataframe(label="Cluster Samples", wrap=True)
 
@@ -554,7 +581,7 @@ def create_gradio_app() -> gr.Blocks:
                 outputs=[cluster1_samples, cluster2_samples, compare_status],
             )
 
-        return app  # type: ignore[no-any-return]
+        return app
 
 
 if __name__ == "__main__":

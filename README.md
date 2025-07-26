@@ -1,5 +1,6 @@
 # text-dedup
 
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Release](https://img.shields.io/github/v/release/ChenghaoMou/text-dedup)](https://img.shields.io/github/v/release/ChenghaoMou/text-dedup)
 [![Build status](https://img.shields.io/github/actions/workflow/status/ChenghaoMou/text-dedup/main.yml?branch=main)](https://github.com/ChenghaoMou/text-dedup/actions/workflows/main.yml?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/ChenghaoMou/text-dedup/branch/main/graph/badge.svg)](https://codecov.io/gh/ChenghaoMou/text-dedup)
