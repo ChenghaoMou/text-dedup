@@ -1,8 +1,9 @@
 [input]
 input_type = "hf"
 path = "HuggingFaceFW/fineweb-2"
-#name = "lit_Latn"
-name = "bel_Cyrl"
+name = "lit_Latn"
+#name = "bel_Cyrl"
+#name = "ava_Cyrl"
 split = "train"
 cache_dir = ".cache"
 
@@ -10,7 +11,7 @@ cache_dir = ".cache"
 algorithm_name = "minhash"
 text_column = "text"
 seed = 42
-batch_size = 10000
+batch_size = 100000
 num_perm = 112
 threshold = 0.7
 false_positive_weight = 0.5

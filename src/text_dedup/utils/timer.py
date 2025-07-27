@@ -45,11 +45,13 @@ class Timer:
         if additional_info:
             self._pad = max(self._pad, max(len(key) for key in additional_info))
 
+        time_pad = max(len(f"{elapsed_time:.2f}") for elapsed_time in self.elapsed_times.values())
+
         total_time = sum(v for k, v in self.elapsed_times.items() if not self._is_total(k))
 
         for name, elapsed_time in self.elapsed_times.items():
             percentage = "" if self._is_total(name) else f"({elapsed_time / total_time * 100:>5.2f}%)"
-            logger.info(f"{name:>{self._pad + 2}}: {elapsed_time:.2f}s {percentage}")
+            logger.info(f"{name:>{self._pad + 2}}: {f'{elapsed_time:.2f}s':<{time_pad + 1}} {percentage}")
 
         if additional_info is not None:
             for key, value in additional_info.items():

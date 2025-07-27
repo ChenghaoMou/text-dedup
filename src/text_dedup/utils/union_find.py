@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # @Date    : 2022-12-26 15:37:44
 # @Author  : Chenghao Mou (mouchenghao@gmail.com)
-import pickle
 from collections import Counter
-from pathlib import Path
 from typing import Generic
 
-import cloudpickle as cp
 from typing_extensions import TypeVar
 
 T = TypeVar("T")
@@ -81,18 +78,3 @@ class UnionFind(Generic[T]):
     def reset(self) -> None:
         self.parent = {}
         self.rank = Counter()
-
-    def dump(self, path: str | Path) -> None:
-        """
-        Dump the union find to a file.
-
-        Parameters
-        ----------
-        path : str | Path
-            The path to the file.
-        id2id : dict[T, T] | None, optional
-            ID mapping/translation. If provided, the union find will be translated to the new IDs.
-        """
-
-        with open(path, "wb") as f:
-            cp.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)

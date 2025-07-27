@@ -15,7 +15,7 @@ from text_dedup.utils.tokenization import ngrams
 
 
 class AlgorithmConfig(BaseSettings):
-    algorithm_name: Literal["minhash", "simhash", "bloomfilter"]
+    algorithm_name: Literal["minhash", "simhash", "bloom_filter", "suffix_array"]
     text_column: str
     index_column: str | None = None
     cluster_column: str = "__CLUSTER__"
@@ -243,6 +243,10 @@ class SimHashAlgorithmConfig(AlgorithmConfig):
 
 class BloomFilterAlgorithmConfig(AlgorithmConfig):
     algo_name: Literal["bloomfilter"] = "bloomfilter"
+
+
+class SuffixArrayAlgorithmConfig(AlgorithmConfig):
+    algo_name: Literal["suffix_array"] = "suffix_array"
 
 
 AlgoConfig: TypeAlias = MinHashAlgorithmConfig | SimHashAlgorithmConfig | BloomFilterAlgorithmConfig

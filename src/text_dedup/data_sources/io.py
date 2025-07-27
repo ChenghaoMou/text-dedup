@@ -1,14 +1,15 @@
-import os
+import pickle
+from pathlib import Path
 from typing import Any
 
 from datasets import Dataset
 from datasets import load_dataset as load_dataset_hf
+from loguru import logger
 
 from text_dedup.config import Config
 from text_dedup.config import HFInputConfig
 from text_dedup.config import HFOutputConfig
 from text_dedup.config import JSONLInputConfig
-from text_dedup.utils.union_find import UnionFind
 
 
 def load_dataset(config: Config) -> Dataset:
@@ -30,7 +31,15 @@ def load_dataset(config: Config) -> Dataset:
     return ds
 
 
-def save_dataset(config: Config, *, final_data: Dataset, uf: UnionFind[Any] | None = None, **kwargs: Any) -> None:
+def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int], **kwargs: Any) -> None:
+    """Save the dataset to disk."""
+    if config.output.save_clusters:
+        if not config.output.keep_index_column:
+            logger.warning("Saving clusters requires `--keep-index-column`, turning it on")
+            config.output.keep_index_column = True
+        with open(Path(config.output.output_dir) / "clusters.pickle", "wb") as f:
+            pickle.dump(clusters, f, protocol=pickle.HIGHEST_PROTOCOL)
+
     match config.output:
         case HFOutputConfig():
             columns_to_remove = {
@@ -39,11 +48,8 @@ def save_dataset(config: Config, *, final_data: Dataset, uf: UnionFind[Any] | No
             }
             if config.output.keep_index_column:
                 columns_to_remove.remove(config.algorithm.internal_index_column)
-            if config.output.keep_cluster_column:
+            if config.output.keep_cluster_column or config.output.save_clusters:
                 columns_to_remove.remove(config.algorithm.cluster_column)
             if columns_to_remove:
                 final_data = final_data.remove_columns(list(columns_to_remove))
-            final_data.save_to_disk(config.output.output_dir)
-
-    if config.output.save_clusters and uf is not None:
-        uf.dump(os.path.join(config.output.output_dir, "clusters.pickle"))
+            final_data.save_to_disk(config.output.output_dir, num_proc=config.algorithm.num_proc)

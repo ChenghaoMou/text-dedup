@@ -17,7 +17,6 @@ from text_dedup.config import MinHashAlgorithmConfig
 from text_dedup.config.base import Config
 from text_dedup.utils.analysis import optimal_param
 from text_dedup.utils.jaccard import cluster_jaccard_similarity
-from text_dedup.utils.union_find import UnionFind
 
 
 class ClusterVisualizer:
@@ -54,14 +53,14 @@ class ClusterVisualizer:
             self.text_column = text_column
             self.cluster_column = cluster_column
             with open(output_path / "clusters.pickle", "rb") as f:
-                uf: UnionFind[int] = pickle.load(f)  # noqa: S301
+                PARENTS: dict[int, int] = pickle.load(f)  # noqa: S301
 
             if cluster_column not in self.dataset.column_names:
                 return None, f"Cluster column '{cluster_column}' not found in dataset", gr.update()
             if text_column not in self.dataset.column_names:
                 return None, f"Text column '{text_column}' not found in dataset", gr.update()
 
-            id2cluster = dict(zip(range(len(self.dataset)), [uf.find(i) for i in self.dataset[index_column]]))
+            id2cluster = dict(zip(range(len(self.dataset)), [PARENTS.get(i, i) for i in self.dataset[index_column]]))
             self.cluster2ids = defaultdict(list)
             for _id, cluster in id2cluster.items():
                 self.cluster2ids[cluster].append(_id)
@@ -73,6 +72,7 @@ class ClusterVisualizer:
             slider_update = gr.update(maximum=self.max_cluster_size, value=(1, min(100, self.max_cluster_size)))
 
         except Exception as e:
+            print(e)
             return None, f"Error loading dataset: {e!s}", gr.update()
         else:
             return stats, "Dataset loaded successfully!", slider_update

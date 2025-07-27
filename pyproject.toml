@@ -56,6 +56,7 @@ dev = [
     "ruff>=0.11.5",
     "types-tqdm>=4.67.0.20250516",
     "types-regex>=2024.11.6.20250403",
+    "maturin>=1.9.1",
 ]
 
 [build-system]
@@ -142,6 +143,3 @@ source = ["src"]
 
 [tool.bandit]
 exclude = ["tests/*"]
-
-[tool.uv.workspace]
-members = ["extensions/rust"]
