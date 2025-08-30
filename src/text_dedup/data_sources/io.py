@@ -2,32 +2,41 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-from datasets import Dataset
-from datasets import load_dataset as load_dataset_hf
-from loguru import logger
+from datasets import Dataset  # pyright: ignore[reportMissingTypeStubs]
+from datasets import disable_progress_bars  # pyright: ignore[reportMissingTypeStubs]
+from datasets import enable_progress_bars  # pyright: ignore[reportMissingTypeStubs]
+from datasets import (  # pyright: ignore[reportMissingTypeStubs]
+    load_dataset as hf_load_dataset,  # pyright: ignore[reportUnknownVariableType]
+)
 
 from text_dedup.config import Config
-from text_dedup.config import HFInputConfig
-from text_dedup.config import HFOutputConfig
-from text_dedup.config import JSONLInputConfig
+from text_dedup.config import LocalInputConfig
+from text_dedup.config.output_configs import OutputConfig
+from text_dedup.utils.logger import log
+
+
+class InvalidDatasetTypeError(Exception):
+    def __init__(self, data_type: type) -> None:
+        super().__init__(f"Expecting Dataset object, loaded {data_type} instead")
 
 
 def load_dataset(config: Config) -> Dataset:
     match config.input:
-        case HFInputConfig():
+        case LocalInputConfig():
             _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
-            result = load_dataset_hf(**config.input.model_dump(exclude={"input_type"}))
-        case JSONLInputConfig():
-            _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
-            result = load_dataset_hf("json", data_files=config.input.path)
-        case _:
-            raise ValueError(f"Unsupported input type: {config.input}")  # noqa: TRY003
 
-    if not isinstance(result, Dataset):
-        raise TypeError(f"Expected Dataset, got {type(result)}")  # noqa: TRY003
+            disable_progress_bars()
+            ds = hf_load_dataset(**config.input.read_arguments)  # pyright: ignore[reportAny]
+            enable_progress_bars()
 
-    ds: Dataset = result
-    ds = ds.map(lambda _, i: {_INTERNAL_INDEX_COLUMN: i}, with_indices=True, num_proc=config.algorithm.num_proc)
+            if not isinstance(ds, Dataset):
+                raise InvalidDatasetTypeError(type(ds))
+            ds = ds.map(  # pyright: ignore[reportUnknownMemberType]
+                lambda _, i: {_INTERNAL_INDEX_COLUMN: i},  # pyright: ignore[reportUnknownLambdaType]
+                with_indices=True,
+                num_proc=config.algorithm.num_proc,
+                desc="Indexing",
+            )
     return ds
 
 
@@ -35,13 +44,13 @@ def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int
     """Save the dataset to disk."""
     if config.output.save_clusters:
         if not config.output.keep_index_column:
-            logger.warning("Saving clusters requires `--keep-index-column`, turning it on")
+            log.warning("Saving clusters requires `--keep-index-column`, turning it on")
             config.output.keep_index_column = True
         with open(Path(config.output.output_dir) / "clusters.pickle", "wb") as f:
             pickle.dump(clusters, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     match config.output:
-        case HFOutputConfig():
+        case OutputConfig():
             columns_to_remove = {
                 config.algorithm.internal_index_column,
                 config.algorithm.cluster_column,
@@ -52,4 +61,5 @@ def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int
                 columns_to_remove.remove(config.algorithm.cluster_column)
             if columns_to_remove:
                 final_data = final_data.remove_columns(list(columns_to_remove))
-            final_data.save_to_disk(config.output.output_dir, num_proc=config.algorithm.num_proc)
+
+            final_data.save_to_disk(config.output.output_dir, num_proc=config.algorithm.num_proc)  # pyright: ignore[reportUnknownMemberType]

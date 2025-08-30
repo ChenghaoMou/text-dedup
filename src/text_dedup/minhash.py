@@ -1,86 +1,89 @@
-from collections import Counter
-from collections import defaultdict
-from typing import Any
+# pyright: reportMissingTypeStubs=false
+from itertools import combinations
 from typing import cast
 
+import polars as pl
 from datasets import Dataset
-from loguru import logger
-from tqdm import tqdm
+from polars.dataframe import DataFrame
+from polars_grouper import super_merger
 
 from text_dedup.config import Config
 from text_dedup.config import MinHashAlgorithmConfig
 from text_dedup.data_sources.io import load_dataset
 from text_dedup.data_sources.io import save_dataset
-from text_dedup.utils.cache import config_fingerprint
 from text_dedup.utils.jaccard import jaccard_similarity
+from text_dedup.utils.logger import log
 from text_dedup.utils.timer import Timer
-from text_dedup.utils.union_find_rust import UnionFind
 
 
-def load_and_preprocess(config: Config) -> Dataset:
+def load_and_preprocess(config: Config) -> tuple[Dataset, int, int]:
     """Load and preprocess the dataset."""
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
     ds = load_dataset(config)
-    result: Dataset = ds.filter(
+    original_len = len(ds)
+    result: Dataset = ds.filter(  # pyright: ignore[reportUnknownMemberType]
         minhash_args.get_filtering_func(),
+        input_columns=[minhash_args.text_column],
         num_proc=config.algorithm.num_proc,
-        new_fingerprint=config_fingerprint(config.input, suffix="preprocessing"),
+        desc="Filtering...",
     )
-    return result
+    filtered_len = len(result)
+    return result, original_len, filtered_len
 
 
 def embed(config: Config, ds: Dataset) -> Dataset:
     """Fingerprint the dataset."""
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    result: Dataset = ds.map(
+    result: Dataset = ds.map(  # pyright: ignore[reportUnknownMemberType]
         function=minhash_args.get_embed_func(),
         input_columns=[minhash_args.text_column, minhash_args.internal_index_column],
         remove_columns=[col for col in ds.column_names if col != minhash_args.internal_index_column],
         num_proc=config.algorithm.num_proc,
+        batched=True,
+        batch_size=1,
         desc="Fingerprinting...",
-        load_from_cache_file=True,
-        new_fingerprint=config_fingerprint(config.algorithm, suffix="hashing"),
     )
     return result
 
 
 def clustering(config: Config, ds: Dataset) -> dict[int, int]:
     """Cluster the dataset."""
-    minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    HASH_TABLES: list[dict[int, set]] = minhash_args.create_hash_tables()
-    uf: UnionFind[int] = UnionFind[int](max_size=len(ds))
-
-    def collect(batch: dict[str, list[Any]]) -> None:
-        """Collect hash values from the fingerprints."""
-        for key, Hs in zip(batch[minhash_args.internal_index_column], batch[minhash_args.signature_column]):
-            for i, H in enumerate(Hs):
-                HASH_TABLES[i][H].add(key)
-
-    ds.map(
-        function=collect,
-        with_indices=False,
-        num_proc=1,
-        desc="Collecting...",
-        batched=True,
-        batch_size=config.algorithm.batch_size,
+    algo = cast(MinHashAlgorithmConfig, config.algorithm)
+    signatures: DataFrame = ds.select_columns(["__band_idx__", "__band_val__", algo.internal_index_column]).to_polars()  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+    clusters = (
+        signatures.group_by(["__band_idx__", "__band_val__"])
+        .agg(pl.col(algo.internal_index_column))
+        .filter(pl.col(algo.internal_index_column).list.len() > 1)
+        .select(pl.col(algo.internal_index_column).alias("values"))
+        .with_row_index(name="index")
     )
+    exploded_df = clusters.explode("values")
+    combinations = (
+        exploded_df.join(exploded_df, on="index")
+        .filter(pl.col("values") < pl.col("values_right"))
+        .rename({"values": "src", "values_right": "dst"})
+        .drop("index")
+    )
+    grouped = super_merger(combinations, from_col_name="src", to_col_name="dst")
+    mapping = pl.concat([
+        grouped.select(pl.col("src").alias("id"), pl.col("group").alias("cluster")).unique(),
+        grouped.select(pl.col("dst").alias("id"), pl.col("group").alias("cluster")).unique(),
+    ]).unique()
 
-    for table in tqdm(HASH_TABLES, desc="Clustering...", dynamic_ncols=True):
-        for cluster in table.values():
-            if len(cluster) <= 1:
-                continue
-            idx = min(cluster)
-            for x in cluster:
-                uf.union(x, idx)
-
-    return {idx: uf.find(idx) for idx in ds[minhash_args.internal_index_column]}
+    return dict(mapping.iter_rows(named=False))
 
 
 def assign_clusters(config: Config, ds: Dataset, parents: dict[int, int]) -> Dataset:
     """Assign cluster id to the dataset."""
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    ds = ds.map(
-        function=lambda record: {minhash_args.cluster_column: parents[record[minhash_args.internal_index_column]]},
+    ds = ds.map(  # pyright: ignore[reportUnknownMemberType]
+        function=lambda record: {  # pyright: ignore[reportUnknownLambdaType]
+            minhash_args.cluster_column: parents.get(
+                record[minhash_args.internal_index_column],  # pyright: ignore[reportUnknownArgumentType]
+                record[minhash_args.internal_index_column],  # pyright: ignore[reportUnknownArgumentType]
+            ),
+            "__duplicate__": record[minhash_args.internal_index_column] in parents,
+        },
         with_indices=False,
         # ! parents is pickled to multiple processes
         num_proc=config.algorithm.num_proc,
@@ -89,113 +92,95 @@ def assign_clusters(config: Config, ds: Dataset, parents: dict[int, int]) -> Dat
     return ds
 
 
-def check_cluster(config: Config, texts_and_indices: list[tuple[str, int]]) -> tuple[set[int], set[int]]:
-    """Find true positives and false positives from a cluster."""
-    minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    ngram_tokenizer = minhash_args.get_ngrams_func()
-
-    true_positives: set[int] = set()
-    false_positives: set[int] = set()
-
-    for i, (text_i, idx_i) in enumerate(texts_and_indices):
-        ngrams = ngram_tokenizer(text_i)
-        for j, (text_j, idx_j) in enumerate(texts_and_indices):
-            if i >= j:
-                continue
-            similarity = jaccard_similarity(
-                ngrams,
-                ngram_tokenizer(text_j),
-            )
-            if similarity >= minhash_args.threshold:
-                true_positives.add(idx_i)
-                true_positives.add(idx_j)
-
-        if idx_i not in true_positives:
-            false_positives.add(idx_i)
-
-    return true_positives, false_positives
-
-
-def retrieve_clusters(config: Config, ds: Dataset) -> dict[str, list[tuple[str, int]]]:
-    """Retrieve clusters from a dataset."""
-    minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    cluster_sizes: dict[int, int] = Counter()
-
-    def count_clusters(batch: dict[str, list[Any]]) -> None:
-        """Count the size of each cluster."""
-        for cluster_id in batch[minhash_args.cluster_column]:
-            cluster_sizes[cluster_id] += 1
-
-    ds.map(
-        function=count_clusters,
-        batched=True,
-        batch_size=config.algorithm.batch_size,
-        num_proc=1,
-        desc="Counting cluster sizes...",
-    )
-
-    multi_item_clusters = {cid for cid, size in cluster_sizes.items() if size > 1}
-    cluster_texts: dict[str, list[tuple[str, int]]] = defaultdict(list)
-
-    def collect_multi_cluster_texts(batch: dict[str, list[Any]]) -> None:
-        """Collect text from each cluster."""
-        for cluster_id, text, idx in zip(
-            batch[minhash_args.cluster_column],
-            batch[minhash_args.text_column],
-            batch[minhash_args.internal_index_column],
-        ):
-            if cluster_id in multi_item_clusters:
-                cluster_texts[cluster_id].append((text, idx))
-
-    ds.map(
-        function=collect_multi_cluster_texts,
-        batched=True,
-        batch_size=config.algorithm.batch_size,
-        num_proc=1,
-        desc="Collecting multi-item cluster texts...",
-    )
-    return cluster_texts
-
-
 def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[int, int]]:
     """Check false positives."""
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
-    cluster_texts: dict[str, list[tuple[str, int]]] = retrieve_clusters(config, ds)
-    new_parents: dict[int, int] = {}
-
-    total = 0
-    total_false_positives = 0
-    total_true_positives = 0
-    total_true_positive_clusters = 0
-
-    for _, texts_and_indices in tqdm(cluster_texts.items(), desc="Verifying..."):
-        true_positives, false_positives = check_cluster(
-            config,
-            texts_and_indices,
+    ds_candidates = ds.filter(  # pyright: ignore[reportUnknownMemberType]
+        function=lambda x: x["__duplicate__"],  # pyright: ignore[reportUnknownLambdaType]
+        num_proc=minhash_args.num_proc,
+    )
+    candidates = pl.from_dict({  # pyright: ignore[reportUnknownArgumentType]
+        minhash_args.internal_index_column: ds_candidates[minhash_args.internal_index_column],
+        minhash_args.text_column: ds_candidates[minhash_args.text_column],
+        minhash_args.cluster_column: ds_candidates[minhash_args.cluster_column],
+    })
+    cluster_num = candidates.unique(minhash_args.cluster_column).shape[0]
+    candidates = (
+        candidates.group_by(pl.col(minhash_args.cluster_column))
+        .agg([
+            pl.col(minhash_args.internal_index_column),
+            pl.col(minhash_args.text_column),
+        ])
+        .with_columns(
+            pairs=pl.struct([
+                pl.col(minhash_args.internal_index_column),
+                pl.col(minhash_args.text_column),
+            ]).map_elements(
+                lambda x: [  # pyright: ignore[reportAny]
+                    {"pair1": {"idx": p1[0], "text": p1[1]}, "pair2": {"idx": p2[0], "text": p2[1]}}
+                    for (p1, p2) in combinations(
+                        zip(x[minhash_args.internal_index_column], x[minhash_args.text_column], strict=True),  # pyright: ignore[reportAny]
+                        2,
+                    )
+                ],
+                return_dtype=pl.List(
+                    pl.Struct({
+                        "pair1": pl.Struct({"idx": pl.Int64, "text": pl.String}),
+                        "pair2": pl.Struct({"idx": pl.Int64, "text": pl.String}),
+                    })
+                ),
+            )
         )
-        for idx in false_positives:
-            new_parents[idx] = idx
+        .select([minhash_args.cluster_column, "pairs"])
+        .explode("pairs")
+    )
+    verified_pairs = len(candidates)
+    tokenizer = minhash_args.get_ngrams_func()
+    results = candidates.with_columns(
+        jaccard_score=pl.col("pairs").map_elements(
+            lambda pair: jaccard_similarity(  # pyright: ignore[reportAny]
+                set(tokenizer(pair["pair1"]["text"])),  # pyright: ignore[reportAny]
+                set(tokenizer(pair["pair2"]["text"])),  # pyright: ignore[reportAny]
+            ),
+            return_dtype=pl.Float64,
+        )
+    ).filter(pl.col("jaccard_score") >= minhash_args.threshold)
 
-        if true_positives:
-            total_true_positive_clusters += 1
-            new_cluster_id = min(true_positives)
-            for idx in true_positives:
-                new_parents[idx] = new_cluster_id
+    assignment = (
+        results.with_columns([
+            pl.col("pairs").struct.field("pair1").struct.field("idx").alias("idx1"),
+            pl.col("pairs").struct.field("pair2").struct.field("idx").alias("idx2"),
+        ])
+        .select([pl.col("idx1").alias("idx"), pl.col(minhash_args.cluster_column)])
+        .vstack(
+            results.with_columns([
+                pl.col("pairs").struct.field("pair1").struct.field("idx").alias("idx1"),
+                pl.col("pairs").struct.field("pair2").struct.field("idx").alias("idx2"),
+            ]).select([pl.col("idx2").alias("idx"), pl.col(minhash_args.cluster_column)])
+        )
+        .unique()
+        # update the cluster id to the minimum index
+        .group_by(minhash_args.cluster_column)
+        .agg(pl.col("idx"), pl.min("idx").alias("cluster_id"))
+        .select([pl.col("idx"), pl.col("cluster_id")])
+        .explode("idx")
+    )
 
-        total += len(texts_and_indices)
-        total_false_positives += len(false_positives)
-        total_true_positives += len(true_positives)
+    new_parents = dict(assignment.iter_rows(named=False))
+    total_true_positives = len(new_parents)
+    total_false_positives = len(ds_candidates) - total_true_positives
+    total_true_positive_clusters = len(set(new_parents.values()))
 
-    logger.info(f"Verified {len(cluster_texts)} clusters")
-    logger.info(f"False Positives   : {total_false_positives}")
-    logger.info(f"True Positives    : {total_true_positives}")
-    logger.info(f"True Clusters     : {total_true_positive_clusters}")
+    log.info(f"Verified {cluster_num} clusters/{verified_pairs} pairs")
+    log.info(f"False Positives   : {total_false_positives}")
+    log.info(f"True Positives    : {total_true_positives}")
+    log.info(f"True Clusters     : {total_true_positive_clusters}")
 
-    ds = ds.map(
-        function=lambda record: {
+    ds = ds.map(  # pyright: ignore[reportUnknownMemberType]
+        function=lambda record: {  # pyright: ignore[reportUnknownLambdaType]
             minhash_args.cluster_column: new_parents.get(
                 record[minhash_args.internal_index_column],
-                record[minhash_args.internal_index_column],
+                record[minhash_args.internal_index_column],  # pyright: ignore[reportUnknownArgumentType]
             )
         },
         with_indices=False,
@@ -207,12 +192,12 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
     return ds, new_parents
 
 
-def filter_duplicates(config: Config, ds: Dataset) -> Dataset:
+def remove_duplicates(config: Config, ds: Dataset) -> Dataset:
     """Remove duplicates from the dataset."""
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
     if not config.output.skip_filtering:
-        result: Dataset = ds.filter(
-            function=lambda record: record[minhash_args.cluster_column] == record[minhash_args.internal_index_column],
+        result: Dataset = ds.filter(  # pyright: ignore[reportUnknownMemberType]
+            function=lambda record: record[minhash_args.cluster_column] == record[minhash_args.internal_index_column],  # pyright: ignore[reportUnknownLambdaType]
             with_indices=False,
             num_proc=config.algorithm.num_proc,
             desc="Removing duplicates...",
@@ -235,38 +220,50 @@ def main(config: Config) -> None:
     minhash_args = cast(MinHashAlgorithmConfig, config.algorithm)
     timer = Timer()
 
-    with timer("Total"):
-        with timer("Preprocessing"):
-            ds = load_and_preprocess(config)
+    with timer("Total", enable_spin=False):
+        with timer("Preprocessing", enable_spin=False):
+            ds, ORIGINAL_LEN, FILTERED_LEN = load_and_preprocess(config)
+            log.info(f"Filtered {ORIGINAL_LEN - FILTERED_LEN} records")
 
-        LEN_DATASET = len(ds)
-
-        with timer("MinHashing"):
+        with timer("MinHashing", enable_spin=False):
             embedded = embed(config, ds)
 
         with timer("Clustering"):
-            PARENTS = clustering(config, embedded)
+            assignment = clustering(config, embedded)
+            ds = assign_clusters(config, ds, assignment)
 
-        with timer("Filtering"):
-            ds = assign_clusters(config, ds, PARENTS)
+        with timer("Verifying"):
             if minhash_args.check_false_positive:
-                ds, PARENTS = check_false_positives(config, ds)
-            final_data = filter_duplicates(config, ds)
+                ds, assignment = check_false_positives(config, ds)
+
+        with timer("Filtering", enable_spin=False):
+            final_data = remove_duplicates(config, ds)
 
         with timer("Saving"):
-            save_dataset(config, final_data=final_data, clusters=PARENTS)
+            save_dataset(config, final_data=final_data, clusters=assignment)
 
         with timer("Cleaning"):
             if config.output.clean_cache:
-                ds.cleanup_cache_files()
-                final_data.cleanup_cache_files()
+                ds.cleanup_cache_files()  # pyright: ignore[reportUnusedCallResult]
+                final_data.cleanup_cache_files()  # pyright: ignore[reportUnusedCallResult]
 
-    timer.report({"Before": LEN_DATASET, "After": len(final_data)})
+    timer.report({"Before": ORIGINAL_LEN, "After": len(final_data)})
 
 
 if __name__ == "__main__":
     from pydantic_settings import CliApp
 
     from text_dedup.config.base import Config
+    from text_dedup.utils.env import check_env
+    from text_dedup.utils.progress import use_custom_progress_bar
 
-    main(CliApp.run(Config))
+    with use_custom_progress_bar():
+        config = CliApp.run(Config)
+        check_env()
+        if config.debug.enable_profiling:
+            from scalene.scalene_profiler import enable_profiling
+
+            with enable_profiling():
+                main(config)
+        else:
+            main(config)

@@ -5,27 +5,23 @@ description = "All-in-one text deduplication tools"
 authors = [{ name = "Chenghao Mou", email = "mouchenghao@gmail.com" }]
 readme = "README.md"
 keywords = ['python']
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.11,<4.0"
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "cloudpickle>=3.1.1",
-    "datasets>=3.6.0",
+    "datasets>=4.0.0",
     "ftfy>=6.3.1",
-    "loguru>=0.7.3",
+    "polars>=1.32.3",
+    "polars-grouper>=0.3.0",
     "pydantic-settings>=2.9.1",
     "regex>=2024.11.6",
     "scipy>=1.13.1",
-    "tqdm>=4.67.1",
     "typing-extensions>=4.13.2",
     "xxhash>=3.5.0",
 ]
@@ -36,14 +32,8 @@ Repository = "https://github.com/ChenghaoMou/text-dedup"
 Documentation = "https://ChenghaoMou.github.io/text-dedup/"
 
 [project.optional-dependencies]
-datasets = [
-    "datasets>=3.6.0",
-]
-report = [
-    "gradio>=4.44.1",
-    "gradio-rangeslider>=0.0.8",
-    "plotly>=6.1.1",
-]
+datasets = []
+report = ["gradio>=4.44.1", "gradio-rangeslider>=0.0.8", "plotly>=6.1.1"]
 
 [dependency-groups]
 dev = [
@@ -54,15 +44,17 @@ dev = [
     "mypy>=0.991",
     "pytest-cov>=4.0.0",
     "ruff>=0.11.5",
-    "types-tqdm>=4.67.0.20250516",
     "types-regex>=2024.11.6.20250403",
-    "maturin>=1.9.1",
+    "scalene>=1.5.51",
+    "scipy-stubs>=1.16.1.1",
+    "gradio>=5.39.0",
+    "plotly>=6.2.0",
+    "gradio-rangeslider>=0.0.8",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
 
 
 [tool.mypy]
@@ -81,7 +73,7 @@ show_error_codes = true
 testpaths = ["tests"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 120
 fix = true
 
@@ -106,7 +98,8 @@ select = [
     # mccabe
     "C90",
     # pycodestyle
-    "E", "W",
+    "E",
+    "W",
     # pyflakes
     "F",
     # pygrep-hooks

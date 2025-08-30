@@ -1,18 +1,17 @@
 [input]
-input_type = "hf"
-path = "HuggingFaceFW/fineweb-2"
-name = "lit_Latn"
-#name = "bel_Cyrl"
-#name = "ava_Cyrl"
-split = "train"
-cache_dir = ".cache"
+input_type = "local_files"
+file_type = "parquet"
+
+[input.read_arguments]
+path = "data/data/lit_Latn/train"
+split = "train[:10%]"
 
 [algorithm]
 algorithm_name = "minhash"
 text_column = "text"
 seed = 42
-batch_size = 100000
-num_perm = 112
+batch_size = 10000
+num_perm = 240
 threshold = 0.7
 false_positive_weight = 0.5
 false_negative_weight = 0.5
@@ -21,10 +20,12 @@ ngram_size = 5
 check_false_positive = true
 
 [output]
-
 output_dir = "output"
 clean_cache = false
 save_clusters = true
 keep_index_column = true
 keep_cluster_column = true
 skip_filtering = true
+
+[debug]
+enable_profiling = false

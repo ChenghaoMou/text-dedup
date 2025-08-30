@@ -5,6 +5,8 @@
 # description : Compute the optimal parameters for MinHashLSH.
 #
 
+# pyright: reportAny=false
+
 from scipy.integrate import quad as integrate
 
 
