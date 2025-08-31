@@ -20,6 +20,7 @@ dependencies = [
     "polars>=1.32.3",
     "polars-grouper>=0.3.0",
     "pydantic-settings>=2.9.1",
+    "rbloom>=1.5.2",
     "regex>=2024.11.6",
     "scipy>=1.13.1",
     "typing-extensions>=4.13.2",
