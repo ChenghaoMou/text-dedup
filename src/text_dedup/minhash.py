@@ -1,5 +1,4 @@
 # pyright: reportMissingTypeStubs=false
-from itertools import combinations
 from typing import cast
 
 import polars as pl
@@ -99,65 +98,37 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
         function=lambda x: x["__duplicate__"],  # pyright: ignore[reportUnknownLambdaType]
         num_proc=minhash_args.num_proc,
     )
-    candidates = pl.from_dict({  # pyright: ignore[reportUnknownArgumentType]
-        minhash_args.internal_index_column: ds_candidates[minhash_args.internal_index_column],
-        minhash_args.text_column: ds_candidates[minhash_args.text_column],
-        minhash_args.cluster_column: ds_candidates[minhash_args.cluster_column],
-    })
+    candidates: DataFrame = ds_candidates.select_columns([  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+        minhash_args.internal_index_column,
+        minhash_args.text_column,
+        minhash_args.cluster_column,
+    ]).to_polars()
     cluster_num = candidates.unique(minhash_args.cluster_column).shape[0]
-    candidates = (
-        candidates.group_by(pl.col(minhash_args.cluster_column))
-        .agg([
-            pl.col(minhash_args.internal_index_column),
-            pl.col(minhash_args.text_column),
-        ])
-        .with_columns(
-            pairs=pl.struct([
-                pl.col(minhash_args.internal_index_column),
-                pl.col(minhash_args.text_column),
-            ]).map_elements(
-                lambda x: [  # pyright: ignore[reportAny]
-                    {"pair1": {"idx": p1[0], "text": p1[1]}, "pair2": {"idx": p2[0], "text": p2[1]}}
-                    for (p1, p2) in combinations(
-                        zip(x[minhash_args.internal_index_column], x[minhash_args.text_column], strict=True),  # pyright: ignore[reportAny]
-                        2,
-                    )
-                ],
-                return_dtype=pl.List(
-                    pl.Struct({
-                        "pair1": pl.Struct({"idx": pl.Int64, "text": pl.String}),
-                        "pair2": pl.Struct({"idx": pl.Int64, "text": pl.String}),
-                    })
-                ),
-            )
-        )
-        .select([minhash_args.cluster_column, "pairs"])
-        .explode("pairs")
+    candidates = candidates.join(candidates, on=minhash_args.cluster_column).filter(
+        pl.col(minhash_args.internal_index_column) < pl.col(f"{minhash_args.internal_index_column}_right")
     )
     verified_pairs = len(candidates)
     tokenizer = minhash_args.get_ngrams_func()
-    results = candidates.with_columns(
-        jaccard_score=pl.col("pairs").map_elements(
-            lambda pair: jaccard_similarity(  # pyright: ignore[reportAny]
-                set(tokenizer(pair["pair1"]["text"])),  # pyright: ignore[reportAny]
-                set(tokenizer(pair["pair2"]["text"])),  # pyright: ignore[reportAny]
-            ),
-            return_dtype=pl.Float64,
+    results = (
+        candidates.with_columns(
+            jaccard_score=pl.struct(pl.all()).map_elements(
+                lambda record: jaccard_similarity(  # pyright: ignore[reportAny]
+                    set(tokenizer(record[minhash_args.text_column])),  # pyright: ignore[reportAny]
+                    set(tokenizer(record[f"{minhash_args.text_column}_right"])),  # pyright: ignore[reportAny]
+                ),
+                return_dtype=pl.Float64,
+            )
         )
-    ).filter(pl.col("jaccard_score") >= minhash_args.threshold)
+        .filter(pl.col("jaccard_score") >= minhash_args.threshold)
+        .with_columns([
+            pl.col(minhash_args.internal_index_column).alias("idx1"),
+            pl.col(f"{minhash_args.internal_index_column}_right").alias("idx2"),
+        ])
+    )
 
     assignment = (
-        results.with_columns([
-            pl.col("pairs").struct.field("pair1").struct.field("idx").alias("idx1"),
-            pl.col("pairs").struct.field("pair2").struct.field("idx").alias("idx2"),
-        ])
-        .select([pl.col("idx1").alias("idx"), pl.col(minhash_args.cluster_column)])
-        .vstack(
-            results.with_columns([
-                pl.col("pairs").struct.field("pair1").struct.field("idx").alias("idx1"),
-                pl.col("pairs").struct.field("pair2").struct.field("idx").alias("idx2"),
-            ]).select([pl.col("idx2").alias("idx"), pl.col(minhash_args.cluster_column)])
-        )
+        results.select([pl.col("idx1").alias("idx"), pl.col(minhash_args.cluster_column)])
+        .vstack(results.select([pl.col("idx2").alias("idx"), pl.col(minhash_args.cluster_column)]))
         .unique()
         # update the cluster id to the minimum index
         .group_by(minhash_args.cluster_column)

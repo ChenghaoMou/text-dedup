@@ -1,7 +1,7 @@
 from pathlib import Path
 
+from report.gradio_app import create_gradio_app
 from text_dedup.config.base import Config
-from text_dedup.gradio.gradio_app import create_gradio_app
 
 
 def main(config: Config) -> None:

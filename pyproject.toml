@@ -71,6 +71,7 @@ show_error_codes = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov-config=.coveragerc --cov=src --cov-report=term-missing --cov-report=xml --cov-report=html"
 
 [tool.ruff]
 target-version = "py310"
@@ -129,6 +130,17 @@ preview = true
 
 [tool.coverage.report]
 skip_empty = true
+omit = [
+    "tests/*",
+    "src/text_dedup/config/algorithms/__init__.py",
+    "src/text_dedup/config/__init__.py",
+    "src/text_dedup/config/io/__init__.py",
+    "src/text_dedup/utils/ftfy_utils.py",
+    "src/text_dedup/utils/logger.py",
+    "src/text_dedup/utils/progress.py",
+    "src/text_dedup/utils/timer.py",
+    "src/text_dedup/utils/env.py",
+]
 
 [tool.coverage.run]
 branch = true

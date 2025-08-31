@@ -31,7 +31,7 @@ def cluster_jaccard_similarity(
     cluster: list[set[bytes]],
     threshold: float,
 ) -> tuple[list[float], float]:
-    if not cluster:
+    if len(cluster) <= 1:
         return [], 0
     similarities: list[float] = []
     total = len(cluster)

@@ -4,8 +4,8 @@ from .algorithms import MinHashAlgorithmConfig
 from .algorithms import SimHashAlgorithmConfig
 from .algorithms import SuffixArrayAlgorithmConfig
 from .base import Config
-from .input_configs import LocalInputConfig
-from .output_configs import OutputConfig
+from .io import LocalInputConfig
+from .io import OutputConfig
 
 __all__ = [
     "AlgoConfig",

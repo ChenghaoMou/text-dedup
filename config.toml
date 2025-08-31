@@ -4,7 +4,7 @@ file_type = "parquet"
 
 [input.read_arguments]
 path = "data/data/lit_Latn/train"
-split = "train[:10%]"
+split = "train"
 
 [algorithm]
 algorithm_name = "minhash"

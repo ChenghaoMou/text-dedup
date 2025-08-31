@@ -10,8 +10,8 @@ from datasets import (  # pyright: ignore[reportMissingTypeStubs]
 )
 
 from text_dedup.config import Config
-from text_dedup.config import LocalInputConfig
-from text_dedup.config.output_configs import OutputConfig
+from text_dedup.config.io import LocalInputConfig
+from text_dedup.config.io import OutputConfig
 from text_dedup.utils.logger import log
 
 
@@ -37,10 +37,10 @@ def load_dataset(config: Config) -> Dataset:
                 num_proc=config.algorithm.num_proc,
                 desc="Indexing",
             )
-    return ds
+            return ds
 
 
-def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int], **kwargs: Any) -> None:
+def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int], **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny, reportAny, reportUnusedParameter]
     """Save the dataset to disk."""
     if config.output.save_clusters:
         if not config.output.keep_index_column:

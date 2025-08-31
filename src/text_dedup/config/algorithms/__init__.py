@@ -8,7 +8,6 @@ from .suffix_array import SuffixArrayAlgorithmConfig
 
 AlgoConfig: TypeAlias = MinHashAlgorithmConfig | SimHashAlgorithmConfig | BloomFilterAlgorithmConfig
 
-
 __all__ = [
     "AlgoConfig",
     "AlgorithmConfig",

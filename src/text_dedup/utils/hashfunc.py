@@ -10,7 +10,9 @@ import xxhash
 
 
 @overload
-def md5_digest(data: bytes, return_type: Literal["str"] = "str") -> str:  # pragma: no cover
+def md5_digest(  # pyright: ignore[reportOverlappingOverload]
+    data: bytes, return_type: Literal["str"] = "str"
+) -> str:  # pragma: no cover
     ...
 
 
@@ -25,7 +27,9 @@ def md5_digest(data: bytes, return_type: Literal["str", "bytes"] = "str") -> byt
 
 
 @overload
-def sha1_digest(data: bytes, return_type: Literal["str"] = "str") -> str:  # pragma: no cover
+def sha1_digest(  # pyright: ignore[reportOverlappingOverload]
+    data: bytes, return_type: Literal["str"] = "str"
+) -> str:  # pragma: no cover
     ...
 
 
@@ -40,7 +44,9 @@ def sha1_digest(data: bytes, return_type: Literal["str", "bytes"] = "str") -> by
 
 
 @overload
-def sha256_digest(data: bytes, return_type: Literal["str"] = "str") -> str:  # pragma: no cover
+def sha256_digest(  # pyright: ignore[reportOverlappingOverload]
+    data: bytes, return_type: Literal["str"] = "str"
+) -> str:  # pragma: no cover
     ...
 
 
@@ -80,9 +86,9 @@ def sha1_hash(data: bytes, d: int = 32) -> int:
     310522945683037930239412421226792791594
     """
     if d == 32:
-        return int(struct.unpack("<I", sha1(data, usedforsecurity=False).digest()[:4])[0])
+        return int(struct.unpack("<I", sha1(data, usedforsecurity=False).digest()[:4])[0])  # pyright: ignore[reportAny]
     if d == 64:
-        return int(struct.unpack("<Q", sha1(data, usedforsecurity=False).digest()[:8])[0])
+        return int(struct.unpack("<Q", sha1(data, usedforsecurity=False).digest()[:8])[0])  # pyright: ignore[reportAny]
     # struct is faster but does not support arbitrary bit lengths
     return int.from_bytes(hashlib.sha1(data, usedforsecurity=False).digest()[: d // 8], byteorder="little")
 
@@ -95,5 +101,5 @@ def xxh3_hash(data: bytes, seed: int = 0, bits: int | Literal[32, 64, 128] = 32)
             return xxhash.xxh3_64_intdigest(data, seed)
         case 128:
             return xxhash.xxh3_128_intdigest(data, seed)
-    # fall back
-    return int.from_bytes(xxhash.xxh3_128_digest(data)[: bits // 8], byteorder="big")
+        case _:
+            return int.from_bytes(xxhash.xxh3_128_digest(data)[: bits // 8], byteorder="big")

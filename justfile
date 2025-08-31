@@ -30,12 +30,17 @@ test:
 # 📊 Run the gradio app for report visualization
 report:
     @echo "📊 Running gradio app"
-    uv run python -m text_dedup.gradio.run
+    uv run --with gradio,plotly,gradio_rangeslider -m report.run
 
 # 🧹 Clean build artifacts
 clean-build:
     @echo "🧹 Removing build artifacts"
     rm -rf ./dist
+
+clean: clean-build
+    @echo "🧹 Removing cache and artifacts"
+    rm -rf .ruff_cache .mypy_cache .pytest_cache
+    find . -type d -name __pycache__ -exec rm -r {} +
 
 # 🏗️ Build wheel file
 build: clean-build

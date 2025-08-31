@@ -7,8 +7,8 @@ from pydantic_settings import TomlConfigSettingsSource
 
 from .algorithms import AlgoConfig
 from .debug import DebugConfig
-from .input_configs import InputConfigType
-from .output_configs import OutputConfigType
+from .io import InputConfigType
+from .io import OutputConfigType
 
 
 class Config(BaseSettings):
@@ -17,7 +17,7 @@ class Config(BaseSettings):
     output: OutputConfigType
     debug: DebugConfig
 
-    model_config = SettingsConfigDict(toml_file="config.toml")
+    model_config = SettingsConfigDict(toml_file="config.toml")  # pyright: ignore[reportUnannotatedClassAttribute]
 
     @classmethod
     @override
@@ -28,5 +28,5 @@ class Config(BaseSettings):
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
+    ) -> tuple[PydanticBaseSettingsSource, ...]:  # pragma: no cover
         return (TomlConfigSettingsSource(settings_cls),)
