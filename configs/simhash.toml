@@ -4,7 +4,7 @@ file_type = "parquet"
 
 [input.read_arguments]
 path = "data/data/lit_Latn/train"
-split = "train[:1%]"
+split = "train[:10%]"
 
 [algorithm]
 algorithm_name = "simhash"
@@ -17,7 +17,7 @@ f = 64
 bit_diff = 3
 num_bucket = 4
 min_length = 5
-jaccard_threshold = 0.7
+jaccard_threshold = 0.5
 
 [output]
 output_dir = "output"

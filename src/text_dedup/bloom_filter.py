@@ -1,5 +1,3 @@
-# pyright: reportMissingTypeStubs=false
-# pyright: reportUnknownMemberType=false
 import uuid
 from typing import cast
 
@@ -83,8 +81,8 @@ def main(config: Config) -> None:
 
         with timer("Cleaning"):
             if config.output.clean_cache:
-                ds.cleanup_cache_files()  # pyright: ignore[reportUnusedCallResult]
-                final_data.cleanup_cache_files()  # pyright: ignore[reportUnusedCallResult]
+                ds.cleanup_cache_files()
+                final_data.cleanup_cache_files()
 
     timer.report({"Before": ORIGINAL_LEN, "After": len(final_data)})
 

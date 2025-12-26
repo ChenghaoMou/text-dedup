@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from gradio.blocks import Block
+
 from report.gradio_app import create_gradio_app
 from text_dedup.config.base import Config
 
@@ -10,7 +12,7 @@ def main(config: Config) -> None:
     output_dir = Path(config.output.output_dir)
     if output_dir.exists():
         for component in app.blocks.values():
-            if not hasattr(component, "label") or not hasattr(component, "value"):
+            if not hasattr(component, "label") or not hasattr(component, "value") or isinstance(component, Block):
                 continue
             if component.label == "Output Directory Path":
                 component.value = str(output_dir)

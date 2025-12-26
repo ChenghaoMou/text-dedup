@@ -149,3 +149,5 @@ data
 profile.html
 profile.json
 .DS_Store
+
+**/__pycache__

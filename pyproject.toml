@@ -5,16 +5,17 @@ description = "All-in-one text deduplication tools"
 authors = [{ name = "Chenghao Mou", email = "mouchenghao@gmail.com" }]
 readme = "README.md"
 keywords = ['python']
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.12,<4.0"
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
+    "bitarray>=3.7.1",
     "datasets>=4.0.0",
     "ftfy>=6.3.1",
     "polars>=1.32.3",
@@ -57,6 +58,10 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.pyright]
+reportUnknownMemberType = false
+reportMissingTypeStubs = false
+reportUnusedCallResult = false
 
 [tool.mypy]
 files = ["src"]

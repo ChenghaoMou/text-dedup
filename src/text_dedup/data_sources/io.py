@@ -1,6 +1,7 @@
 import pickle
 from pathlib import Path
 from typing import Any
+from typing import cast
 
 from datasets import Dataset  # pyright: ignore[reportMissingTypeStubs]
 from datasets import disable_progress_bars  # pyright: ignore[reportMissingTypeStubs]
@@ -37,7 +38,7 @@ def load_dataset(config: Config) -> Dataset:
                 num_proc=config.algorithm.num_proc,
                 desc="Indexing",
             )
-            return ds
+            return cast(Dataset, ds)
 
 
 def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int], **kwargs: Any) -> None:  # pyright: ignore[reportExplicitAny, reportAny, reportUnusedParameter]

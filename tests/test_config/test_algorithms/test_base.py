@@ -2,6 +2,7 @@
 # pyright: reportPrivateUsage=false
 # pyright: reportUnusedCallResult=false
 import os
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -15,7 +16,9 @@ class TestAlgorithmConfig:
         "algorithm_name",
         ["minhash", "simhash", "bloom_filter", "suffix_array"],
     )
-    def test_algorithm_config_defaults(self, algorithm_name: str) -> None:
+    def test_algorithm_config_defaults(
+        self, algorithm_name: Literal["minhash", "simhash", "bloom_filter", "suffix_array"]
+    ) -> None:
         config = AlgorithmConfig(algorithm_name=algorithm_name, text_column="text")
 
         assert config.algorithm_name == algorithm_name
@@ -49,14 +52,14 @@ class TestAlgorithmConfig:
 
     def test_algorithm_config_invalid_algorithm_name(self) -> None:
         with pytest.raises(ValidationError, match="algorithm_name"):
-            AlgorithmConfig(algorithm_name="invalid_algorithm", text_column="text")
+            AlgorithmConfig(algorithm_name="invalid_algorithm", text_column="text")  # type: ignore[arg-type]
 
     def test_algorithm_config_missing_required_fields(self) -> None:
         with pytest.raises(ValidationError, match="text_column"):
-            AlgorithmConfig(algorithm_name="minhash")
+            AlgorithmConfig(algorithm_name="minhash")  # type: ignore[call-arg]
 
         with pytest.raises(ValidationError, match="algorithm_name"):
-            AlgorithmConfig(text_column="text")
+            AlgorithmConfig(text_column="text")  # type: ignore[call-arg]
 
     def test_num_proc_default_behavior(self) -> None:
         # Test that num_proc defaults to a positive integer

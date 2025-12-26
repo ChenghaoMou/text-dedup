@@ -23,9 +23,9 @@ def ngrams(sequence: list[str], n: int, min_length: int = 5) -> Iterator[tuple[s
         The ngrams.
     """
     if len(sequence) < min_length:
-        return []  # pyright: ignore[reportReturnType]
+        return iter([])
     if len(sequence) < n:
-        return [tuple(sequence)]  # pyright: ignore[reportReturnType]
+        return iter([tuple(sequence)])
     iterables = tee(iter(sequence), n)
     for i, sub_iterable in enumerate(iterables):
         for _ in range(i):

@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from contextlib import contextmanager
 from types import TracebackType
 from typing import Self
@@ -26,12 +27,13 @@ class CustomProgressBar:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ):
-        self.progress.__exit__(exc_type=exc_type, exc_val=exc_val, exc_tb=exc_tb)
-        pass
+    ) -> None:
+        self.progress.__exit__(exc_type=exc_type, exc_val=exc_val, exc_tb=exc_tb)  # type: ignore[call-arg]
 
     def update(self, n: int | float) -> None:
-        self.progress.update(self.task, advance=n)  # pyright: ignore[reportArgumentType]
+        if self.task is None:
+            raise ValueError("Task is not set")  # noqa: TRY003
+        self.progress.update(self.task, advance=n)
 
     def set_description(self, desc: str) -> None:
         self.desc = desc
@@ -39,12 +41,12 @@ class CustomProgressBar:
             self.progress.update(self.task, description=desc)
 
 
-def custom_track(unit: str, total: int, desc: str, initial: int = 0):
+def custom_track(unit: str, total: int, desc: str, initial: int = 0) -> CustomProgressBar:
     return CustomProgressBar(unit=unit, total=total, initial=initial, desc=desc)
 
 
 @contextmanager
-def use_custom_progress_bar():
+def use_custom_progress_bar() -> Generator[None, None, None]:
     from unittest.mock import patch
 
     with (

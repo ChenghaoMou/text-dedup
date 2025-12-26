@@ -11,28 +11,28 @@ format:
     @echo "👕️ Formatting code with ruff"
     uv run ruff format .
 
-# 🔍 Run code quality tools (linting, type checking, dependency checks)
+# Run code quality tools (linting, type checking, dependency checks)
 check:
     @echo "🔍 Checking lock file consistency with 'pyproject.toml'"
     uv lock --locked
     @echo "🔍 Linting code: Running pre-commit"
     uv run pre-commit run -a
     @echo "🔍 Static type checking: Running mypy"
-    uv run mypy
+    uv run mypy src report
     @echo "🔍 Checking for obsolete dependencies: Running deptry"
     uv run deptry src
 
-# 🧪 Test the code with pytest and coverage
+# Test the code with pytest and coverage
 test:
     @echo "🧪 Testing code: Running pytest"
     uv run python -m pytest --cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing
 
-# 📊 Run the gradio app for report visualization
+# Run the gradio app for report visualization
 report:
     @echo "📊 Running gradio app"
     uv run --with gradio,plotly,gradio_rangeslider -m report.run
 
-# 🧹 Clean build artifacts
+# Clean build artifacts
 clean-build:
     @echo "🧹 Removing build artifacts"
     rm -rf ./dist

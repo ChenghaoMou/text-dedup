@@ -14,7 +14,6 @@ from plotly.subplots import make_subplots
 
 from text_dedup.config import MinHashAlgorithmConfig
 from text_dedup.config.base import Config
-from text_dedup.utils.analysis import optimal_param
 from text_dedup.utils.jaccard import cluster_jaccard_similarity
 
 
@@ -42,7 +41,7 @@ class ClusterVisualizer:
             if not (output_path.parent / "config.toml").exists():
                 return None, "Config file not found", gr.update()
 
-            self.config = Config()
+            self.config = Config()  # type: ignore[call-arg]
 
             ds = load_from_disk(output_path)
             if not isinstance(ds, Dataset):
@@ -131,7 +130,7 @@ class ClusterVisualizer:
         if len(df_filtered) > 0:
             histogram = go.Histogram(
                 x=df_filtered["size"],
-                nbinsx=min(50, max_size - min_size + 1),
+                nbinsx=int(min(50, max_size - min_size + 1)),
                 name="Cluster Size Distribution",
                 marker_color="rgba(0, 123, 255, 0.7)",
                 marker_line_color="rgba(0, 0, 0, 0.8)",
@@ -365,11 +364,6 @@ class ClusterVisualizer:
         info = f"Cluster {cluster_id}: {cluster_size:,} records total (showing {len(samples)} samples)"
 
         if self.config and isinstance(self.config.algorithm, MinHashAlgorithmConfig):
-            b, r = optimal_param(
-                threshold=self.config.algorithm.threshold,
-                num_perm=self.config.algorithm.num_perm,
-            )
-            fpr = float(1 - (1 - self.config.algorithm.threshold ** float(r)) ** float(b))
             tokenize = self.config.algorithm.get_ngrams_func()
             docs = self.dataset.select(sample_ids)[self.text_column]
             similarities, fp_rate = cluster_jaccard_similarity(
@@ -380,7 +374,7 @@ class ClusterVisualizer:
             info += f"- Mean: {np.mean(similarities):.4f}\n"
             info += f"- Min: {min(similarities):.4f}\n"
             info += f"- 90 Percentile: {np.percentile(similarities, 0.9):.4f}\n"
-            info += f"- FP Rate: {fp_rate:.4f} vs {fpr:.4f}"
+            info += f"- FP Rate: {fp_rate:.4f}"
 
         return df, info
 

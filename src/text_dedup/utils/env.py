@@ -1,7 +1,7 @@
 from .logger import log
 
 
-def check_env():  # pragma: no cover
+def check_env() -> None:  # pragma: no cover
     import polars as pl
     import psutil
 

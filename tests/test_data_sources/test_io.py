@@ -134,7 +134,7 @@ class TestSaveDataset:
             mock_dataset.remove_columns.assert_called_once_with(list(expected_columns_to_remove))
 
             # Verify dataset is saved to disk
-            mock_dataset.save_to_disk.assert_called_once_with(temp_dir, num_proc=4)
+            mock_dataset.save_to_disk.assert_called_once_with(temp_dir, num_proc=4)  # ty:ignore[unresolved-attribute]
 
     def test_save_dataset_with_clusters_save(self, mock_config: Config, mock_dataset: Dataset) -> None:
         clusters = {1: 10, 2: 20, 3: 30}
@@ -252,7 +252,7 @@ class TestSaveDataset:
 
             # When no columns to remove, remove_columns should not be called
             mock_dataset.remove_columns.assert_not_called()
-            mock_dataset.save_to_disk.assert_called_once_with(temp_dir, num_proc=4)
+            mock_dataset.save_to_disk.assert_called_once_with(temp_dir, num_proc=4)  # ty:ignore[unresolved-attribute]
 
     def test_save_dataset_with_custom_column_names(self, mock_config: Config, mock_dataset: Dataset) -> None:
         clusters = {1: 10}
@@ -280,7 +280,7 @@ class TestSaveDataset:
             )
 
             # Should still work normally
-            mock_dataset.save_to_disk.assert_called_once_with(temp_dir, num_proc=4)
+            mock_dataset.save_to_disk.assert_called_once_with(temp_dir, num_proc=4)  # ty:ignore[unresolved-attribute]
 
     def test_save_dataset_pathlib_path(self, mock_config: Config, mock_dataset: Dataset) -> None:
         clusters = {1: 10, 2: 20}
