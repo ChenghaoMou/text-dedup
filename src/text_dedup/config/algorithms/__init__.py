@@ -6,7 +6,9 @@ from .minhash import MinHashAlgorithmConfig
 from .simhash import SimHashAlgorithmConfig
 from .suffix_array import SuffixArrayAlgorithmConfig
 
-AlgoConfig: TypeAlias = MinHashAlgorithmConfig | SimHashAlgorithmConfig | BloomFilterAlgorithmConfig
+AlgoConfig: TypeAlias = (
+    MinHashAlgorithmConfig | SimHashAlgorithmConfig | BloomFilterAlgorithmConfig | SuffixArrayAlgorithmConfig
+)
 
 __all__ = [
     "AlgoConfig",

@@ -61,6 +61,7 @@ def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int
             if config.output.keep_cluster_column or config.output.save_clusters:
                 columns_to_remove.remove(config.algorithm.cluster_column)
             if columns_to_remove:
+                columns_to_remove = [col for col in columns_to_remove if col in final_data.column_names]
                 final_data = final_data.remove_columns(list(columns_to_remove))
 
             final_data.save_to_disk(config.output.output_dir, num_proc=config.algorithm.num_proc)  # pyright: ignore[reportUnknownMemberType]
