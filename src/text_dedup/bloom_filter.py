@@ -8,6 +8,7 @@ from text_dedup.config import BloomFilterAlgorithmConfig
 from text_dedup.config import Config
 from text_dedup.data_sources.io import load_dataset
 from text_dedup.data_sources.io import save_dataset
+from text_dedup.utils.logger import log
 from text_dedup.utils.timer import Timer
 
 
@@ -22,6 +23,11 @@ def bloom_filter(config: Config, ds: Dataset) -> Dataset:
     """Bloom filter the dataset."""
     algo = cast(BloomFilterAlgorithmConfig, config.algorithm)
     bf: Bloom = algo.get_filter()
+
+    if config.algorithm.num_proc > 1:
+        log.warning(
+            "Bloom filter does not support multi-processing due to state requirements. Using num_proc=1 instead."
+        )
 
     def f(text: str) -> dict[str, bool]:
         if text in bf:

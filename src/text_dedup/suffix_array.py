@@ -20,7 +20,7 @@ def load_and_preprocess(config: Config) -> tuple[Dataset, int]:
 
 def main(config: Config) -> None:
     """
-    Running BloomFilter algorithm.
+    Running Suffix Array algorithm.
 
     Parameters
     ----------
@@ -31,20 +31,22 @@ def main(config: Config) -> None:
 
     timer = Timer()
     algo = cast(SuffixArrayAlgorithmConfig, config.algorithm)
-    config.output.save_clusters = False
+    cache_dir = Path(algo.google_repo_path) / algo.cache_dir
     temp_output_dir = Path(algo.google_repo_path) / "output"
     temp_dir = Path(algo.google_repo_path) / "tmp"
-    temp_output_dir.mkdir(exist_ok=True, parents=True)
-    temp_dir.mkdir(exist_ok=True, parents=True)
-    temp_text = "output/temp_text.txt"
-    temp_output = "output/temp_output.txt"
+    temp_text = temp_output_dir / "temp_text.txt"
+    temp_output = temp_output_dir / "temp_output.txt"
+
+    for d in {cache_dir, temp_output_dir, temp_dir}:
+        shutil.rmtree(d, ignore_errors=True)
+        d.mkdir(exist_ok=True, parents=True)
 
     with timer("Total", enable_spin=False):
         with timer("Preprocessing", enable_spin=False):
             ds, ORIGINAL_SIZE = load_and_preprocess(config)
             offsets: list[slice] = []
             start = 0
-            with open(Path(algo.google_repo_path) / temp_text, "wb") as f:
+            with open(temp_text, "wb") as f:
                 for doc in ds:
                     doc_bytes = doc[algo.text_column].encode("utf-8")  # pyright: ignore[reportCallIssue, reportArgumentType]
                     end = start + len(doc_bytes)
@@ -54,27 +56,27 @@ def main(config: Config) -> None:
 
         with timer("Making suffix array", enable_spin=True):
             algo.run_command(
-                f"python scripts/make_suffix_array.py {temp_text}",
+                f"python scripts/make_suffix_array.py {temp_text.relative_to(algo.google_repo_path)}",
                 algo.google_repo_path,
             )
 
         with timer("SelfSimilar", enable_spin=True):
             algo.run_command(
-                f"cargo run self-similar --data-file {temp_text}"
-                f" --length-threshold {algo.length_threshold} --cache-dir {algo.cache_dir} --num-threads {algo.num_proc}",
+                f"cargo run self-similar --data-file {temp_text.relative_to(algo.google_repo_path)}"
+                f" --length-threshold {algo.length_threshold} --cache-dir {cache_dir.relative_to(algo.google_repo_path)} --num-threads {algo.num_proc}",
                 algo.google_repo_path,
             )
             algo.run_command(
-                f"cargo run collect --data-file {temp_text}"
-                f" --length-threshold {algo.length_threshold} --cache-dir {algo.cache_dir} >"
-                f" {temp_output}",
+                f"cargo run collect --data-file {temp_text.relative_to(algo.google_repo_path)}"
+                f" --length-threshold {algo.length_threshold} --cache-dir {cache_dir.relative_to(algo.google_repo_path)} >"
+                f" {temp_output.relative_to(algo.google_repo_path)}",
                 algo.google_repo_path,
             )
 
         with timer("Restore", enable_spin=True):
             duplicate_slices, duplicate_size = algo.restore_and_merge(
                 offsets,
-                Path(algo.google_repo_path) / temp_output,
+                temp_output,
                 algo.length_threshold,
                 algo.merge_strategy,
             )
@@ -96,12 +98,12 @@ def main(config: Config) -> None:
         with timer("Saving"):
             save_dataset(config, final_data=ds, clusters={})
 
-        with timer("Cleaning"):
-            if config.output.clean_cache:
+        if config.output.clean_cache:
+            with timer("Cleaning"):
                 ds.cleanup_cache_files()
                 shutil.rmtree(temp_output_dir)
                 shutil.rmtree(temp_dir)
-                shutil.rmtree(algo.cache_dir)
+                shutil.rmtree(cache_dir)
 
     timer.report({"Before": f"{ORIGINAL_SIZE / 1024 / 1024:.2f} MB", "After": f"{ds.data.nbytes / 1024 / 1024:.2f} MB"})
 

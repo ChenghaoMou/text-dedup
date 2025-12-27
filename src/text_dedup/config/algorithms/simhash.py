@@ -240,10 +240,13 @@ def compute(hashes: list[bitarray]) -> bitarray:
     >>> ba2int(res)
     74633958390507528
     """
+    if not hashes:
+        raise ValueError("Cannot compute simhash from empty hash list")  # noqa: TRY003
+
     sigs = np.asarray([h.tolist() for h in hashes], dtype=int)
     sig = np.where(np.sum(2 * sigs - 1, axis=0) > 0, True, False)
     res = bitarray()
-    res.pack(sig.tobytes())
+    res.extend(sig.tolist())
     return res
 
 
@@ -352,7 +355,11 @@ class SimHashAlgorithmConfig(AlgorithmConfig):
             """
 
             tokens = tokenizer(text_col[0])
-            sig = compute([_unsigned_hash(t, self.hash_func, length=self.f // 8) for t in tokens])
+            if tokens:
+                sig = compute([_unsigned_hash(t, self.hash_func, length=self.f // 8) for t in tokens])
+            else:
+                sig = bitarray(self.f)
+                sig.setall(0)
             keys: list[tuple[bytes, bytes]] = []
             if self._perms:
                 for permutation in self._perms:

@@ -1,3 +1,4 @@
+from typing import Any
 from typing import override
 
 from pydantic_settings import BaseSettings
@@ -18,6 +19,15 @@ class Config(BaseSettings):
     debug: DebugConfig
 
     model_config = SettingsConfigDict(toml_file="config.toml")  # pyright: ignore[reportUnannotatedClassAttribute]
+
+    @override
+    def model_post_init(self, context: Any) -> None:
+        from .algorithms import SuffixArrayAlgorithmConfig
+
+        super().model_post_init(context)
+        if isinstance(self.algorithm, SuffixArrayAlgorithmConfig):
+            self.output.save_clusters = False
+            self.output.keep_cluster_column = False
 
     @classmethod
     @override

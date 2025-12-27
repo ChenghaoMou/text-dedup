@@ -24,7 +24,10 @@ def jaccard_similarity(
     float
         The Jaccard similarity.
     """
-    return len(doc1 & doc2) / max(1, len(doc1 | doc2))
+    if (union_size := len(doc1 | doc2)) == 0:
+        return 1.0
+
+    return len(doc1 & doc2) / union_size
 
 
 def cluster_jaccard_similarity(

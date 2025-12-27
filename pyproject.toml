@@ -23,6 +23,7 @@ dependencies = [
     "pydantic-settings>=2.9.1",
     "rbloom>=1.5.2",
     "regex>=2024.11.6",
+    "scikit-learn>=1.8.0",
     "scipy>=1.13.1",
     "typing-extensions>=4.13.2",
     "xxhash>=3.5.0",

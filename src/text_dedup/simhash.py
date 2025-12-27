@@ -32,7 +32,6 @@ def fingerprint(config: Config, ds: Dataset) -> Dataset:
         with_indices=False,
         batched=True,
         batch_size=1,
-        # new_fingerprint=str(uuid.uuid4()),
         desc="SimHashing...",
     )
     return embedded
@@ -42,6 +41,7 @@ def cluster(config: Config, ds: Dataset) -> dict[int, int]:
     """Cluster the dataset."""
     algo = cast(SimHashAlgorithmConfig, config.algorithm)
     signatures: DataFrame = ds.select_columns(["__key__", "__val__", algo.internal_index_column]).to_polars()  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+
     clusters = (
         signatures.group_by(["__key__"])
         .agg(items=pl.struct(["__val__", algo.internal_index_column]))
@@ -178,7 +178,7 @@ def remove_duplicates(config: Config, ds: Dataset) -> Dataset:
     """Remove duplicates from the dataset."""
     if not config.output.skip_filtering:
         result: Dataset = ds.filter(
-            function=lambda record: not record["duplicate"],  # pyright: ignore[reportUnknownLambdaType]
+            function=lambda record: not record["__duplicate__"],  # pyright: ignore[reportUnknownLambdaType]
             with_indices=False,
             num_proc=config.algorithm.num_proc,
             desc="Removing duplicates...",
@@ -189,7 +189,7 @@ def remove_duplicates(config: Config, ds: Dataset) -> Dataset:
 
 def main(config: Config) -> None:
     """
-    Running BloomFilter algorithm.
+    Running SimHash algorithm.
 
     Parameters
     ----------
