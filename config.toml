@@ -1,0 +1,24 @@
+[input]
+input_type = "local_files"
+file_type = "parquet"
+
+[input.read_arguments]
+path = "data/data/lit_Latn/train"
+split = "train[:2%]"
+
+[algorithm]
+algorithm_name = "suffix_array"
+text_column = "text"
+seed = 42
+batch_size = 10000
+merge_strategy = "longest"
+length_threshold = 100
+google_repo_path = "third_party/deduplicate-text-datasets"
+cache_dir = ".cache"
+
+[output]
+output_dir = "output"
+clean_cache = true
+
+[debug]
+enable_profiling = false

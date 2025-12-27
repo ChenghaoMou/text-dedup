@@ -1,0 +1,26 @@
+[input]
+input_type = "local_files"
+file_type = "parquet"
+
+[input.read_arguments]
+path = "data/data/lit_Latn/train"
+split = "train[:10%]"
+
+[algorithm]
+algorithm_name = "bloom_filter"
+text_column = "text"
+seed = 42
+batch_size = 10000
+max_elements = 1000000
+error_rate = 0.001
+
+[output]
+output_dir = "output"
+clean_cache = false
+save_clusters = true
+keep_index_column = true
+keep_cluster_column = true
+skip_filtering = true
+
+[debug]
+enable_profiling = false

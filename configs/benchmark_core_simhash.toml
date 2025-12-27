@@ -1,0 +1,28 @@
+# Configuration for SimHash benchmark on CORE dataset
+
+[input]
+input_type = "local_hf_dataset"
+
+[input.read_arguments]
+dataset_path = "pinecone/core-2020-05-10-deduplication"
+
+[algorithm]
+algorithm_name = "simhash"
+num_proc = 6
+text_column = "text"
+f = 64
+bit_diff = 7
+num_bucket = 8
+ngram_size = 1
+min_length = 0
+check_false_positive = false
+jaccard_threshold = 0.5
+
+[output]
+output_dir = "./output/benchmark_core_simhash"
+save_clusters = true
+keep_cluster_column = true
+clean_cache = true
+
+[debug]
+enable_profiling = false

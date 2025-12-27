@@ -1,0 +1,30 @@
+# Configuration for MinHash benchmark on CORE dataset
+# Based on the benchmark results from the README
+
+[input]
+input_type = "local_hf_dataset"
+
+[input.read_arguments]
+dataset_path = "pinecone/core-2020-05-10-deduplication"
+
+[algorithm]
+algorithm_name = "minhash"
+num_proc = 6
+hash_func_name = "xxh3"
+text_column = "text"
+num_perm = 200
+ngram_size = 2
+bands = 50
+rows = 4
+threshold = 0.5
+min_length = 0
+check_false_positive = false
+
+[output]
+output_dir = "./output/benchmark_core_minhash"
+save_clusters = true
+keep_cluster_column = true
+clean_cache = true
+
+[debug]
+enable_profiling = false

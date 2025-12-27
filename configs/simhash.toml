@@ -1,0 +1,31 @@
+[input]
+input_type = "local_files"
+file_type = "parquet"
+
+[input.read_arguments]
+path = "data/data/lit_Latn/train"
+split = "train[:10%]"
+
+[algorithm]
+algorithm_name = "simhash"
+text_column = "text"
+seed = 42
+batch_size = 10000
+ngram_size = 5
+check_false_positive = true
+f = 64
+bit_diff = 3
+num_bucket = 4
+min_length = 5
+jaccard_threshold = 0.5
+
+[output]
+output_dir = "output"
+clean_cache = false
+save_clusters = true
+keep_index_column = true
+keep_cluster_column = true
+skip_filtering = true
+
+[debug]
+enable_profiling = false
