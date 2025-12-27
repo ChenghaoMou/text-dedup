@@ -436,6 +436,7 @@ class ClusterVisualizer:
 def create_gradio_app() -> gr.Blocks:
     visualizer = ClusterVisualizer()
 
+    app: gr.Blocks
     with gr.Blocks(
         title="Text Deduplication Cluster Visualizer",
         theme=gr.themes.Soft(font=[gr.themes.GoogleFont("IBM Plex Sans"), "IBM Plex Sans", "sans-serif"]),
