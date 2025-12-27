@@ -1,6 +1,5 @@
 from typing import Any
 from typing import Literal
-from typing import TypeAlias
 
 from pydantic_settings import BaseSettings
 
@@ -20,4 +19,4 @@ class LocalHFDatasetInputConfig(InputConfig):
     read_arguments: dict[str, Any]  # pyright: ignore[reportExplicitAny]
 
 
-InputConfigType: TypeAlias = LocalInputConfig | LocalHFDatasetInputConfig
+type InputConfigType = LocalInputConfig | LocalHFDatasetInputConfig

@@ -1,12 +1,10 @@
-from typing import TypeAlias
-
 from .base import AlgorithmConfig
 from .bloom import BloomFilterAlgorithmConfig
 from .minhash import MinHashAlgorithmConfig
 from .simhash import SimHashAlgorithmConfig
 from .suffix_array import SuffixArrayAlgorithmConfig
 
-AlgoConfig: TypeAlias = (
+type AlgoConfig = (
     MinHashAlgorithmConfig | SimHashAlgorithmConfig | BloomFilterAlgorithmConfig | SuffixArrayAlgorithmConfig
 )
 

@@ -1,5 +1,3 @@
-from typing import TypeAlias
-
 from pydantic_settings import BaseSettings
 
 
@@ -12,4 +10,4 @@ class OutputConfig(BaseSettings):
     keep_cluster_column: bool = False
 
 
-OutputConfigType: TypeAlias = OutputConfig
+type OutputConfigType = OutputConfig
