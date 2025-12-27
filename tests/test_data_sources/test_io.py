@@ -61,6 +61,7 @@ def mock_dataset() -> Dataset:
     mock_ds.map = Mock(return_value=mock_ds)
     mock_ds.remove_columns = Mock(return_value=mock_ds)
     mock_ds.save_to_disk = Mock()
+    mock_ds.column_names = ["__INDEX__", "__CLUSTER__", "text"]
     return mock_ds
 
 
@@ -258,6 +259,8 @@ class TestSaveDataset:
         clusters = {1: 10}
         mock_config.algorithm.internal_index_column = "__CUSTOM_INDEX__"
         mock_config.algorithm.cluster_column = "__CUSTOM_CLUSTER__"
+        # Update mock's column_names to include custom columns
+        mock_dataset.column_names = ["__CUSTOM_INDEX__", "__CUSTOM_CLUSTER__", "text"]
 
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_config.output.output_dir = temp_dir

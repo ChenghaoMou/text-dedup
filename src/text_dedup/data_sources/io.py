@@ -49,7 +49,7 @@ def load_dataset(config: Config) -> Dataset:
 
             disable_progress_bars()
             with use_tqdm():
-                ds = hf_load_dataset(**config.input.read_arguments)  # pyright: ignore[reportAny]
+                ds = hf_load_dataset(**config.input.read_arguments)  # type: ignore[assignment]  # pyright: ignore[reportAny]
             enable_progress_bars()
 
             if not isinstance(ds, Dataset):
@@ -78,7 +78,7 @@ def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int
 
     match config.output:
         case OutputConfig():
-            columns_to_remove = {
+            columns_to_remove: set[str] = {
                 config.algorithm.internal_index_column,
                 config.algorithm.cluster_column,
             }
@@ -89,7 +89,8 @@ def save_dataset(config: Config, *, final_data: Dataset, clusters: dict[int, int
             ) and config.algorithm.cluster_column in columns_to_remove:
                 columns_to_remove.remove(config.algorithm.cluster_column)
             if columns_to_remove:
-                columns_to_remove = [col for col in columns_to_remove if col in final_data.column_names]
-                final_data = final_data.remove_columns(list(columns_to_remove))
+                columns_to_remove_filtered = [col for col in columns_to_remove if col in final_data.column_names]
+                if columns_to_remove_filtered:
+                    final_data = final_data.remove_columns(columns_to_remove_filtered)
 
             final_data.save_to_disk(config.output.output_dir, num_proc=config.algorithm.num_proc)  # pyright: ignore[reportUnknownMemberType]

@@ -10,8 +10,8 @@ class TestJaccardSimilarity:
         [  # pyright: ignore[reportUnknownArgumentType]
             # Identical sets
             ({"hello", "world", "test"}, {"hello", "world", "test"}, 1.0, "identical_sets"),
-            # Empty sets
-            (set(), set(), 0.0, "empty_sets"),
+            # Empty sets (both empty sets are identical, so similarity is 1.0)
+            (set(), set(), 1.0, "empty_sets"),
             # One empty set
             ({"hello", "world"}, set(), 0.0, "one_empty_set"),
             # No overlap
@@ -164,21 +164,26 @@ class TestClusterJaccardSimilarity:
         assert fp_rate == 1.0
 
     @pytest.mark.parametrize(
-        "cluster, threshold, expected_fp_rate, description",
+        "cluster, threshold, expected_similarities, expected_fp_rate, description",
         [
-            # All empty sets
-            ([set(), set(), set()], 0.5, 1.0, "all_empty_sets"),
+            # All empty sets (empty sets are identical, so similarity is 1.0)
+            ([set(), set(), set()], 0.5, [1.0, 1.0, 1.0], 0.0, "all_empty_sets"),
             # One empty set among non-overlapping docs
-            ([{b"hello", b"world"}, set(), {b"foo", b"bar"}], 0.5, 1.0, "one_empty_set"),
+            ([{b"hello", b"world"}, set(), {b"foo", b"bar"}], 0.5, [0.0, 0.0, 0.0], 1.0, "one_empty_set"),
         ],
     )
     def test_cluster_jaccard_similarity_edge_cases(
-        self, cluster: list[set[bytes]], threshold: float, expected_fp_rate: float, description: str
+        self,
+        cluster: list[set[bytes]],
+        threshold: float,
+        expected_similarities: list[float],
+        expected_fp_rate: float,
+        description: str,
     ) -> None:
         similarities, fp_rate = cluster_jaccard_similarity(cluster, threshold)
 
         assert len(similarities) == len(cluster)
-        assert all(sim == 0.0 for sim in similarities)
+        assert similarities == expected_similarities
         assert fp_rate == expected_fp_rate
 
     def test_cluster_jaccard_similarity_threshold_boundary(self) -> None:

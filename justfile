@@ -27,6 +27,11 @@ test:
     @echo "Testing code: Running pytest"
     uv run python -m pytest --cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing
 
+# Run tests across multiple Python versions using tox
+tox:
+    @echo "Running tox across Python 3.12, 3.13"
+    uvx --with tox-uv tox
+
 # Run benchmarks
 # Run all benchmarks
 benchmark-all: benchmark-core benchmark-news

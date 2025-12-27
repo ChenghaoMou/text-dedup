@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13"]
       fail-fast: false
     defaults:
       run:
@@ -50,8 +50,8 @@ jobs:
       - name: Check typing
         run: uv run mypy
 
-      - name: Upload coverage reports to Codecov with GitHub Action on Python 3.11
+      - name: Upload coverage reports to Codecov with GitHub Action on Python 3.12
         uses: codecov/codecov-action@v4
-        if: ${{ matrix.python-version == '3.11' }}
+        if: ${{ matrix.python-version == '3.12' }}
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -59,7 +59,7 @@ def load_config_from_toml(toml_path: Path) -> Config:
     original_config = Config.model_config.copy()
     Config.model_config = SettingsConfigDict(toml_file=str(toml_path))
     try:
-        config = Config()  # pyright: ignore[reportCallIssue]
+        config = Config()  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
     finally:
         Config.model_config = original_config
     return config
