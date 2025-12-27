@@ -8,6 +8,7 @@ from text_dedup.config import Config
 from text_dedup.config import SuffixArrayAlgorithmConfig
 from text_dedup.data_sources.io import load_dataset
 from text_dedup.data_sources.io import save_dataset
+from text_dedup.utils.progress import use_custom_progress_bar
 from text_dedup.utils.timer import Timer
 
 
@@ -41,7 +42,7 @@ def main(config: Config) -> None:
         shutil.rmtree(d, ignore_errors=True)
         d.mkdir(exist_ok=True, parents=True)
 
-    with timer("Total", enable_spin=False):
+    with timer("Total", enable_spin=False), use_custom_progress_bar():
         with timer("Preprocessing", enable_spin=False):
             ds, ORIGINAL_SIZE = load_and_preprocess(config)
             offsets: list[slice] = []
@@ -115,13 +116,12 @@ if __name__ == "__main__":
     from text_dedup.utils.env import check_env
     from text_dedup.utils.progress import use_custom_progress_bar
 
-    with use_custom_progress_bar():
-        config = CliApp.run(Config)
-        check_env()
-        if config.debug.enable_profiling:
-            from scalene.scalene_profiler import enable_profiling
+    config = CliApp.run(Config)
+    check_env()
+    if config.debug.enable_profiling:
+        from scalene.scalene_profiler import enable_profiling
 
-            with enable_profiling():
-                main(config)
-        else:
+        with enable_profiling():
             main(config)
+    else:
+        main(config)

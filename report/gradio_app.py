@@ -440,10 +440,10 @@ def create_gradio_app() -> gr.Blocks:
         title="Text Deduplication Cluster Visualizer",
         theme=gr.themes.Soft(font=[gr.themes.GoogleFont("IBM Plex Sans"), "IBM Plex Sans", "sans-serif"]),
     ) as app:
-        gr.Markdown("# 📊 Text Deduplication Cluster Visualizer")
+        gr.Markdown("# Text Deduplication Cluster Visualizer")
         gr.Markdown("Explore and visualize text deduplication results with interactive plots.")
 
-        with gr.Tab("📁 Dataset Loading"):
+        with gr.Tab("Dataset Loading"):
             with gr.Row():
                 with gr.Column():
                     output_dir = gr.Textbox(label="Output Directory Path", placeholder="e.g., ./output", value="output")
@@ -456,7 +456,7 @@ def create_gradio_app() -> gr.Blocks:
                     load_status = gr.Textbox(label="Status", interactive=False)
                     summary_stats = gr.Dataframe(label="Dataset Summary Statistics")
 
-            with gr.Tab("📈 Cluster Distribution"):
+            with gr.Tab("Cluster Distribution"):
                 with gr.Row():
                     cluster_size_slider = RangeSlider(
                         minimum=1, maximum=1000, value=(2, 100), step=1, label="Cluster Size Range"
@@ -476,7 +476,7 @@ def create_gradio_app() -> gr.Blocks:
                 outputs=[summary_stats, load_status, cluster_size_slider],
             )
 
-        with gr.Tab("📊 Detailed Analysis"):
+        with gr.Tab("Detailed Analysis"):
             with gr.Row():
                 with gr.Column(scale=3):
                     bin_size_slider = gr.Slider(
@@ -491,7 +491,7 @@ def create_gradio_app() -> gr.Blocks:
                 fn=visualizer.plot_detailed_distribution, inputs=[bin_size_slider], outputs=[detailed_plot]
             )
 
-        with gr.Tab("🌳 Treemap Visualization"):
+        with gr.Tab("Treemap Visualization"):
             with gr.Row():
                 with gr.Column(scale=3):
                     max_treemap_clusters = gr.Slider(
@@ -504,7 +504,7 @@ def create_gradio_app() -> gr.Blocks:
 
             treemap_btn.click(fn=visualizer.plot_cluster_treemap, inputs=[max_treemap_clusters], outputs=[treemap_plot])
 
-        with gr.Tab("🏆 Top Clusters"):
+        with gr.Tab("Top Clusters"):
             with gr.Row():
                 with gr.Column(scale=3):
                     top_n = gr.Slider(minimum=5, maximum=50, value=20, step=5, label="Number of Top Clusters to Show")
@@ -515,7 +515,7 @@ def create_gradio_app() -> gr.Blocks:
 
             refresh_top_btn.click(fn=visualizer.get_top_clusters, inputs=[top_n], outputs=[top_clusters_df])
 
-        with gr.Tab("🔍 Cluster Explorer"):
+        with gr.Tab("Cluster Explorer"):
             with gr.Row():
                 with gr.Column():
                     cluster_id_input = gr.Number(label="Cluster ID", precision=0)
@@ -535,7 +535,7 @@ def create_gradio_app() -> gr.Blocks:
                 outputs=[cluster_samples, cluster_info],
             )
 
-        with gr.Tab("🔎 Text Search"):
+        with gr.Tab("Text Search"):
             with gr.Row():
                 with gr.Column():
                     search_query = gr.Textbox(label="Search Query", placeholder="Enter text to search...")
@@ -553,7 +553,7 @@ def create_gradio_app() -> gr.Blocks:
                 outputs=[search_results, search_status],
             )
 
-        with gr.Tab("🆚 Cluster Comparison"):
+        with gr.Tab("Cluster Comparison"):
             with gr.Row():
                 with gr.Column():
                     cluster_id_1 = gr.Number(label="Cluster ID 1", precision=0)

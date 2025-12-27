@@ -79,7 +79,7 @@ def optimal_param(
 class MinHashAlgorithmConfig(AlgorithmConfig):
     algo_name: Literal["minhash"] = "minhash"
     hash_bits: int = 64
-    hash_func_name: Literal["sha1", "xxh3"] = "sha1"
+    hash_func_name: Literal["sha1", "xxh3"] = "xxh3"
     bands: int | None = None
     rows: int | None = None
     num_perm: int
@@ -182,7 +182,7 @@ class MinHashAlgorithmConfig(AlgorithmConfig):
         NON_ALPHA = re.compile(r"\W", re.UNICODE)
 
         def f(content: str) -> list[str]:
-            return NON_ALPHA.split(content.lower())
+            return [t for t in NON_ALPHA.split(content.lower()) if t]
 
         return f
 

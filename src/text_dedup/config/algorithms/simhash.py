@@ -307,7 +307,7 @@ class SimHashAlgorithmConfig(AlgorithmConfig):
         NON_ALPHA = re.compile(r"\W", re.UNICODE)
 
         def f(content: str) -> list[str]:
-            return NON_ALPHA.split(content.lower())
+            return [t for t in NON_ALPHA.split(content.lower()) if t]
 
         return f
 

@@ -18,6 +18,7 @@ from text_dedup.config.io import LocalInputConfig
 from text_dedup.config.io import OutputConfig
 from text_dedup.config.io.input_configs import LocalHFDatasetInputConfig
 from text_dedup.utils.logger import log
+from text_dedup.utils.progress import use_tqdm
 
 
 class InvalidDatasetTypeError(Exception):
@@ -29,17 +30,26 @@ def load_dataset(config: Config) -> Dataset:
     match config.input:
         case LocalHFDatasetInputConfig():
             disable_progress_bars()
-            ds = hf_load_from_disk(**config.input.read_arguments)  # pyright: ignore[reportAny]
+            with use_tqdm():
+                ds = hf_load_from_disk(**config.input.read_arguments)  # pyright: ignore[reportAny]
             enable_progress_bars()
             if not isinstance(ds, Dataset):
                 raise InvalidDatasetTypeError(type(ds))
+            _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
+            ds = ds.map(  # pyright: ignore[reportUnknownMemberType]
+                lambda _, i: {_INTERNAL_INDEX_COLUMN: i},  # pyright: ignore[reportUnknownLambdaType]
+                with_indices=True,
+                num_proc=config.algorithm.num_proc,
+                desc="Indexing",
+            )
             return cast(Dataset, ds)
 
         case LocalInputConfig():
             _INTERNAL_INDEX_COLUMN = config.algorithm.internal_index_column
 
             disable_progress_bars()
-            ds = hf_load_dataset(**config.input.read_arguments)  # pyright: ignore[reportAny]
+            with use_tqdm():
+                ds = hf_load_dataset(**config.input.read_arguments)  # pyright: ignore[reportAny]
             enable_progress_bars()
 
             if not isinstance(ds, Dataset):

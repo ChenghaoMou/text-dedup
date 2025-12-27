@@ -1,10 +1,11 @@
+from collections import defaultdict
+from typing import Any
 from typing import cast
 
-import polars as pl
 from bitarray import frozenbitarray
 from datasets import Dataset
-from polars.dataframe import DataFrame
-from polars_grouper import super_merger
+from rich.progress import track
+from tqdm import tqdm
 
 from text_dedup.config import Config
 from text_dedup.config import SimHashAlgorithmConfig
@@ -12,7 +13,9 @@ from text_dedup.data_sources.io import load_dataset
 from text_dedup.data_sources.io import save_dataset
 from text_dedup.utils.jaccard import jaccard_similarity
 from text_dedup.utils.logger import log
+from text_dedup.utils.progress import use_custom_progress_bar
 from text_dedup.utils.timer import Timer
+from text_dedup.utils.union_find import UnionFind
 
 
 def load_and_preprocess(config: Config) -> tuple[Dataset, int]:
@@ -38,49 +41,34 @@ def fingerprint(config: Config, ds: Dataset) -> Dataset:
 
 
 def cluster(config: Config, ds: Dataset) -> dict[int, int]:
-    """Cluster the dataset."""
     algo = cast(SimHashAlgorithmConfig, config.algorithm)
-    signatures: DataFrame = ds.select_columns(["__key__", "__val__", algo.internal_index_column]).to_polars()  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+    uf = UnionFind()
+    buckets: dict[Any, list[tuple[int, frozenbitarray]]] = defaultdict(list)
 
-    clusters = (
-        signatures.group_by(["__key__"])
-        .agg(items=pl.struct(["__val__", algo.internal_index_column]))
-        .filter(pl.col("items").list.len() > 1)
-        .with_row_index(name="index")
-        .drop("__key__")
-    )
+    # Get the data columns we need
+    indices = ds[algo.internal_index_column]
+    keys_list = ds["__key__"]
+    vals_list = ds["__val__"]
 
-    exploded_df = clusters.explode("items")
-    combinations = (
-        exploded_df.join(exploded_df, on="index")
-        .filter(
-            pl.col("items").struct.field(algo.internal_index_column)
-            < pl.col("items_right").struct.field(algo.internal_index_column)
-        )
-        .with_columns(
-            hamming_score=pl.struct(pl.all()).map_elements(
-                lambda record: algo.hamming_distance(
-                    frozenbitarray(record["items"]["__val__"]),
-                    frozenbitarray(record["items_right"]["__val__"]),
-                ),
-                return_dtype=pl.Int64,
-            )
-        )
-        .filter(pl.col("hamming_score") <= algo.bit_diff)
-        .select([
-            pl.col("items").struct.field(algo.internal_index_column).alias("src"),
-            pl.col("items_right").struct.field(algo.internal_index_column).alias("dst"),
-        ])
-        .unique()
-    )
+    for idx, key, sig_bytes in track(
+        zip(indices, keys_list, vals_list, strict=True),
+        description="Clustering...",
+        total=len(ds),
+        transient=True,
+    ):
+        sig = frozenbitarray(buffer=sig_bytes)
+        key_tuple = tuple(key)
 
-    grouped = super_merger(combinations, from_col_name="src", to_col_name="dst")
-    mapping = pl.concat([
-        grouped.select(pl.col("src").alias("id"), pl.col("group").alias("cluster")).unique(),
-        grouped.select(pl.col("dst").alias("id"), pl.col("group").alias("cluster")).unique(),
-    ]).unique()
+        for other_idx, other_sig in buckets[key_tuple]:
+            if other_idx == idx:
+                continue
+            if (sig ^ other_sig).count(1) <= algo.bit_diff:
+                uf.union(idx, other_idx)
 
-    return dict(mapping.iter_rows(named=False))
+        buckets[key_tuple].append((idx, sig))
+
+    clusters = uf.get_clusters()
+    return {k: v for k, v in clusters.items() if k != v}
 
 
 def assign(config: Config, ds: Dataset, parents: dict[int, int]) -> Dataset:
@@ -103,52 +91,64 @@ def assign(config: Config, ds: Dataset, parents: dict[int, int]) -> Dataset:
 
 
 def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[int, int]]:
-    """Check false positives."""
+    """
+    Check false positives using Jaccard similarity.
+
+    This version avoids polars map_elements by doing the computation in Python directly.
+    """
     algo = cast(SimHashAlgorithmConfig, config.algorithm)
-    ds_candidates = ds.filter(
+
+    # Filter to only candidates (items marked as duplicates)
+    ds_candidates: Dataset = ds.filter(
         function=lambda x: x["__duplicate__"],  # pyright: ignore[reportUnknownLambdaType]
         num_proc=algo.num_proc,
     )
-    candidates: DataFrame = ds_candidates.select_columns([  # pyright: ignore[reportAssignmentType]
-        algo.internal_index_column,
-        algo.text_column,
-        algo.cluster_column,
-    ]).to_polars()
-    cluster_num = candidates.unique(algo.cluster_column).shape[0]
-    candidates = candidates.join(candidates, on=algo.cluster_column).filter(
-        pl.col(algo.internal_index_column) < pl.col(f"{algo.internal_index_column}_right")
-    )
-    verified_pairs = len(candidates)
+
+    if len(ds_candidates) == 0:
+        return ds, {}
+
+    # Group candidates by cluster
+    cluster_groups: dict[int, list[tuple[int, str]]] = defaultdict(list)
+    for i in range(len(ds_candidates)):
+        record = ds_candidates[i]
+        cluster_id = record[algo.cluster_column]
+        idx = record[algo.internal_index_column]
+        text = record[algo.text_column]
+        cluster_groups[cluster_id].append((idx, text))
+
+    cluster_num = len(cluster_groups)
     tokenizer = algo.get_ngrams_func()
-    results = (
-        candidates.with_columns(
-            jaccard_score=pl.struct(pl.all()).map_elements(
-                lambda record: jaccard_similarity(  # pyright: ignore[reportAny]
-                    set(tokenizer(record[algo.text_column])),  # pyright: ignore[reportAny]
-                    set(tokenizer(record[f"{algo.text_column}_right"])),  # pyright: ignore[reportAny]
-                ),
-                return_dtype=pl.Float64,
-            )
-        )
-        .filter(pl.col("jaccard_score") >= algo.jaccard_threshold)
-        .with_columns([
-            pl.col(algo.internal_index_column).alias("idx1"),
-            pl.col(f"{algo.internal_index_column}_right").alias("idx2"),
-        ])
-    )
 
-    assignment = (
-        results.select([pl.col("idx1").alias("idx"), pl.col(algo.cluster_column)])
-        .vstack(results.select([pl.col("idx2").alias("idx"), pl.col(algo.cluster_column)]))
-        .unique()
-        # update the cluster id to the minimum index
-        .group_by(algo.cluster_column)
-        .agg(pl.col("idx"), pl.min("idx").alias("cluster_id"))
-        .select([pl.col("idx"), pl.col("cluster_id")])
-        .explode("idx")
-    )
+    # Verify pairs within each cluster
+    verified_pairs = 0
+    true_pairs: list[tuple[int, int, int]] = []  # (idx1, idx2, cluster_id)
 
-    new_parents = dict(assignment.iter_rows(named=False))
+    for cluster_id, members in tqdm(cluster_groups.items(), desc="Verifying clusters..."):
+        if len(members) < 2:
+            continue
+
+        # Compare all pairs within this cluster
+        for i, (idx1, text1) in enumerate(members):
+            tokens1 = set(tokenizer(text1))
+            for j in range(i + 1, len(members)):
+                idx2, text2 = members[j]
+                verified_pairs += 1
+
+                tokens2 = set(tokenizer(text2))
+                similarity = jaccard_similarity(tokens1, tokens2)
+
+                if similarity >= algo.jaccard_threshold:
+                    true_pairs.append((idx1, idx2, cluster_id))
+
+    # Build new cluster assignments from verified pairs
+    uf = UnionFind()
+    for idx1, idx2, _ in true_pairs:
+        uf.union(idx1, idx2)
+
+    new_parents = uf.get_clusters()
+    # Only keep non-trivial assignments
+    new_parents = {k: v for k, v in new_parents.items() if k != v}
+
     total_true_positives = len(new_parents)
     total_false_positives = len(ds_candidates) - total_true_positives
     total_true_positive_clusters = len(set(new_parents.values()))
@@ -201,14 +201,14 @@ def main(config: Config) -> None:
     timer = Timer()
     algo = cast(SimHashAlgorithmConfig, config.algorithm)
 
-    with timer("Total", enable_spin=False):
+    with timer("Total", enable_spin=False), use_custom_progress_bar():
         with timer("Preprocessing", enable_spin=False):
             ds, ORIGINAL_LEN = load_and_preprocess(config)
 
         with timer("SimHashing", enable_spin=False):
             embedded = fingerprint(config, ds)
 
-        with timer("Clustering"):
+        with timer("Clustering", enable_spin=False):
             assignment = cluster(config, embedded)
             ds = assign(config, ds, assignment)
 
@@ -237,13 +237,12 @@ if __name__ == "__main__":
     from text_dedup.utils.env import check_env
     from text_dedup.utils.progress import use_custom_progress_bar
 
-    with use_custom_progress_bar():
-        config = CliApp.run(Config)
-        check_env()
-        if config.debug.enable_profiling:
-            from scalene.scalene_profiler import enable_profiling
+    config = CliApp.run(Config)
+    check_env()
+    if config.debug.enable_profiling:
+        from scalene.scalene_profiler import enable_profiling
 
-            with enable_profiling():
-                main(config)
-        else:
+        with enable_profiling():
             main(config)
+    else:
+        main(config)

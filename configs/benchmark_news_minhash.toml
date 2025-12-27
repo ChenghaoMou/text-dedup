@@ -1,0 +1,29 @@
+# Configuration for MinHash benchmark on NEWS-COPY dataset
+
+[input]
+input_type = "local_hf_dataset"
+
+[input.read_arguments]
+dataset_path = "chenghao/NEWS-COPY-eval"
+split = "test"
+
+[algorithm]
+algorithm_name = "minhash"
+num_proc = 6
+text_column = "text"
+num_perm = 256
+hash_func_name = "xxh3"
+ngram_size = 2
+threshold = 0.45
+min_length = 0
+seed = 42
+check_false_positive = false
+
+[output]
+output_dir = "./output/benchmark_news_minhash"
+save_clusters = true
+keep_cluster_column = true
+clean_cache = true
+
+[debug]
+enable_profiling = false

@@ -8,12 +8,12 @@ from rich.progress import TaskID
 
 
 class CustomProgressBar:
-    def __init__(self, unit: str, total: int, initial: int = 0, desc: str = ""):
+    def __init__(self, unit: str, total: int, initial: int = 0, desc: str = "", disable: bool = False):
         self.unit: str = unit
         self.total: int = total
         self.initial: int = initial
         self.desc: str = desc
-        self.progress: Progress = Progress(transient=True)
+        self.progress: Progress = Progress(transient=True, disable=disable)
         self.task: TaskID | None = None
 
     def __enter__(self) -> Self:
@@ -52,6 +52,20 @@ def use_custom_progress_bar() -> Generator[None, None, None]:
     with (
         patch("datasets.utils.tqdm", CustomProgressBar),
         patch("datasets.arrow_dataset.hf_tqdm", CustomProgressBar),
+        # patch("datasets.arrow_reader.hf_tqdm", track),
+    ):
+        yield
+
+
+@contextmanager
+def use_tqdm() -> Generator[None, None, None]:
+    from unittest.mock import patch
+
+    from tqdm import tqdm
+
+    with (
+        patch("datasets.utils.tqdm", tqdm),
+        patch("datasets.arrow_dataset.hf_tqdm", tqdm),
         # patch("datasets.arrow_reader.hf_tqdm", track),
     ):
         yield

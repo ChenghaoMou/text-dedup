@@ -18,11 +18,7 @@ cache_dir = ".cache"
 
 [output]
 output_dir = "output"
-clean_cache = false
-save_clusters = false
-keep_index_column = false
-keep_cluster_column = false
-skip_filtering = false
+clean_cache = true
 
 [debug]
 enable_profiling = false

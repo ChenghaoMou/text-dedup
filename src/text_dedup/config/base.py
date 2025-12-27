@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 from typing import override
 
@@ -40,3 +41,25 @@ class Config(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:  # pragma: no cover
         return (TomlConfigSettingsSource(settings_cls),)
+
+
+def load_config_from_toml(toml_path: Path) -> Config:
+    """Load Config from a TOML file.
+
+    Parameters
+    ----------
+    toml_path : Path
+        Path to the TOML configuration file
+
+    Returns
+    -------
+    Config
+        Loaded configuration object
+    """
+    original_config = Config.model_config.copy()
+    Config.model_config = SettingsConfigDict(toml_file=str(toml_path))
+    try:
+        config = Config()  # pyright: ignore[reportCallIssue]
+    finally:
+        Config.model_config = original_config
+    return config
