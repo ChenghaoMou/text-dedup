@@ -14,6 +14,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: Set up Just
+        uses: extractions/setup-just@v3
+
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
@@ -23,7 +26,6 @@ jobs:
         uses: ./.github/actions/setup-python-env
 
       - name: Run checks
-        uses: extractions/setup-just@v3
         run: just check
 
   tests-and-type-check:
