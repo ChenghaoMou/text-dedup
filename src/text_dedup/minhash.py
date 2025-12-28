@@ -224,9 +224,7 @@ def main(config: Config) -> None:
 if __name__ == "__main__":
     from pydantic_settings import CliApp
 
-    from text_dedup.config.base import Config
     from text_dedup.utils.env import check_env
-    from text_dedup.utils.progress import use_custom_progress_bar
 
     config = CliApp.run(Config)
     check_env()

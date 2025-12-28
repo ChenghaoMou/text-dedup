@@ -235,7 +235,7 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
         for idx, s in self.restore(boundaries, segments):
             if s.stop - s.start >= k:
                 results[int(idx)].append(s)
-        for i in range(len(results)):
+        for i, _ in enumerate(results):
             results[i] = self.merge_intervals(results[i], merge_strategy)
             duplicate_size += sum([s.stop - s.start for s in results[i]])
         return results, duplicate_size

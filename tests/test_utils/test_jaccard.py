@@ -193,12 +193,12 @@ class TestClusterJaccardSimilarity:
 
         # Test with threshold just below the similarity
         threshold = 0.33
-        similarities, fp_rate = cluster_jaccard_similarity(cluster, threshold)
+        _, fp_rate = cluster_jaccard_similarity(cluster, threshold)
         assert fp_rate == 0.0  # Both docs above threshold
 
         # Test with threshold just above the similarity
         threshold = 0.34
-        similarities, fp_rate = cluster_jaccard_similarity(cluster, threshold)
+        _, fp_rate = cluster_jaccard_similarity(cluster, threshold)
         assert fp_rate == 1.0  # Both docs below threshold
 
     def test_cluster_jaccard_similarity_value_error_handling(self) -> None:

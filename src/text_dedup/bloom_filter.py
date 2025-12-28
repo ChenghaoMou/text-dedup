@@ -97,7 +97,6 @@ def main(config: Config) -> None:
 if __name__ == "__main__":
     from pydantic_settings import CliApp
 
-    from text_dedup.config.base import Config
     from text_dedup.utils.env import check_env
 
     config = CliApp.run(Config)

@@ -109,8 +109,7 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
 
     # Group candidates by cluster
     cluster_groups: dict[int, list[tuple[int, str]]] = defaultdict(list)
-    for i in range(len(ds_candidates)):
-        record = ds_candidates[i]
+    for _, record in enumerate(ds_candidates):
         cluster_id = record[algo.cluster_column]
         idx = record[algo.internal_index_column]
         text = record[algo.text_column]
@@ -233,9 +232,7 @@ def main(config: Config) -> None:
 if __name__ == "__main__":
     from pydantic_settings import CliApp
 
-    from text_dedup.config.base import Config
     from text_dedup.utils.env import check_env
-    from text_dedup.utils.progress import use_custom_progress_bar
 
     config = CliApp.run(Config)
     check_env()

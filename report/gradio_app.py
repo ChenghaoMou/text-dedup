@@ -470,9 +470,7 @@ def create_gradio_app() -> gr.Blocks:
                 )
 
             load_btn.click(
-                fn=lambda directory, text_col, cluster_col, index_col: visualizer.load_dataset(
-                    directory, text_col, cluster_col, index_col
-                ),
+                fn=visualizer.load_dataset,
                 inputs=[output_dir, text_column, cluster_column, index_column],
                 outputs=[summary_stats, load_status, cluster_size_slider],
             )
