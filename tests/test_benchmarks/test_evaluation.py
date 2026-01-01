@@ -34,7 +34,7 @@ class TestPrepareGroundTruth:
             {"core_id": "3", "labelled_duplicates": None},
         ]
 
-        id_to_core_id, labels = prepare_ground_truth(dataset)
+        _, labels = prepare_ground_truth(dataset)
 
         assert labels["1"] == set()
         assert labels["2"] == set()
@@ -48,7 +48,7 @@ class TestPrepareGroundTruth:
             {"core_id": "4", "labelled_duplicates": ["1", "2", "3"]},
         ]
 
-        id_to_core_id, labels = prepare_ground_truth(dataset)
+        _, labels = prepare_ground_truth(dataset)
 
         assert len(labels) == 4
         assert labels["1"] == {"2", "3", "4"}
@@ -61,7 +61,7 @@ class TestPrepareGroundTruth:
             {"core_id": "3", "labelled_duplicates": None},
         ]
 
-        id_to_core_id, labels = prepare_ground_truth(dataset)
+        _, labels = prepare_ground_truth(dataset)
 
         assert labels["1"] == {"2"}
         assert labels["2"] == {"1"}
