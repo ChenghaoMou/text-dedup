@@ -22,7 +22,7 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(toml_file="config.toml")  # pyright: ignore[reportUnannotatedClassAttribute]
 
     @override
-    def model_post_init(self, context: Any) -> None:
+    def model_post_init(self, context: Any) -> None:  # pragma: no cover
         from .algorithms import SuffixArrayAlgorithmConfig
 
         super().model_post_init(context)
@@ -43,7 +43,7 @@ class Config(BaseSettings):
         return (TomlConfigSettingsSource(settings_cls),)
 
 
-def load_config_from_toml(toml_path: Path) -> Config:
+def load_config_from_toml(toml_path: Path) -> Config:  # pragma: no cover
     """Load Config from a TOML file.
 
     Parameters

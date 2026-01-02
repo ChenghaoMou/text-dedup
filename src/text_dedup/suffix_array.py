@@ -109,7 +109,7 @@ def main(config: Config) -> None:
     timer.report({"Before": f"{ORIGINAL_SIZE / 1024 / 1024:.2f} MB", "After": f"{ds.data.nbytes / 1024 / 1024:.2f} MB"})
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     from pydantic_settings import CliApp
 
     from text_dedup.utils.env import check_env

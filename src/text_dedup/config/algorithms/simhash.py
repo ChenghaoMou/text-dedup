@@ -178,9 +178,9 @@ def hamming_distance(a: bitarray, b: bitarray) -> int:
 
     Examples
     --------
-    >>> _hamming_distance(bitarray("1010"), bitarray("1010"))
+    >>> hamming_distance(bitarray("1010"), bitarray("1010"))
     0
-    >>> _hamming_distance(bitarray("1010"), bitarray("0010"))
+    >>> hamming_distance(bitarray("1010"), bitarray("0010"))
     1
     """
     return (a ^ b).count(1)
@@ -198,6 +198,8 @@ def _unsigned_hash(obj: bytes, hash_func: Callable[[bytes], int], length: int) -
         The object to hash.
     hash_func: Callable
         The hash function to use.
+    length: int
+        The length in bytes of the hash.
 
     Returns
     -------
@@ -206,9 +208,10 @@ def _unsigned_hash(obj: bytes, hash_func: Callable[[bytes], int], length: int) -
 
     Examples
     --------
-    >>> len(_unsigned_hash(b"hello world", xxh3_64_digest))
+    >>> from text_dedup.utils.hashfunc import xxh3_hash
+    >>> len(_unsigned_hash(b"hello world", lambda x: xxh3_hash(x, bits=64), length=8))
     64
-    >>> len(_unsigned_hash(b"hello world", xxh3_128_digest))
+    >>> len(_unsigned_hash(b"hello world", lambda x: xxh3_hash(x, bits=128), length=16))
     128
     """
     result = bitarray(0)
@@ -395,9 +398,9 @@ class SimHashAlgorithmConfig(AlgorithmConfig):
 
         Examples
         --------
-        >>> _hamming_distance(bitarray("1010"), bitarray("1010"))
+        >>> SimHashAlgorithmConfig.hamming_distance(bitarray("1010"), bitarray("1010"))
         0
-        >>> _hamming_distance(bitarray("1010"), bitarray("0010"))
+        >>> SimHashAlgorithmConfig.hamming_distance(bitarray("1010"), bitarray("0010"))
         1
         """
         return (a ^ b).count(1)
@@ -414,10 +417,10 @@ class SimHashAlgorithmConfig(AlgorithmConfig):
         Examples
         --------
         >>> from bitarray.util import urandom
-        >>> perms = _create_permutations(128, 3, 4)
+        >>> perms = SimHashAlgorithmConfig(text_column="").create_permutations()
         >>> len(perms)
         4
-        >>> data = urandom(128)
+        >>> data = urandom(perms[0].f)
         >>> for perm in perms:
         ...     assert perm.reverse(perm.permute(data)) == data, f"{perm.reverse(perm.permute(data))} != {data}"
         """

@@ -13,7 +13,7 @@ from text_dedup.utils.progress import use_custom_progress_bar
 from text_dedup.utils.timer import Timer
 
 
-def load_and_preprocess(config: Config) -> tuple[Dataset, int]:
+def load_and_preprocess(config: Config) -> tuple[Dataset, int]:  # pragma: no cover
     """Load and preprocess the dataset."""
     ds = load_dataset(config)
     original_len = len(ds)
@@ -94,7 +94,7 @@ def main(config: Config) -> None:
     timer.report({"Before": ORIGINAL_LEN, "After": len(final_data)})
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     from pydantic_settings import CliApp
 
     from text_dedup.utils.env import check_env

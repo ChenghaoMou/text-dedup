@@ -17,8 +17,8 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
     google_repo_path: str = "third_party/deduplicate-text-datasets"
     cache_dir: str = ".cache"
 
+    @staticmethod
     def merge_intervals(
-        self,
         intervals: list[slice],
         merge_strategy: Literal["longest", "overlapping"] = "longest",
     ) -> list[slice]:
@@ -42,7 +42,7 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
 
         Examples
         --------
-        >>> merge_intervals(
+        >>> SuffixArrayAlgorithmConfig.merge_intervals(
         ...     [
         ...         slice(0, 10, None),
         ...         slice(1, 11, None),
@@ -56,7 +56,7 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
         ...     merge_strategy="overlapping",
         ... )
         [slice(0, 21, None)]
-        >>> merge_intervals(
+        >>> SuffixArrayAlgorithmConfig.merge_intervals(
         ...     [
         ...         slice(0, 10, None),
         ...         slice(1, 11, None),
@@ -70,11 +70,11 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
         ...     merge_strategy="longest",
         ... )  # doctest: +ELLIPSIS
         [slice(0, 10, None), slice(1, 11, None), slice(2, 12, None), ... slice(7, 21, None)]
-        >>> merge_intervals([slice(0, 2), slice(2, 4), slice(4, 5)], "overlapping")
+        >>> SuffixArrayAlgorithmConfig.merge_intervals([slice(0, 2), slice(2, 4), slice(4, 5)], "overlapping")
         [slice(0, 5, None)]
-        >>> merge_intervals([slice(0, 4), slice(2, 4), slice(4, 5)], "longest")
+        >>> SuffixArrayAlgorithmConfig.merge_intervals([slice(0, 4), slice(2, 4), slice(4, 5)], "longest")
         [slice(0, 4, None), slice(4, 5, None)]
-        >>> merge_intervals(
+        >>> SuffixArrayAlgorithmConfig.merge_intervals(
         ...     [slice(0, 10, None), slice(0, 10, None), slice(0, 10, None), slice(0, 10, None), slice(0, 10, None)]
         ... )
         [slice(0, 10, None)]
@@ -112,8 +112,8 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
 
         return merged
 
+    @staticmethod
     def restore(  # noqa: C901
-        self,
         boundaries: list[slice],
         segments: str | Path | list[slice],
     ) -> Generator[tuple[int, slice], None, None]:
@@ -135,7 +135,7 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
         Examples
         --------
         >>> list(
-        ...     restore(
+        ...     SuffixArrayAlgorithmConfig.restore(
         ...         [slice(0, 10, None), slice(10, 20, None)],
         ...         [slice(0, 5, None), slice(5, 10, None), slice(5, 15, None), slice(5, 19, None)],
         ...     )
@@ -187,8 +187,8 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
                         indices.appendleft(slice(s.stop, y))
                     break
 
+    @staticmethod
     def restore_and_merge(
-        self,
         boundaries: list[slice],
         segments: str | Path | list[slice],
         k: int,
@@ -215,14 +215,14 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
 
         Examples
         --------
-        >>> restore_and_merge(
+        >>> SuffixArrayAlgorithmConfig.restore_and_merge(
         ...     [slice(0, 10, None), slice(10, 20, None)],
         ...     [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
         ...     5,
         ...     "longest",
         ... )
         ([[slice(0, 5, None), slice(5, 10, None)], [slice(2, 9, None)]], 17)
-        >>> restore_and_merge(
+        >>> SuffixArrayAlgorithmConfig.restore_and_merge(
         ...     [slice(0, 10, None), slice(10, 20, None)],
         ...     [slice(0, 5, None), slice(5, 10, None), slice(12, 19, None)],
         ...     5,
@@ -232,11 +232,11 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
         """
         duplicate_size = 0
         results: list[list[slice]] = [[] for _ in boundaries]
-        for idx, s in self.restore(boundaries, segments):
+        for idx, s in SuffixArrayAlgorithmConfig.restore(boundaries, segments):
             if s.stop - s.start >= k:
                 results[int(idx)].append(s)
         for i, _ in enumerate(results):
-            results[i] = self.merge_intervals(results[i], merge_strategy)
+            results[i] = SuffixArrayAlgorithmConfig.merge_intervals(results[i], merge_strategy)
             duplicate_size += sum([s.stop - s.start for s in results[i]])
         return results, duplicate_size
 
@@ -257,7 +257,8 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
                 error_msg += f"\nstderr:\n{stderr.decode(errors='replace')}"
             raise RuntimeError(error_msg)
 
-    def clean_up(self, text: str, slices: list[slice]) -> str:
+    @staticmethod
+    def clean_up(text: str, slices: list[slice]) -> str:
         """
         Remove duplicate substrings from the text.
 
@@ -275,7 +276,7 @@ class SuffixArrayAlgorithmConfig(AlgorithmConfig):
 
         Examples
         --------
-        >>> clean_up("This is a test.", [slice(0, 4, None), slice(5, 7, None)])
+        >>> SuffixArrayAlgorithmConfig.clean_up("This is a test.", [slice(0, 4, None), slice(5, 7, None)])
         '  a test.'
         """
         byte_array = bytearray(text, "utf-8")

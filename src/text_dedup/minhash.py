@@ -221,7 +221,7 @@ def main(config: Config) -> None:
     timer.report({"Before": ORIGINAL_LEN, "After": len(final_data)})
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     from pydantic_settings import CliApp
 
     from text_dedup.utils.env import check_env
