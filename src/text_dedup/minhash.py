@@ -69,6 +69,13 @@ def cluster(config: Config, ds: Dataset) -> dict[int, int]:
         grouped.select(pl.col("dst").alias("id"), pl.col("group").alias("cluster")).unique(),
     ]).unique()
 
+    mapping = (
+        mapping.group_by("group")
+        .agg(pl.col("id"), pl.min("id").alias("cluster"))
+        .select(pl.col("id"), pl.col("cluster"))
+        .explode("id")
+    )
+
     return dict(mapping.iter_rows(named=False))
 
 
