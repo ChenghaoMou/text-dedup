@@ -107,6 +107,7 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
     if len(ds_candidates) == 0:
         return ds, {}
 
+    
     # Group candidates by cluster
     cluster_groups: dict[int, list[tuple[int, str]]] = defaultdict(list)
     for _, record in enumerate(ds_candidates):
@@ -114,7 +115,23 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
         idx = record[algo.internal_index_column]
         text = record[algo.text_column]
         cluster_groups[cluster_id].append((idx, text))
-
+    # add root data into cluster_groups
+    root_ids = set(cluster_groups.keys())
+    for root_id in root_ids:
+        record = ds[root_id]
+        cluster_groups[root_id].insert(0, (root_id, record[algo.text_column]))
+    
+    # If the dataset order ever stops matching the internal index, switch to
+    # the filter-based fallback below. It can use multiprocessing but scans
+    # the dataset and materializes a temporary Dataset.
+    # ds_roots = ds.filter(
+    #     function=lambda x: x[algo.internal_index_column] in root_ids,
+    #     num_proc=algo.num_proc,
+    # )
+    # for record in ds_roots:
+    #     root_id = record[algo.internal_index_column]
+    #     cluster_groups[root_id].insert(0, (root_id, record[algo.text_column]))
+    
     cluster_num = len(cluster_groups)
     tokenizer = algo.get_ngrams_func()
 
@@ -156,13 +173,13 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
     log.info(f"False Positives   : {total_false_positives}")
     log.info(f"True Positives    : {total_true_positives}")
     log.info(f"True Clusters     : {total_true_positive_clusters}")
-
     ds = ds.map(
         function=lambda record: {  # pyright: ignore[reportUnknownLambdaType]
             algo.cluster_column: new_parents.get(
                 record[algo.internal_index_column],
                 record[algo.internal_index_column],  # pyright: ignore[reportUnknownArgumentType]
-            )
+            ),
+            "__duplicate__": record[algo.internal_index_column] in new_parents,
         },
         with_indices=False,
         # ! new_parents is pickled
