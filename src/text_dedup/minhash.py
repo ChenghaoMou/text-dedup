@@ -132,17 +132,22 @@ def check_false_positives(config: Config, ds: Dataset) -> tuple[Dataset, dict[in
             pl.col(f"{algo.internal_index_column}_right").alias("idx2"),
         ])
     )
-
-    assignment = (
-        results.select([pl.col("idx1").alias("idx"), pl.col(algo.cluster_column)])
-        .vstack(results.select([pl.col("idx2").alias("idx"), pl.col(algo.cluster_column)]))
-        .unique()
-        # update the cluster id to the minimum index
-        .group_by(algo.cluster_column)
-        .agg(pl.col("idx"), pl.min("idx").alias("cluster_id"))
-        .select([pl.col("idx"), pl.col("cluster_id")])
-        .explode("idx")
-    )
+    verified_edges = results.select(["idx1", "idx2"]).unique()
+    if verified_edges.is_empty():
+        assignment = pl.DataFrame(schema={"idx": pl.Int64, "cluster_id": pl.Int64})
+    else:
+        grouped = super_merger(verified_edges, from_col_name="idx1", to_col_name="idx2")
+        assignment = (
+            pl.concat([
+                grouped.select(pl.col("idx1").alias("idx"), pl.col("group")).unique(),
+                grouped.select(pl.col("idx2").alias("idx"), pl.col("group")).unique(),
+            ])
+            .unique()
+            .group_by("group")
+            .agg(pl.col("idx"), pl.min("idx").alias("cluster_id"))
+            .select([pl.col("idx"), pl.col("cluster_id")])
+            .explode("idx")
+        )
 
     new_parents = dict(assignment.iter_rows(named=False))
     total_true_positives = len(new_parents)
